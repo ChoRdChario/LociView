@@ -1,5 +1,6 @@
 import type { Field } from '../../scene/types';
 import { sceneSwitchReason, type CaptionOwnerFilter, type PendingInteraction, type SceneUiMemory } from './navigationState';
+import type { CaptionTextPreview } from './captionDetailState';
 
 /** Validated read projection, not a wire format or an untrusted-data validator. */
 export interface CaptionListItem {
@@ -26,6 +27,7 @@ export interface CaptionListContext {
   readonly showModelPending?: PendingInteraction | null;
   /** Host's reason that shared edits are unavailable. Local finding still works. */
   readonly mutationBlock: string | null;
+  readonly preview?: CaptionTextPreview;
 }
 export type CaptionListIntent =
   | Readonly<{ kind: 'search'; query: string }>

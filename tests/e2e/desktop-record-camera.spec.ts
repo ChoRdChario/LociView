@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 import * as A from '@automerge/automerge';
 import {ownedServer} from '../offline-e2e/server';
 import {triangleGlb,smallPng} from './fixtures';
-import { chooseHomeFiles, revealCoordinateAdd,revealCameraPositions,revealModelManagement,revealFileSurface,revealWorkPanel } from './workspaceUi';
+import { finishCaptionEditing, chooseHomeFiles, revealCoordinateAdd,revealCameraPositions,revealModelManagement,revealFileSurface,revealWorkPanel } from './workspaceUi';
 import {BackupArchive} from '../../src/projectPackage/backupArchive';
 import {validationMetadataLimits} from '../../src/projectFiles/validation';
 
@@ -31,7 +31,7 @@ test('record list, pin actions and direct camera navigation remain coherent thro
     for(const [name,x] of [['確認点A','0'],['確認点B','.2'],['確認点C','-.2']]){
       await revealCoordinateAdd(p);const owner=p.getByLabel('追加先モデル',{exact:true});await owner.focus();await owner.selectOption({label:'模型A.glb'});await p.getByRole('button',{name:'このモデルに追加',exact:true}).click();
       for(const axis of ['X','Y','Z'])await pin.getByLabel('位置 '+axis,{exact:true}).fill(axis==='X'?x!:axis==='Y'?'.5':'0');await pin.getByRole('button',{name:'ここに記録を作る',exact:true}).click();await ready('ピンの位置を確定しました。');
-      await detail.getByLabel('タイトル',{exact:true}).fill(name!);await detail.getByLabel('本文',{exact:true}).fill('一覧を見ながら確認する本文');await expect(list).toBeInViewport();await expect(detail.getByRole('button',{name:'変更を適用',exact:true})).toBeInViewport({ratio:1});await detail.getByRole('button',{name:'変更を適用',exact:true}).click();await ready('変更を適用しました。');
+      await detail.getByLabel('タイトル',{exact:true}).fill(name!);await detail.getByLabel('本文',{exact:true}).fill('一覧を見ながら確認する本文');await expect(list).toBeInViewport();await expect(detail.getByLabel('本文',{exact:true})).toBeInViewport({ratio:1});await expect(detail.getByRole('button',{name:'変更を適用',exact:true})).toBeHidden();await finishCaptionEditing(p, {title:name!,body:'一覧を見ながら確認する本文'}, 90_000);
     }
     await gizmo.getByRole('button',{name:'Z',exact:true}).press('Enter');await expect(p.locator('.lv-project-marker')).toHaveCount(3);
     const unselected=p.locator('.lv-project-marker[aria-pressed="false"]').filter({hasText:'確認点A'});await expect(unselected).toHaveText('確認点A');expect(await unselected.evaluate(n=>getComputedStyle(n).fontSize)).toBe('0px');expect((await unselected.boundingBox())!.width).toBeGreaterThanOrEqual(44);
@@ -74,7 +74,7 @@ test('record list, pin actions and direct camera navigation remain coherent thro
     await expect(detail.getByLabel('タイトル',{exact:true})).toHaveValue('確認点A');
     await tools.getByRole('button',{name:'位置を調整',exact:true}).click();await expect(pin).toBeVisible();await pin.getByRole('button',{name:'取り消す',exact:true}).click();
     await tools.getByText('配置先モデルを変更',{exact:true}).click();const parent=tools.getByLabel('変更先モデル',{exact:true});await parent.focus();await parent.selectOption({label:'模型B.glb'});await tools.getByRole('button',{name:'位置を確認',exact:true}).click();await expect(pin.getByRole('button',{name:'配置先と位置を確定',exact:true})).toBeEnabled();await pin.getByRole('button',{name:'取り消す',exact:true}).click();
-    await detail.getByLabel('本文',{exact:true}).focus();const choosePhoto=p.waitForEvent('filechooser');await p.getByLabel('メディアを追加',{exact:true}).click();await(await choosePhoto).setFiles({name:'確認画像.png',mimeType:'image/png',buffer:smallPng()});await p.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await ready('メディアを追加しました。');await p.screenshot({path:info.outputPath('list-and-detail.png'),fullPage:false});
+    await detail.getByLabel('本文',{exact:true}).focus();const choosePhoto=p.waitForEvent('filechooser');await p.getByLabel('メディアを追加',{exact:true}).click();await(await choosePhoto).setFiles({name:'確認画像.png',mimeType:'image/png',buffer:smallPng()});await finishCaptionEditing(p, {}, 90_000);await p.screenshot({path:info.outputPath('list-and-detail.png'),fullPage:false});
     const before=await backup('before-camera');await gizmo.getByRole('button',{name:'Z',exact:true}).press('Enter');const z=gizmo.getByRole('button',{name:'Z',exact:true}),initialAxis=await z.getAttribute('style');
     const canvas=p.getByLabel('3Dモデルの表示',{exact:true}),captureCanvas=(name:string)=>canvas.screenshot({path:info.outputPath(name),scale:'device',style:'.lv-project-markers,.lv-development-pin-layer,.lv-caption-windows,.lv-caption-window-line,.lv-context-help-note{visibility:hidden!important}'});await drag(canvas,35,15);await expect(z).toHaveAttribute('aria-pressed','false');await z.press('Enter');
     const selectedTitle=await detail.getByLabel('タイトル',{exact:true}).inputValue(),rootPin=p.locator('.lv-project-marker').filter({hasText:'確認点A'});await drag(rootPin,25,15);await expect(z).toHaveAttribute('aria-pressed','false');await expect(detail.getByLabel('タイトル',{exact:true})).toHaveValue(selectedTitle);await z.press('Enter');

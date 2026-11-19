@@ -1,6 +1,7 @@
 # Caption autosave and immediate reading preview
 
-Status: **Product direction confirmed2026-11-18; engineering proposal, not implemented.**
+Status: **Product direction confirmed2026-11-18; implementation authorized and bounded Desktop/offline implementation verified2026-11-19.**
+Executed PC/touch-equivalent scope and remaining device acceptance belong in todo.
 The owner supplied their followup discussion and asked that it guide development.
 It explicitly chooses Caption autosave without a routine Apply button, separates
 immediate display from durable saving, and keeps editing beside the list while
@@ -20,20 +21,21 @@ autosave for models/materials or public release is included.
 
 ## 2. Admission and the known recovery dependency
 
-Current implementation still follows specification08's explicit text-then-media
-Apply. Do not remove that completion path before the replacement is qualified.
+Before this unit, implementation followed specification08's explicit text-then-media
+Apply. The bounded product-only replacement is implemented; harnesses retain explicit
+Apply. Executed checks and connection status belong in todo.
 The new schedule must not bypass Session commands, validation, readback,
 publication or recovery fences.
 
-The reproduced cold local-command start without prepared data currently leaves
-the Project pending and fails `incomplete-staging-repair`. A UI exit does not
-repair this state. More frequent automatic writes increase exposure to it.
-Define and independently review its safe terminal recovery before connecting
-autosave. Any new Journal terminal state or restored-generation admission rule
-requires its own explicit storage contract. Preserve every interrupted byte and
-every acknowledged change. Do not ignore, delete or overwrite bad receipts.
+The reproduced baseline cold local-command start without prepared data left
+the Project pending with `incomplete-staging-repair`. A UI exit alone did not
+repair it.06j now qualifies the start-only closure; the additional normal
+process-cut states are explicitly approved in06k. More frequent automatic writes
+require those bounded paths to pass before the new workflow is qualified.
+Preserve every interrupted byte and every acknowledged change. Do not ignore,
+delete or overwrite bad receipts.
 The unexplained external `receipt-invalid` is a separate unresolved cause.
-[06j](06j-interrupted-local-edit-resolution-proposal.md) proposes only the
+[06j](06j-interrupted-local-edit-resolution-proposal.md) covers only the
 start-only state. Partial change/preparation and torn receipts remain outside that
 proposal; its approval alone must not be reported as qualification of every
 autosave interruption or general repair.
@@ -111,6 +113,12 @@ Role changes here mean authorised user-requested mode changes. External lease or
 permission revocation immediately forbids new dispatch and retains input; never
 flush against revoked authority.
 
+Switching a work panel, returning to the same record's list, or returning to its
+retained editor changes UI state only. Preserve the input and allow these reading
+transitions synchronously without requiring a successful save. Keep composition,
+placement, other-operation and ownership guards; actual commands in another
+panel still recheck pending Caption input, busy state and the current token.
+
 Do not make a global busy cycle where file output blocks the very Caption flush
 it awaits. Declare the UI flush ports and their lifetimes before implementation;
 file generation may start only after the flush succeeds and its normal fences
@@ -162,3 +170,34 @@ Reuse existing Vitest and Playwright paths; do not add another test framework.
 Physical iPhone IME/background exit, native file handling, memory/thermal and
 safe-area acceptance remain separate. Tab reorganization, global terminology
 replacement, demos and off-screen camera assistance are later bounded units.
+
+## 9. Implementation ports and ownership (2026-11-19)
+
+The product composition opts into Caption autosave explicitly; existing harness
+adapters may retain explicit Apply. The UI owns the debounce/drain, raw draft,
+one selected File and display-only preview. Session remains the only mutation
+authority. No provider/source/token is synthesized from a preview.
+
+Expose UI-only `flushCaption(): Promise<boolean>` plus a readonly indication
+that Caption work can be flushed without unrelated panel input. Product file,
+mode and Project navigation invoke the flush before acquiring their own busy
+fence. A failed flush prevents the dependent action. Revalidate the owner and
+target afterward; do not replace a pending action with a stale token or plan.
+All remaining mutation/lease/publication/output guards stay independent.
+
+Only a same-owner Caption save keeps its title/body inputs editable. Other
+mutations remain serialized. One immutable command is retried explicitly; newer
+input waits in the draft. Acknowledgement verifies normalized submitted fields,
+advances only their own baselines and retains newer raw input/composition.
+List/window preview receives separate title/body values bound to the current
+owner, Scene and Caption. Scene geometry and command planning use canonical data.
+
+The existing global input guard and beforeunload protection include the drain.
+An input-completion/blur event requests a flush without stealing focus. During
+composition it retains input and reports the required completion instead of
+writing an incomplete composition or silently continuing an export.
+
+[06k](06k-autosave-interruption-admission-proposal.md) separately approves the
+remaining normal process-cut states and restored attachment admission. It is
+not implied by06j. Claim only the executed recovery scope recorded in todo;
+arbitrary corruption repair and physical iPhone acceptance remain separate.

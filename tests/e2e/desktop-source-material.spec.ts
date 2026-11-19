@@ -1,7 +1,7 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { writeCleanImportFixture } from './cleanImportFixture';
 import { desktopEntry, desktopOrigin } from './desktopEntry';
-import { chooseHomeFiles, revealReviewFiles,chooseSharedScene, selectShareOutput,  closeFileSurface, beginMaterialEditing } from './workspaceUi';
+import { finishCaptionEditing, chooseHomeFiles, revealReviewFiles,chooseSharedScene, selectShareOutput,  closeFileSurface, beginMaterialEditing } from './workspaceUi';
 import { revealFileSurface, lookAlongFront, revealCaptionList } from './workspaceUi';
 import {expect,chromium,type Page,type TestInfo,type BrowserContext} from '@playwright/test';
 
@@ -22,7 +22,7 @@ const detail=(p:Page)=>p.getByRole('region',{name:'キャプションの詳細',
 async function ready(p:Page){await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText(title,{timeout:240000});await expect(p.locator('.lv-project-viewport-status')).toBeEmpty({timeout:180000});}
 async function open(p:Page,path:string){await chooseHomeFiles(p, path);}
 async function caption(p:Page){await revealCaptionList(p);await p.getByRole('tab',{name:'キャプション',exact:true}).click();await p.getByRole('list',{name:'キャプション一覧',exact:true}).locator('.lv-caption-select').first().click();}
-async function edit(p:Page,field:'タイトル'|'本文',value:string){await closeFileSurface(p);await detail(p).getByLabel(field,{exact:true}).fill(value);await detail(p).getByRole('button',{name:'変更を適用',exact:true}).click();await expect(p.getByText('変更を適用しました。',{exact:true})).toBeVisible({timeout:180000});}
+async function edit(p:Page,field:'タイトル'|'本文',value:string){await closeFileSurface(p);await detail(p).getByLabel(field,{exact:true}).fill(value);await finishCaptionEditing(p, {}, 180000);}
 async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWorkspace'|'contribution'|'review',base?:string){
   const menu=p.locator('details.lv-project-files');if(await menu.count()&&!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();
   const area=p.getByRole('region',{name:'ファイル',exact:true});

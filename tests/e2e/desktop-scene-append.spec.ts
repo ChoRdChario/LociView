@@ -8,7 +8,7 @@ import { selectCleanRecords } from '../../src/projectPackage/cleanRecords';
 import { validationMetadataLimits } from '../../src/projectFiles/validation';
 import { ownedServer } from '../offline-e2e/server';
 import { smallPng, triangleGlb } from './fixtures';
-import { chooseHomeFiles, revealReviewFiles, openAddOptions,chooseSharedScene, beginSceneCreation, revealCoordinateAdd, revealFileSurface, selectShareOutput } from './workspaceUi';
+import { finishCaptionEditing, chooseHomeFiles, revealReviewFiles, openAddOptions,chooseSharedScene, beginSceneCreation, revealCoordinateAdd, revealFileSurface, selectShareOutput } from './workspaceUi';
 
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
 const files = (page: Page) => page.getByRole('region', { name: 'ファイル', exact: true });
@@ -57,12 +57,11 @@ for (const scenario of [
     const detail = source.getByRole('region', { name: 'キャプションの詳細', exact: true });
     await detail.getByLabel('タイトル', { exact: true }).fill('継承したピン');
     await detail.getByLabel('本文', { exact: true }).fill('継承した本文');
-    await detail.getByRole('button', { name: '変更を適用', exact: true }).click();
-    await expect(source.getByText('変更を適用しました。', { exact: true })).toBeVisible();
+    await finishCaptionEditing(source, {});
     const photo = smallPng();
     const chooser = source.waitForEvent('filechooser'); await source.getByLabel('メディアを追加', { exact: true }).click();
     await (await chooser).setFiles({ name: '点検写真.png', mimeType: 'image/png', buffer: photo });
-    await source.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await expect(source.getByText('メディアを追加しました。', { exact: true })).toBeVisible();
+    await finishCaptionEditing(source, {});
     if (scenario.interrupt) {
       await button(source, 'シーン 1').click();
       await openAddOptions(source);

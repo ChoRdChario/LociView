@@ -13,6 +13,6 @@
 .lv-caption-detail button:active:not(:disabled) { background: var(--lv-selected); box-shadow: inset 0 1px 2px var(--lv-line); }
 .lv-caption-detail :is(input, textarea, button):focus-visible { outline: 2px solid var(--lv-ink); outline-offset: 2px; }
 .lv-caption-detail-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.lv-caption-detail-actions > button:first-child:not(:disabled) { background: var(--lv-action); color: var(--lv-field); font-weight: 500; }
+.lv-caption-detail-actions > button:first-child:not(:disabled), .lv-caption-detail-actions > .lv-caption-retry:not(:disabled) { background: var(--lv-action); color: var(--lv-field); font-weight: 500; }
 .lv-caption-detail-actions > button[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--lv-action); }
 .lv-caption-impact { color: var(--lv-muted); }

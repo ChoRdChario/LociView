@@ -14,7 +14,7 @@ import { checkLimits, fail, MetadataSourceError, type MetadataLimits } from './f
 import { ProjectMetadataSource } from './source';
 import { MetadataRepository, type MetadataStorageFactory } from './repository';
 import { TransactionJournal, observeJournal, journalCommandBase, type JournalCommandBase, type JournalStart, type PreparedJournal, type JournalEntry } from './journal';
-import { assertClosedLocalOriginals, closedLocalBase } from './closedLocal';
+import { assertClosedLocalOriginals, closedLocalBase, readUnpreparedLocalPart } from './closedLocal';
 import { digest, equalBytes, json, newId, underWriteLease, withMetadataRead, metadataPath, selectedTextCommit, type MetadataReadPorts, type TextCommitPorts } from './persistence';
 import { canonicalMetadataEdit, planMetadataEdit, type MetadataEdit } from './commands';
 import { checkRemoteStored, copyFullSource, initialWorkspaceChanges, planRemoteChanges, type FullMetadataSource, type RemoteBatchProof } from './remote';
@@ -333,6 +333,9 @@ export class MetadataProjectSession {
     const allowed = new Set([this.journal.path(entry.start.transactionId, 'staging.json'),
       ...(entry.closedLocal ? [this.journal.path(entry.start.transactionId, 'closedLocal.json')] : [])]);
     const paths = await this.fs.list(this.journal.path(entry.start.transactionId, ''));
+    const partPath = this.journal.path(entry.start.transactionId, 'changes/00000000.amchange');
+    const part = paths.includes(partPath) ? await readUnpreparedLocalPart(this.fs, partPath, this.limits) : null;
+    if (part) allowed.add(partPath);
     if (paths.length !== allowed.size || paths.some(path => !allowed.has(path))) return null;
     if (json(entry.start.baseHeads) !== json(effective.publication.heads) || entry.start.repositoryId !== effective.start.repositoryId ||
       json(entry.start.proof) !== json(effective.start.proof)) return fail('closed-local-binding');
@@ -348,11 +351,11 @@ export class MetadataProjectSession {
     assertClosedLocalOriginals((await closedLocalBase(whole.originalChanges(), this.limits)).originals, published.originals);
     if (entry.closedLocal && json(entry.closedLocal.baseChangeSet) !== json(published.seal)) return fail('closed-local-base');
     const fingerprint = json({ start: entry.start, effectivePublication: effective.start.transactionId,
-      publication: effective.publication, baseChangeSet: published.seal });
-    return { start: entry.start, baseChangeSet: published.seal, fingerprint, closed: !!entry.closedLocal, read };
+      publication: effective.publication, baseChangeSet: published.seal, unpreparedParts: part ? [part] : [] });
+    return { start: entry.start, baseChangeSet: published.seal, unpreparedParts: part ? [part] : [], fingerprint, closed: !!entry.closedLocal, read };
   }
 
-  /** Cold start-only admission, not permission to ignore a pending transaction. */
+  /** Cold unprepared-edit admission; never ignore a pending transaction. */
   async inspectUnwrittenLocalEdit(): Promise<UnwrittenLocalEditRecovery | null> {
     return withMetadataRead(this.fs, this.storage, async () => {
       if (this.retained) return fail('closed-local-hot-command');
@@ -374,7 +377,7 @@ export class MetadataProjectSession {
       if (!candidate || candidate.fingerprint !== binding.fingerprint) return fail('closed-local-stale');
       if (binding.observedClosure && !candidate.closed) return fail('closed-local-missing');
       if (candidate.closed) binding.observedClosure = true;
-      await this.journal.closeLocal(candidate.start, candidate.baseChangeSet);
+      await this.journal.closeLocal(candidate.start, candidate.baseChangeSet, candidate.unpreparedParts);
       binding.observedClosure = true;
       const confirmed = await this.inspectUnwrittenLocal(binding.transactionId);
       if (!confirmed?.closed || confirmed.fingerprint !== binding.fingerprint) return fail('closed-local-readback');

@@ -97,7 +97,7 @@ export class MetadataRepository {
       new MetadataRepository(fs, factory!, this.limits).readDirect(ownedId, ownedProof, ownedHeads, allowUninitialized), 'repository.read');
   }
 
-  /**06j only: account for every physical row, including data normal loadDoc skips. */
+  /**06j/06k recovery only: include physical rows normal loadDoc skips. */
   async readForUnwrittenResolution(id: string, proof: MetadataProof): Promise<ProjectMetadataSource | null> {
     const ownedProof = checkedProof(proof, this.limits), documentId = this.documentId(id);
     return withMetadataRead(this.fs, this.factory, async ({ factory }) => {

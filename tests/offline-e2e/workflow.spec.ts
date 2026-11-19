@@ -1,5 +1,5 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
-import { chooseHomeFiles, revealReviewFiles, chooseSharedScene, selectShareOutput, revealCaptionList, revealCoordinateAdd, revealFileSurface, revealProjectSelection, revealOfflineUtilities } from '../e2e/workspaceUi';
+import { finishCaptionEditing, chooseHomeFiles, revealReviewFiles, chooseSharedScene, selectShareOutput, revealCaptionList, revealCoordinateAdd, revealFileSurface, revealProjectSelection, revealOfflineUtilities } from '../e2e/workspaceUi';
 import {expect,chromium,type BrowserContext,type Page,type TestInfo} from '@playwright/test';
 import {readFile,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -66,7 +66,7 @@ test('static data survives prepared cold offline Mesh/Point/500k SH4/Proxy/media
     await p.getByRole('tab',{name:'モデル',exact:true}).click();const models=p.getByRole('tabpanel',{name:'モデル',exact:true});await models.locator('.lv-model-select').filter({hasText:'500k'}).click();
     const chooser=p.waitForEvent('filechooser');await models.getByRole('button',{name:'ピン配置用モデルを追加',exact:true}).click();await(await chooser).setFiles(mesh);await models.getByRole('button',{name:'ピン配置用モデルを設定',exact:true}).click();await ready(p,'ピン配置用モデルを登録しました。');
     await p.getByRole('tab',{name:'キャプション',exact:true}).click();await revealCoordinateAdd(p);await p.getByLabel('追加先モデル',{exact:true}).focus();await p.getByLabel('追加先モデル',{exact:true}).selectOption({label:'基準.glb'});await p.getByRole('button',{name:'このモデルに追加',exact:true}).click();for(const[axis,value]of [['X','0'],['Y','.5'],['Z','0']])await p.getByLabel(`位置 ${axis}`,{exact:true}).fill(value!);await p.getByRole('button',{name:'ここに記録を作る',exact:true}).click();await ready(p,'ピンの位置を確定しました。');
-    await p.getByLabel('タイトル',{exact:true}).fill('現地の記録');await p.getByLabel('本文',{exact:true}).fill('通信前の本文');await p.getByRole('button',{name:'変更を適用',exact:true}).click();await ready(p,'変更を適用しました。');const media=p.waitForEvent('filechooser');await p.getByLabel('メディアを追加',{exact:true}).click();await(await media).setFiles(photo);await p.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await ready(p,'メディアを追加しました。');
+    await p.getByLabel('タイトル',{exact:true}).fill('現地の記録');await p.getByLabel('本文',{exact:true}).fill('通信前の本文');await finishCaptionEditing(p, {}, 180_000);const media=p.waitForEvent('filechooser');await p.getByLabel('メディアを追加',{exact:true}).click();await(await media).setFiles(photo);await finishCaptionEditing(p, {}, 180_000);
     const before=await changes(await output(p,info,'static-before'));await close();server.setRoot(resolve(builds(),'a'));
     const preparedRecipient=await launch(firstRecipient,server.url,false,errors,true);recipientContext=preparedRecipient.context;
     await preparedRecipient.page.goto(server.url);await prepare(preparedRecipient.page);await recipientContext.close();recipientContext=undefined;
@@ -74,12 +74,12 @@ test('static data survives prepared cold offline Mesh/Point/500k SH4/Proxy/media
     // Preserve unrelated cache/registration and an original-route local body as exact bytes.
     await p.evaluate(async()=>{await(await caches.open('unrelated-retain')).put('/sentinel',new Response('untouched'));await navigator.serviceWorker.register('/foreign/worker.js',{scope:'/foreign/'});const base=await navigator.storage.getDirectory(),dir=await base.getDirectoryHandle('legacy-retain',{create:true}),handle=await dir.getFileHandle('original.zip',{create:true}),writer=await handle.createWritable();await writer.write('owned legacy source sentinel');await writer.close();});
     const prepared=await cacheInventory(p);await close();await server.stop();p=await open(true);await selected(p,'オフライン現地作業');await revealOfflineUtilities(p);await expect(offlineStatus(p)).toContainText('オフラインで起動できます');expect(await controllerBuild(p)).toMatch(/^offline-test-a-/);expect(await changes(await output(p,info,'cold-before'))).toEqual(before);mark('cold offline: server stopped; Mesh/Point/500k SH4/Proxy loaded');
-    await p.locator('.lv-caption-select').filter({hasText:'現地の記録'}).click();await detail(p).getByLabel('本文',{exact:true}).fill('通信なしで更新');await detail(p).getByRole('button',{name:'変更を適用',exact:true}).click();await ready(p,'変更を適用しました。');await expect(p.getByRole('region',{name:'現地の記録',exact:true}).getByRole('region',{name:'添付メディア',exact:true}).locator('img')).toBeVisible();
+    await p.locator('.lv-caption-select').filter({hasText:'現地の記録'}).click();await detail(p).getByLabel('本文',{exact:true}).fill('通信なしで更新');await finishCaptionEditing(p, {}, 180_000);await expect(p.getByRole('region',{name:'現地の記録',exact:true}).getByRole('region',{name:'添付メディア',exact:true}).locator('img')).toBeVisible();
     const showPhoto=p.getByRole('region',{name:'現地の記録',exact:true}).getByRole('region',{name:'添付メディア',exact:true}).getByRole('button',{name:'画像を表示',exact:true});
     await showPhoto.click();const photoDialog=p.getByRole('dialog',{name:'メディアビューア',exact:true});await expect.poll(()=>photoDialog.locator('img').evaluate(n=>(n as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
     await expect(p.getByLabel('3Dモデルの表示',{exact:true})).toHaveAttribute('aria-busy','true');await photoDialog.getByRole('button',{name:'閉じる',exact:true}).click();await expect(showPhoto).toBeFocused();await selected(p,'オフライン現地作業');mark('cold offline touch: photo/native-GS release and same-view reconstruction');
     const edited=await changes(await output(p,info,'cold-edited'));await p.screenshot({path:info.outputPath('cold-offline.png'),fullPage:true});await close();p=await open(true);await selected(p,'オフライン現地作業');expect(await changes(await output(p,info,'cold-reopened'))).toEqual(edited);mark('cold offline: edit/save/full-close reopen exact history');
-    await home(p);const native=info.outputPath('admitted-native.zip');await writeFile(native,await nativeConversionBackup(triangleGlb(),smallPng()));await file(p,native);await p.getByRole('button',{name:'新しいプロジェクトに変換',exact:true}).click();await selected(p,'Nativeから引き継ぐ記録');await p.locator('.lv-caption-select').filter({hasText:'既存のピン'}).click();await detail(p).getByLabel('本文',{exact:true}).fill('オフライン変換後');await detail(p).getByRole('button',{name:'変更を適用',exact:true}).click();await ready(p,'変更を適用しました。');const converted=await changes(await output(p,info,'converted-offline'));
+    await home(p);const native=info.outputPath('admitted-native.zip');await writeFile(native,await nativeConversionBackup(triangleGlb(),smallPng()));await file(p,native);await p.getByRole('button',{name:'新しいプロジェクトに変換',exact:true}).click();await selected(p,'Nativeから引き継ぐ記録');await p.locator('.lv-caption-select').filter({hasText:'既存のピン'}).click();await detail(p).getByLabel('本文',{exact:true}).fill('オフライン変換後');await finishCaptionEditing(p, {}, 180_000);const converted=await changes(await output(p,info,'converted-offline'));
     const firstFile=await backup(p,info,'first-offline-backup');
     expect((await BackupArchive.inspect(new Blob([Uint8Array.from(await readFile(firstFile)).buffer]),limits)).source.originalChanges()).toEqual(converted);
     await close();
@@ -101,7 +101,7 @@ test('static data survives prepared cold offline Mesh/Point/500k SH4/Proxy/media
     await receiver.evaluate(()=>(window as any).firstRestoreGate.release());await selectedWithStage(receiver,'Nativeから引き継ぐ記録');
     await revealCaptionList(receiver);
     await receiver.locator('.lv-caption-select').filter({hasText:'既存のピン'}).click();await detail(receiver).getByLabel('本文',{exact:true}).fill('別端末のオフライン復元後');
-    await detail(receiver).getByRole('button',{name:'変更を適用',exact:true}).click();await ready(receiver,'変更を適用しました。');
+    await finishCaptionEditing(receiver, {}, 180_000);
     const received=await changes(await output(receiver,info,'first-offline-edited'));await recipientContext.close();recipientContext=undefined;
     recipient=await launch(firstRecipient,server.url,true,errors,true);recipientContext=recipient.context;receiver=recipient.page;
     await receiver.setViewportSize({width:390,height:844});
@@ -198,7 +198,7 @@ test('touch can create a direct mixed Review copy offline, save and cold reopen 
     await home(p); await file(p, reviewPath); await expect(p.getByRole('main', { name: '閲覧用のシーン', exact: true })).toBeVisible();
     await revealReviewFiles(p); await p.getByRole('button', { name: '編集コピーを作る', exact: true }).click(); await p.getByRole('button', { name: 'コピーを作成', exact: true }).click(); await selectedWithStage(p, 'Native点群とGS');
     await revealCaptionList(p); await p.locator('.lv-caption-select').first().click(); await detail(p).getByLabel('本文', { exact: true }).fill('通信なしの直接コピー');
-    await detail(p).getByRole('button', { name: '変更を適用', exact: true }).click(); await ready(p, '変更を適用しました。');
+    await finishCaptionEditing(p, {}, 180_000);
     const saved = await BackupArchive.inspect(new Blob([Uint8Array.from(await readFile(await backup(p, info, 'direct-offline'))).buffer]), limits);
     for (const body of review.archive.control.manifest.blobs) expect(saved.archive.control.manifest.blobs).toContainEqual(body);
     await context!.close(); context = undefined; p = await open(true); await selectedWithStage(p, 'Native点群とGS');

@@ -15,7 +15,7 @@ import { assertContributionBaseInReceiver, frozenBaseSource } from '../projectPa
 import { readManifestControl } from '../projectPackage/manifest';
 import type { EvidenceRef } from '../projectPackage/contract';
 import { readSceneAppend } from '../projectPackage/sceneAppend';
-import { closedLocalReference, validateClosedLocal, type ClosedLocalReceipt } from './closedLocal';
+import { closedLocalReference, readUnpreparedLocalPart, validateClosedLocal, type ClosedLocalReceipt, type UnpreparedLocalPart } from './closedLocal';
 
 export interface JournalStart {
   requiredCapabilities?: ReaderCapabilities;
@@ -144,7 +144,8 @@ export class TransactionJournal {
       const closedLocal = paths.includes(this.path(id, 'closedLocal.json'))
         ? await readReceipt<ClosedLocalReceipt>(this.fs, this.path(id, 'closedLocal.json'), this.limits) : null;
       if (closedLocal && (prepared || durable || publication || start!.purpose !== 'localCommand' ||
-        paths.filter(path => path.startsWith(this.path(id, ''))).some(path => path !== this.path(id, 'staging.json') && path !== this.path(id, 'closedLocal.json'))))
+        paths.filter(path => path.startsWith(this.path(id, ''))).some(path => path !== this.path(id, 'staging.json') && path !== this.path(id, 'closedLocal.json') &&
+          !(closedLocal.schema === 'lociview-metadata-closed-local-2' && path === this.path(id, 'changes/00000000.amchange')))))
         fail('closed-local-directory');
       entries.push({ start: start!, prepared, durable, publication, ...(closedLocal ? { closedLocal } : {}) });
     }
@@ -161,6 +162,10 @@ export class TransactionJournal {
       if (child.closedLocal) {
         if (!previous.effectivePublication) return fail('closed-local-publication');
         await validateClosedLocal(child.closedLocal, child.start, previous.effectivePublication, this.limits);
+        if (child.closedLocal.schema === 'lociview-metadata-closed-local-2') {
+          const part = await readUnpreparedLocalPart(this.fs, this.path(child.start.transactionId, 'changes/00000000.amchange'), this.limits);
+          if (json(part) !== json(child.closedLocal.unpreparedParts[0])) return fail('closed-local-part-changed');
+        }
       }
       chain.push(child); predecessor = child.start.transactionId;
     }
@@ -174,18 +179,23 @@ export class TransactionJournal {
     await writeReceipt(this.fs, this.path(start.transactionId, 'staging.json'), start, this.limits);
   }
   /** Only the caller's fresh whole-repository proof can authorize this terminal. */
-  async closeLocal(start: JournalStart, baseChangeSet: ClosedLocalReceipt['baseChangeSet']): Promise<ClosedLocalReceipt> {
+  async closeLocal(start: JournalStart, baseChangeSet: ClosedLocalReceipt['baseChangeSet'], unpreparedParts: readonly UnpreparedLocalPart[] = []): Promise<ClosedLocalReceipt> {
     const entries = await this.entries(), observation = observeJournal(entries), entry = entries.at(-1), effective = observation.effectivePublication;
     if (!entry || !effective || json(entry.start) !== json(start) || start.purpose !== 'localCommand' || entry.prepared || entry.durable || entry.publication)
       return fail('closed-local-state');
-    const receipt: ClosedLocalReceipt = { schema: 'lociview-metadata-closed-local-1', transactionId: start.transactionId,
+    if (unpreparedParts.length > 1) return fail('closed-local-part');
+    const receipt: ClosedLocalReceipt = { ...(unpreparedParts.length ? { schema: 'lociview-metadata-closed-local-2' as const,
+      unpreparedParts: [{ ...unpreparedParts[0]! }] as [UnpreparedLocalPart] } : { schema: 'lociview-metadata-closed-local-1' as const }), transactionId: start.transactionId,
       repositoryId: start.repositoryId, start: await closedLocalReference(start),
       effectivePublication: { transactionId: effective.start.transactionId, receipt: await closedLocalReference(effective.publication), heads: [...effective.publication.heads] },
       baseChangeSet: { ...baseChangeSet }, resolution: 'retain-published-state' };
     await validateClosedLocal(receipt, start, effective, this.limits);
     const paths = await this.fs.list(this.path(start.transactionId, ''));
-    const allowed = new Set([this.path(start.transactionId, 'staging.json'), ...(entry.closedLocal ? [this.path(start.transactionId, 'closedLocal.json')] : [])]);
+    const allowed = new Set([this.path(start.transactionId, 'staging.json'), ...(entry.closedLocal ? [this.path(start.transactionId, 'closedLocal.json')] : []),
+      ...(unpreparedParts.length ? [this.path(start.transactionId, 'changes/00000000.amchange')] : [])]);
     if (paths.length !== allowed.size || paths.some(path => !allowed.has(path))) return fail('closed-local-directory');
+    if (unpreparedParts.length && json(await readUnpreparedLocalPart(this.fs, this.path(start.transactionId, 'changes/00000000.amchange'), this.limits)) !== json(unpreparedParts[0]))
+      return fail('closed-local-part-changed');
     if (entry.closedLocal) {
       if (json(entry.closedLocal) !== json(receipt)) return fail('closed-local-conflict');
       return entry.closedLocal;

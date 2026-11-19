@@ -37,7 +37,19 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   let storageFailure:{diagnostic:string|null|undefined;text:string}|undefined;
   let readingToken: string | null = null;
   let primaryAction = () => {};
-  primary.addEventListener('click', () => { if (!disposed && !primary.disabled) primaryAction(); });
+  let preparingPrimary = false;
+  primary.addEventListener('click', () => { void(async () => {
+    if (disposed || primary.disabled || preparingPrimary) return;
+    const owner = session(), flushing = !!(owner?.interactionPending && owner.flushCaption);
+    preparingPrimary = true;
+    try {
+      if (flushing && (!owner!.canFlushCaption?.() || !await owner!.flushCaption?.())) return;
+      if (disposed || busy || composing || otherBusy() || flushing && session() !== owner) return;
+      // Refresh closure/token/disclosure after saving, before acquiring file busy.
+      if (flushing) render();
+      if (!primary.disabled) primaryAction();
+    } finally { preparingPrimary = false; }
+  })(); });
   type Presentation = 'all' | 'save' | 'share';
   let presentation: Presentation = 'all';
   type OutputPurpose = 'teamWorkspace' | 'contribution' | 'backup' | 'clean' | 'review';

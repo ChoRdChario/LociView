@@ -1,4 +1,4 @@
-import { chooseHomeFiles, selectShareOutput,  revealCoordinateAdd, revealFileSurface, revealCaptionList, revealProjectSelection } from './workspaceUi';
+import { finishCaptionEditing, chooseHomeFiles, selectShareOutput,  revealCoordinateAdd, revealFileSurface, revealCaptionList, revealProjectSelection } from './workspaceUi';
 import { test, expect, type Page, type TestInfo } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import * as A from '@automerge/automerge';
@@ -21,7 +21,7 @@ async function ready(p: Page, message: string) {
 }
 async function edit(p: Page, field: 'タイトル' | '本文', value: string) {
   await detail(p).getByLabel(field, { exact: true }).fill(value);
-  await detail(p).getByRole('button', { name: '変更を適用', exact: true }).click(); await ready(p, '変更を適用しました。');
+  await finishCaptionEditing(p, {}, 90_000);
 }
 async function workspaceFits(p: Page) {
   const canvas = p.getByLabel('3Dモデルの表示', { exact: true });
@@ -95,8 +95,9 @@ test('PC Caption work continues after empty tag focus and cancelled file checks,
     await chooseCaption(page, '見比べる記録・長い日本語の見出しと現地で確認した内容');
     const windows = page.locator('.lv-caption-window'); await expect(windows).toHaveCount(2);
     await page.evaluate(() => { const w = window as any; w.__layoutCanvas = document.querySelector('.lv-project-stage canvas'); w.__layoutWindows = [...document.querySelectorAll('.lv-caption-window')]; });
-    const draft = detail(page).getByLabel('タイトル', { exact: true }); await draft.fill('入力中の記録を保つ');
-    await fileMenu(page); await workspaceFits(page); await expect(draft).toHaveValue('入力中の記録を保つ');
+    const draft = detail(page).getByLabel('タイトル', { exact: true }), retainedTitle='入力中の記録を保つ\u2028';
+    await draft.fill(retainedTitle);
+    await fileMenu(page); await workspaceFits(page); await expect(draft).toHaveValue(retainedTitle);
     await page.locator('details.lv-project-files > summary').click();
     await detail(page).getByRole('button', { name: '取り消す', exact: true }).click(); await detail(page).getByRole('button', { name: '変更を取り消す', exact: true }).click();
     const moving = windows.last();

@@ -12,6 +12,7 @@ interface OrganizationHost {
   localBlocked(): boolean;
   blocked(): string | null; run(command: MetadataEdit, complete: () => void): void;
   scene(id: string): void; caption(id: string): void; changed(): void; message(text: string): void;
+  captionPending?(): boolean; canFlushCaption?(): boolean; flushCaption?(): Promise<boolean>;
 }
 /** Task controls only; complete reads and typed command preparation belong to the Host. */
 export function createProjectOrganization(document: Document, host: OrganizationHost) {
@@ -107,6 +108,9 @@ export function createProjectOrganization(document: Document, host: Organization
   const history = () => actionHistory;
   function currentMatches(snapshot: CaptionUndoSnapshot) { try { const s = host.source(); return sameProjectValue(snapshot, host.ports.authoring!.undoSnapshot(s.provider.token, snapshot.target)); } catch { return false; } }
   function compensate(forward: boolean) {
+    if (host.captionPending?.() && host.canFlushCaption?.()) {
+      void host.flushCaption?.().then(saved => { if (saved && !disposed) compensate(forward); }); return;
+    }
     const h = history(), entry = (forward ? h.future : h.past).at(-1); if (!entry || host.blocked() || form || captured) return;
     const expected = forward ? entry.before : entry.after, goal = forward ? entry.after : entry.before;
     if (!currentMatches(expected)) { host.message('別の更新があるため戻せません。現在の内容は保持しています。'); return; }
@@ -177,6 +181,7 @@ export function createProjectOrganization(document: Document, host: Organization
     undo.hidden = !h?.past.length; redo.hidden = !h?.future.length;
     undo.disabled = blocked || owned || !h?.past.length || !currentMatches(h.past.at(-1)!.after);
     redo.disabled = blocked || owned || !h?.future.length || !currentMatches(h.future.at(-1)!.before);
+    if (host.captionPending?.() && host.canFlushCaption?.() && !owned) { undo.hidden = false; undo.disabled = false; redo.disabled = !h?.future.length; }
     undoHelp.hidden = !h?.past.length && !h?.future.length;
     undoNote.textContent = undoWarning; undoNote.hidden = !undoWarning;
     saveTag.textContent = captured?.tagId ? 'タグを更新' : 'タグを追加'; saveTag.disabled = blocked || composing || !!stale || !captured || !tagName.value.trim();

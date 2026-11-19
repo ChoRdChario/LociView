@@ -22,7 +22,7 @@ export async function bootDesktopApp(root:HTMLElement){
       if(legacy&&!(await legacy.close()))return;legacy=undefined;
       await workspace?.dispose();workspace=undefined;document.documentElement.classList.add('lv-project-page');root.replaceChildren();
       workspace=await createValidationBrowserWorkspace(document,{smoothDisplay,progressivePresentation:true,filePolicy:policy,residency,initialFiles:files,openLegacy,
-        mountEditor:(host,factory,tools,renderCandidate,navigation)=>createProductWorkspace(document,host,factory,tools,renderCandidate,{...navigation,compactFiles:true})},new URL(location.href).searchParams.get('run')??undefined);
+        mountEditor:(host,factory,tools,renderCandidate,navigation)=>createProductWorkspace(document,host,factory,tools,renderCandidate,{...navigation,compactFiles:true,captionAutosave:true})},new URL(location.href).searchParams.get('run')??undefined);
       root.append(workspace.root);await workspace.ready;
     }catch(error){message(error);const retry=document.createElement('button');retry.textContent='以前のプロジェクトを開く';retry.addEventListener('click',()=>{void openLegacy();});root.append(retry);}
     finally{busy=false;}

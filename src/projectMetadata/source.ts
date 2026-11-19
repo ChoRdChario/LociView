@@ -111,6 +111,62 @@ export class ProjectMetadataSource {
     }
     planMetadataEdit(provider, { kind: 'editCaption', captionId, edits }, this.limits);
   }
+  /** Finite prepared attachment admission; never a generic pending-edit bypass. */
+  assertCaptionAttachmentIntroduction(bytes: Uint8Array, provider: Extract<ProjectProviderRead, {kind: 'scene-provider'}>): JsonObject {
+    if (provider.token !== this.token) return fail('restore-destination-not-ready');
+    const change = A.decodeChange(bytes), ops = change.ops;
+    if (ops.length !== 7 && ops.length !== 8) return fail('restore-destination-not-ready');
+    const addingMedia = ops.length === 8, mapIndex = addingMedia ? 1 : 0, make = ops[mapIndex]!;
+    const attachmentMap = A.getObjectId(this.doc.captionAttachmentsById), mediaMap = A.getObjectId(this.doc.mediaResourcesById);
+    if (!attachmentMap || !mediaMap || make.action !== 'makeMap' || make.obj !== attachmentMap || typeof make.key !== 'string' ||
+      make.pred.length || 'insert' in make && make.insert) return fail('restore-destination-not-ready');
+    const attachmentId = make.key, attachmentObject = `${change.startOp + mapIndex}@${change.actor}`;
+    if (Object.keys(projectRecordMaps).some(map => Object.hasOwn(this.doc[map], attachmentId))) return fail('restore-destination-not-ready');
+    const readScalar = (op: typeof ops[number]) => {
+      if (op.action !== 'set' || op.pred.length || op.datatype !== undefined || 'insert' in op && op.insert || typeof op.value !== 'string')
+        return fail('restore-destination-not-ready');
+      try {
+        const value = JSON.parse(op.value);
+        if (String(scalar(value, this.limits)) !== op.value) return fail('restore-destination-not-ready');
+        return value;
+      } catch { return fail('restore-destination-not-ready'); }
+    };
+    const fields: Record<string, JsonObject[string]> = {};
+    for (const op of ops.slice(mapIndex + 1)) {
+      if (op.obj !== attachmentObject || typeof op.key !== 'string' ||
+        !['id', 'captionId', 'mediaResourceId', 'altText', 'orderKey', 'lifecycle'].includes(op.key) || Object.hasOwn(fields, op.key))
+        return fail('restore-destination-not-ready');
+      fields[op.key] = readScalar(op);
+    }
+    if (Object.keys(fields).sort().join(',') !== 'altText,captionId,id,lifecycle,mediaResourceId,orderKey' || fields.id !== attachmentId ||
+      typeof fields.captionId !== 'string' || typeof fields.mediaResourceId !== 'string' || typeof fields.altText !== 'string' || typeof fields.orderKey !== 'string')
+      return fail('restore-destination-not-ready');
+    const lifecycle = object(fields.lifecycle), mediaId = fields.mediaResourceId;
+    let media: JsonObject;
+    if (addingMedia) {
+      const op = ops[0]!;
+      if (op.obj !== mediaMap || op.key !== mediaId || Object.keys(projectRecordMaps).some(map => Object.hasOwn(this.doc[map], mediaId)))
+        return fail('restore-destination-not-ready');
+      media = object(readScalar(op));
+    } else {
+      const value = provider.details.immutable.mediaResourcesById[mediaId];
+      if (value?.kind !== 'value') return fail('restore-destination-not-ready');
+      media = object(value.value);
+    }
+    let work = 0;
+    for (const sceneId of Object.keys(provider.state.scenes)) {
+      if (++work > this.limits.maxWork) return fail('restore-destination-not-ready');
+      try {
+        const planned = planMetadataEdit(provider, { kind: 'createAttachment', sceneId, captionId: fields.captionId, attachmentId,
+          media, altText: fields.altText, orderKey: fields.orderKey, eventId: lifecycle.eventId as string }, this.limits);
+        const expected = [ ...(addingMedia ? [{ map: 'mediaResourcesById', id: mediaId, create: true, fields: media }] : []),
+          { map: 'captionAttachmentsById', id: attachmentId, create: true, fields } ];
+        if (planned.length === expected.length && planned.every((write, i) => write.map === expected[i]!.map && write.id === expected[i]!.id &&
+          write.create === true && same(write.fields, expected[i]!.fields))) return media;
+      } catch (error) { if (!(error instanceof MetadataSourceError)) throw error; }
+    }
+    return fail('restore-destination-not-ready');
+  }
   get heads(): string[] { return A.getHeads(this.doc).sort(); }
   /** Internal repository comparison against this already inspected source. */
   matchesStoredCaption(doc: PhysicalDoc, captionId: string, limits: MetadataLimits): boolean {

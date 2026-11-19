@@ -8,21 +8,22 @@ Check actual branch/HEAD/worktree and preserve existing changes.
 
 ## Current workflow
 
-The current workflow investigates the external reopening failure and completes
-text/photo recording, file saving and resume on PC/touch. Approved06j adds one
-explicit continue-saved path for a cold start-only local edit whose entire
-repository still equals the last publication. Partial/corrupt changes retain
-strict refusal and a safe exit. Every old byte is retained; unfinished input is
-never called recovered. Save verification and ordinary recovery fences remain.
+The current workflow implements approved Caption autosave/immediate preview and
+safe interrupted saving on PC/touch.06j's start-only closure remains; separately
+approved06k adds one sealed unprepared part and finite restored prepared-media
+retry. Every old byte is retained; unfinished input is never called recovered.
+Torn controls remain refusal. Save verification and recovery fences remain.
 [Todo](todo.md) owns
 the executed checks, unresolved receipt cause and physical iPhone acceptance.
 
 The owner's followup confirms Caption autosave, immediate preview distinct from
 durable saving, list-side editing/read-only windows and minimum camera
 intervention. [08d](../docs/specs/08d-caption-autosave-workflow-proposal.md) records
-that direction and the replacement's acceptance; it is not implemented. The
-current explicit Apply path is transitional. Do not implement autosave by clicking
-Apply on a timer or drop unresolved input during a save.
+that direction and the replacement's acceptance. The bounded implementation has
+passed its code checkpoint and PC/touch-equivalent file, fault and offline checks;
+todo owns exact candidate qualification and device limits. Product Desktop/offline opts into an
+owned serial drain with UI-only preview/settled raw spelling; harnesses retain
+Apply. Do not click Apply on a timer or discard newer input after an older save.
 [06j](../docs/specs/06j-interrupted-local-edit-resolution-proposal.md) is an
 independently reviewed contract for one proven start-only interrupted local edit.
 The PO approved implementation2026-11-19; the bounded implementation passed its

@@ -1,7 +1,7 @@
 import {test,expect,chromium,type Page} from '@playwright/test';
 import {ownedServer} from '../offline-e2e/server';
 import {triangleGlb} from './fixtures';
-import { chooseHomeFiles, revealCoordinateAdd,revealFileSurface } from './workspaceUi';
+import { finishCaptionEditing, chooseHomeFiles, revealCoordinateAdd,revealFileSurface } from './workspaceUi';
 import {readFile} from 'node:fs/promises';
 import * as A from '@automerge/automerge';
 import {BackupArchive} from '../../src/projectPackage/backupArchive';
@@ -32,7 +32,7 @@ test('same-profile Project editing stays exclusive and resumes after the holder 
     await revealCoordinateAdd(holder);const model=holder.getByLabel('追加先モデル',{exact:true});await model.focus();await model.selectOption({label:'共有モデル.glb'});await holder.getByRole('button',{name:'このモデルに追加',exact:true}).click();
     for(const axis of ['X','Y','Z'])await holder.getByLabel(`位置 ${axis}`,{exact:true}).fill('0');
     await holder.getByRole('button',{name:'ここに記録を作る',exact:true}).click();await ready(holder,'ピンの位置を確定しました。');
-    await detail(holder).getByLabel('タイトル',{exact:true}).fill('排他確認');await detail(holder).getByLabel('本文',{exact:true}).fill('先の画面の保存済み本文');await detail(holder).getByRole('button',{name:'変更を適用',exact:true}).click();await ready(holder,'変更を適用しました。');
+    await detail(holder).getByLabel('タイトル',{exact:true}).fill('排他確認');await detail(holder).getByLabel('本文',{exact:true}).fill('先の画面の保存済み本文');await finishCaptionEditing(holder, {}, 15000);
     const before=await backup(holder,'holder-saved');expect(before.bodies).toContain(triangleGlb().toString('hex'));
     const projectUrl=holder.url(),contender=await context.newPage();await contender.goto(projectUrl);await readable(contender);
     await contender.locator('.lv-caption-select').filter({hasText:'排他確認'}).click();
@@ -44,7 +44,7 @@ test('same-profile Project editing stays exclusive and resumes after the holder 
     // mutation lease by entering view mode; no fake LockManager or separate peer.
     await holder.getByRole('button',{name:'閲覧する',exact:true}).click();await expect(holder.getByRole('button',{name:'編集する',exact:true})).toBeEnabled();
     await contender.getByRole('button',{name:'編集する',exact:true}).click();await expect(contender.getByRole('button',{name:'閲覧する',exact:true})).toBeEnabled();
-    await expect(detail(contender).getByLabel('本文',{exact:true})).toHaveValue('先の画面の保存済み本文');await detail(contender).getByLabel('本文',{exact:true}).fill('解放後の画面で保存');await detail(contender).getByRole('button',{name:'変更を適用',exact:true}).click();await ready(contender,'変更を適用しました。');
+    await expect(detail(contender).getByLabel('本文',{exact:true})).toHaveValue('先の画面の保存済み本文');await detail(contender).getByLabel('本文',{exact:true}).fill('解放後の画面で保存');await finishCaptionEditing(contender, {}, 15000);
     await contender.reload();await readable(contender);await contender.locator('.lv-caption-select').filter({hasText:'排他確認'}).click();await expect(detail(contender).getByLabel('本文',{exact:true})).toHaveValue('解放後の画面で保存');
     const after=await backup(contender,'contender-resumed');expect(after.identity).toEqual(before.identity);expect(after.changes).toEqual(expect.arrayContaining(before.changes));expect(after.changes.length).toBeGreaterThan(before.changes.length);expect(after.bodies).toEqual(before.bodies);
     // The released holder must still be a reader while its peer edits.

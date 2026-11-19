@@ -10,6 +10,9 @@ Caption autosave. Neither direction authorizes ignoring an unfinished Journal.
 The owner explicitly authorized implementation and automated verification of this
 bounded recovery contract. It closes one reproduced state before increasing automatic writes.
 It does not claim to repair the external, unexplained `receipt-invalid` report.
+[06k](06k-autosave-interruption-admission-proposal.md), separately approved2026-11-19,
+extends only schema2's sealed single-part admission and restored prepared media.
+The schema1 and malformed-control rules below remain unchanged.
 
 ## 1. User outcome and exact boundary
 

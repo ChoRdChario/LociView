@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { gsFixture } from '../helpers/gsFixture';
 import { smallPng, triangleGlb } from './fixtures';
-import { chooseHomeFiles, openAddOptions, beginSceneCreation, closeFileSurface, lookAlongFront, revealCameraPositions, revealCaptionList, revealFileSurface, selectShareOutput } from './workspaceUi';
+import { finishCaptionEditing, chooseHomeFiles, openAddOptions, beginSceneCreation, closeFileSurface, lookAlongFront, revealCameraPositions, revealCaptionList, revealFileSurface, selectShareOutput } from './workspaceUi';
 
 const points = Buffer.from([
   'ply', 'format ascii 1.0', 'element vertex 5', 'property float x', 'property float y', 'property float z',
@@ -164,7 +164,7 @@ for (const touch of [false, true])
         const picker = page.waitForEvent('filechooser');
         await page.getByLabel('メディアを追加', exact).click();
         await (await picker).setFiles({ name: '外板.png', mimeType: 'image/png', buffer: smallPng() });
-        await detail(page).getByRole('button', { name: '変更を適用', ...exact }).click();
+        await finishCaptionEditing(page, { title: '塗装の確認', body: '塗装の境界を確認。' });
         await checkPhoto(page);
         const tags = page.getByLabel('分類タグ', exact); await tags.locator(':scope > summary').click();
         const tagSettings = tags.locator('.lv-tag-settings'); await expect(tagSettings).not.toHaveAttribute('open');
@@ -199,14 +199,15 @@ for (const touch of [false, true])
         await expect(page.locator('.lv-caption-select')).toHaveCount(1);
         await search.fill(''); await selectRecord(page);
         const bodyInput = detail(page).getByLabel('本文', exact);
-        await bodyInput.fill('未適用の本文を保持。');
+        const retainedBody = '未保存の本文を保持。\u2028';
+        await bodyInput.fill(retainedBody);
         if (touch) await action(page, '3D').click();
         await action(page, '記録を検索').click(); await search.fill('見つからない条件');
         if (touch) {
           await expect(page.locator('.lv-retained-edit')).toBeVisible();
           await page.locator('.lv-retained-edit').getByRole('button', { name: '編集に戻る', ...exact }).click();
         }
-        await expect(bodyInput).toBeVisible(); await expect(bodyInput).toHaveValue('未適用の本文を保持。');
+        await expect(bodyInput).toBeVisible(); await expect(bodyInput).toHaveValue(retainedBody);
         await detail(page).getByRole('button', { name: '取り消す', ...exact }).click();
         await detail(page).getByRole('button', { name: '変更を取り消す', ...exact }).click();
         await revealCaptionList(page); await search.fill(''); await selectRecord(page);
@@ -240,16 +241,14 @@ for (const touch of [false, true])
         await expect(page.locator('.lv-caption-add-settings > summary')).toBeFocused();
         await selectRecord(page);
         await detail(page).getByLabel('本文', exact).fill(sharedBody);
-        await detail(page).getByRole('button', { name: '変更を適用', ...exact }).click();
-        await status(page, '変更を適用しました。');
+        await finishCaptionEditing(page, {}, 15000);
         await action(page, 'シーン 1').click();
         await selectRecord(page);
         await expect(detail(page).getByLabel('本文', exact)).toHaveValue(sharedBody);
         await checkPhoto(page);
         if (sharedTitle !== '塗装の確認') {
           await detail(page).getByLabel('タイトル', exact).fill(sharedTitle);
-          await detail(page).getByRole('button', { name: '変更を適用', ...exact }).click();
-          await status(page, '変更を適用しました。');
+          await finishCaptionEditing(page, {}, 15000);
         }
 
         await action(page, reviewSceneName).click();
@@ -280,6 +279,7 @@ for (const touch of [false, true])
         await expect(contents).toHaveCount(0);
         await sharedScenes.getByRole('checkbox', { name: reviewSceneName, ...exact }).check();
         await files.getByRole('button', { name: '内容を確認', ...exact }).click();
+        await expect(contents).toBeVisible();
         const [download] = await Promise.all([page.waitForEvent('download'), files.getByRole('button', { name: 'ダウンロード', ...exact }).click()]);
         const path = info.outputPath('shared-scene.zip');
         await download.saveAs(path);
@@ -594,7 +594,14 @@ for (const touch of [false, true])
           await expect(singleReader.getByRole('region', { name: 'キャプションの詳細', ...exact })).toContainText(sharedBody);
         }
       }
-      finally {
+      catch (error) {
+        const failedPage = sender.pages()[0];
+        if (failedPage && !failedPage.isClosed()) {
+          await info.attach('sharing-failure', { body: await failedPage.locator('body').innerText(), contentType: 'text/plain' });
+          await failedPage.screenshot({ path: info.outputPath('sharing-failure.png') });
+        }
+        throw error;
+      } finally {
         await receiver.close();
         await sender.close();
       }
@@ -616,8 +623,7 @@ test('配置用モデルのないGSに座標で記録し、再開して元の位
   await action(page, 'ここに記録を作る').click();
   await status(page, 'ピンの位置を確定しました。');
   await detail(page).getByLabel('タイトル', exact).fill('基準点');
-  await detail(page).getByRole('button', { name: '変更を適用', ...exact }).click();
-  await status(page, '変更を適用しました。');
+  await finishCaptionEditing(page, {}, 15000);
   await page.reload();
   await page.locator('.lv-caption-select').filter({ hasText: '基準点' }).click();
   await action(page, '位置を調整').click();

@@ -1,5 +1,5 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
-import { chooseHomeFiles, revealCaptionList, revealCameraPositions, revealWorkPanel, revealCoordinateAdd, revealFileSurface, revealProjectSelection, lookAlongFront, revealOfflineUtilities } from './workspaceUi';
+import { finishCaptionEditing, chooseHomeFiles, revealCaptionList, revealCameraPositions, revealWorkPanel, revealCoordinateAdd, revealFileSurface, revealProjectSelection, lookAlongFront, revealOfflineUtilities } from './workspaceUi';
 import { expect, chromium, type Locator } from '@playwright/test';
 import { readFile} from 'node:fs/promises';
 
@@ -79,14 +79,16 @@ test('short Caption workspace keeps dense and filtered lists, Scene choices and 
     }
     await search.fill('既存のピン'); await list.locator('.lv-caption-select').click();
     const body = detail.getByLabel('本文', { exact: true }), beforeBodyFocus = await split(); await body.focus(); expect(await split()).toEqual(beforeBodyFocus); await expect(task).toHaveAttribute('data-editing', 'false');
-    await body.fill('小画面で保持する入力'); await expect(task).toHaveAttribute('data-editing', 'true');
+    const retainedBody = '小画面で保持する入力\u2028';
+    await body.fill(retainedBody); await expect(task).toHaveAttribute('data-editing', 'true');
     await p.setViewportSize({ width: 720, height: 500 }); await revealWorkPanel(p); await body.focus();
     await body.dispatchEvent('compositionstart', { data: '入力中' }); await p.setViewportSize({ width: 1280, height: 600 });
-    await expect(body).toBeFocused(); await expect(body).toHaveValue('小画面で保持する入力'); await body.dispatchEvent('compositionend', { data: '入力中' });
+    await expect(body).toBeFocused(); await expect(body).toHaveValue(retainedBody); await body.dispatchEvent('compositionend', { data: '入力中' });
     for (const size of [{ width: 1280, height: 600 }, { width: 720, height: 500 }]) {
       await p.setViewportSize(size); await revealWorkPanel(p); await layout(`edit-${size.width}`);
-      for (const name of ['変更を適用', '取り消す']) await expect(detail.locator('[data-caption-completion]').getByRole('button', { name, exact: true })).toBeInViewport({ ratio: 1 });
-      expect(await detail.locator('[data-caption-completion] > button').evaluateAll(nodes => nodes.every(node => { const r = node.getBoundingClientRect(), hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return r.width >= 44 && r.height >= 44 && (hit === node || node.contains(hit)); }))).toBe(true);
+      await expect(detail.getByRole('button', { name: '変更を適用', exact: true })).toBeHidden();
+      await expect(detail.locator('[data-caption-completion]').getByRole('button', { name: '取り消す', exact: true })).toBeInViewport({ ratio: 1 });
+      expect(await detail.locator('[data-caption-completion] > button:not([hidden])').evaluateAll(nodes => nodes.length > 0 && nodes.every(node => { const r = node.getBoundingClientRect(), hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return r.width >= 44 && r.height >= 44 && (hit === node || node.contains(hit)); }))).toBe(true);
     }
     await detail.getByRole('button', { name: '取り消す', exact: true }).click(); await detail.getByRole('button', { name: '変更を取り消す', exact: true }).click(); await expect(body).toHaveValue('本文を保持');
     await p.setViewportSize({ width: 1280, height: 720 }); await search.fill(''); await layout('return-dense', true);
@@ -120,7 +122,12 @@ test('view mode hides editing while preserving reading, local display, existing 
     expect(await p.locator('.lv-project-stage').boundingBox()).toEqual(stageBefore);
     if(!await revealFileSurface(p,'保存')) await files.getByRole('button', { name: '保存', exact: true }).click();
     await readablePrimaryHover(files.locator('button.lv-file-primary'));
-    const [download] = await Promise.all([p.waitForEvent('download'), files.locator('button.lv-file-primary').click()]);
+    const started = Date.now();
+    const [download] = await Promise.all([p.waitForEvent('download'), files.locator('button.lv-file-primary').click()]).catch(async error => {
+      await info.attach('file-output-failure', { body: JSON.stringify({ name, elapsedMs: Date.now()-started, files: await files.innerText(),
+        caption: await detail.locator('[data-save-state]').evaluateAll(nodes=>nodes.map(n=>({state:(n as HTMLElement).dataset.saveState,text:n.textContent}))), errors, remote }), contentType: 'application/json' });
+      await p.screenshot({ path: info.outputPath('file-output-failure.png') }); throw error;
+    });
     const path = info.outputPath(name + '.zip'); await download.saveAs(path); expect(await download.failure()).toBeNull();
     await expect(files.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false');
     await menu.locator(':scope > summary').click(); return path;
@@ -167,8 +174,8 @@ test('view mode hides editing while preserving reading, local display, existing 
     for (const axis of ['X', 'Y', 'Z']) await p.getByLabel('位置 ' + axis, { exact: true }).fill(axis === 'Y' ? '.5' : '0');
     await p.getByRole('button', { name: 'ここに記録を作る', exact: true }).click(); await ready('ピンの位置を確定しました。');
     await detail.getByLabel('タイトル', { exact: true }).fill('現地の写真'); await detail.getByLabel('本文', { exact: true }).fill('確認する本文\n二行目');
-    await detail.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready('変更を適用しました。');
-    const pick = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await pick).setFiles({ name: '現地.png', mimeType: 'image/png', buffer: smallPng() }); await p.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await ready('メディアを追加しました。');
+    await finishCaptionEditing(p, {}, 15000);
+    const pick = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await pick).setFiles({ name: '現地.png', mimeType: 'image/png', buffer: smallPng() }); await finishCaptionEditing(p, {}, 15000);
     await revealCameraPositions(p); const author = p.getByRole('region', { name: '視点の作成と管理', exact: true });
     await p.getByRole('button',{name:'開始視点を記録',exact:true}).click();await ready('開始視点を記録しました。');
     await revealWorkPanel(p); await tab('キャプション').click(); await save('before-view');
@@ -225,27 +232,33 @@ test('view mode hides editing while preserving reading, local display, existing 
     await p.getByRole('tab',{name:'キャプション',exact:true}).click();await expect(detail).toBeVisible();await revealCaptionList(p);await p.locator('.lv-caption-select').click();await p.setViewportSize({ width: 1440, height: 1000 });
     await p.getByRole('button', { name: '編集する', exact: true }).click(); await expect(p.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled();
     await expect(p.getByRole('list',{name:'キャプション一覧',exact:true})).toBeVisible();await expect(captions.locator('.lv-caption-search').getByLabel('検索', { exact: true })).toHaveValue('現地');await p.locator('.lv-caption-select').click(); await expect(detail.getByLabel('本文', { exact: true })).toHaveValue('確認する本文\n二行目');
-    await detail.getByLabel('本文', { exact: true }).fill('閲覧から戻って編集'); await expect(p.getByRole('button', { name: '閲覧する', exact: true })).toBeDisabled();
+    const retainedBody = '閲覧から戻って編集\u2028';
+    await detail.getByLabel('本文', { exact: true }).fill(retainedBody);
+    await p.getByRole('button', { name: '閲覧する', exact: true }).click();
+    await expect(detail.getByLabel('本文', { exact: true })).toHaveValue(retainedBody);
     await detail.getByLabel('本文',{exact:true}).dispatchEvent('compositionstart',{data:'編集中'});
+    await expect(p.getByRole('button', { name: '閲覧する', exact: true })).toBeDisabled();
     await expect(z).toBeDisabled();
     await expect(tab('モデル')).toBeDisabled();await expect(p.locator('.lv-compact-navigation button').first()).toBeDisabled();
     await detail.getByLabel('本文',{exact:true}).dispatchEvent('compositionend',{data:'編集中'});
     await revealWorkPanel(p); await tab('モデル').click(); await expect(p.getByText('キャプションに未適用の変更があります。',{exact:true})).toBeVisible();
-    await p.getByRole('button',{name:'編集に戻る',exact:true}).click(); await expect(detail.getByLabel('本文',{exact:true})).toHaveValue('閲覧から戻って編集');
+    await p.getByRole('button',{name:'編集に戻る',exact:true}).click(); await expect(detail.getByLabel('本文',{exact:true})).toHaveValue(retainedBody);
     await expect(detail.getByRole('heading',{name:'現地の写真',exact:true})).toBeFocused();
     await p.setViewportSize({width:1280,height:600});
     await info.attach('short-edit-layout',{body:JSON.stringify(await p.evaluate(()=>{
       const selectors=['.lv-caption-task','.lv-caption-browser','.lv-caption-reading','.lv-caption-detail','.lv-caption-content','[data-caption-completion]'];
       return{viewport:{width:innerWidth,height:innerHeight},active:{tag:document.activeElement?.tagName,className:document.activeElement?.className},nodes:selectors.map(selector=>{const n=document.querySelector(selector)!,r=n.getBoundingClientRect(),s=getComputedStyle(n);return{selector,rect:{x:r.x,y:r.y,width:r.width,height:r.height},scrollTop:n.scrollTop,scrollHeight:n.scrollHeight,clientHeight:n.clientHeight,overflow:s.overflow,rows:s.gridTemplateRows};})};
     })),contentType:'application/json'});
-    await expect(detail.getByRole('button',{name:'変更を適用',exact:true})).toBeInViewport().catch(async error=>{await p.screenshot({path:info.outputPath('short-edit-failure.png')});throw error;});
-    for(const name of ['変更を適用','取り消す'])await expect(detail.locator('[data-caption-completion]').getByRole('button',{name,exact:true})).toBeInViewport({ratio:1});
-    const completionHits=await detail.locator('[data-caption-completion] > button').evaluateAll(nodes=>nodes.map(n=>{const r=n.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return{text:n.textContent,width:r.width,height:r.height,hit:hit===n||!!hit&&n.contains(hit)};}));
+    await expect(detail.getByRole('button',{name:'変更を適用',exact:true})).toBeHidden();
+    await expect(detail.locator('[data-caption-completion]').getByRole('button',{name:'取り消す',exact:true})).toBeInViewport({ratio:1}).catch(async error=>{await p.screenshot({path:info.outputPath('short-edit-failure.png')});throw error;});
+    const completionHits=await detail.locator('[data-caption-completion] > button:not([hidden])').evaluateAll(nodes=>nodes.map(n=>{const r=n.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return{text:n.textContent,width:r.width,height:r.height,hit:hit===n||!!hit&&n.contains(hit)};}));
     await info.attach('short-edit-completion-hits',{body:JSON.stringify(completionHits),contentType:'application/json'});expect(completionHits.every(n=>n.hit&&n.width>=44&&n.height>=44)).toBe(true);
     await p.screenshot({path:info.outputPath('edit-short.png'),fullPage:false});await p.setViewportSize({width:1440,height:1000});
     await expect(p.getByRole('list',{name:'キャプション一覧',exact:true})).toBeVisible(); await expect(captions.locator('.lv-caption-search').getByLabel('検索',{exact:true})).toHaveValue('現地');
-    await expect(detail.getByLabel('本文',{exact:true})).toHaveValue('閲覧から戻って編集');
-    await detail.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready('変更を適用しました。'); const path = await save('after-view');
+    await expect(detail.getByLabel('本文',{exact:true})).toHaveValue(retainedBody);
+    await detail.getByRole('button',{name:'取り消す',exact:true}).click();await detail.getByRole('button',{name:'変更を取り消す',exact:true}).click();
+    await detail.getByLabel('本文',{exact:true}).fill('閲覧から戻って編集');
+    await finishCaptionEditing(p, {body:'閲覧から戻って編集'}, 15000); const path = await save('after-view');
     const archive = await BackupArchive.inspect(new Blob([Uint8Array.from(await readFile(path)).buffer]), validationMetadataLimits), inspected = await inspectProjectCandidates(archive.source.read(), validationMetadataLimits);
     if (inspected.kind !== 'project-candidate-inspection') throw Error('Saved metadata'); expect(Object.values((inspected.unambiguousRecords as any).captionsById)).toEqual([expect.objectContaining({ title: '現地の写真', body: '閲覧から戻って編集' })]);
     await p.reload(); await expect(p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('閲覧と編集', { timeout: 90_000 }); await p.locator('.lv-caption-select').filter({ hasText: '現地の写真' }).click(); await expect(detail.getByLabel('本文', { exact: true })).toHaveValue('閲覧から戻って編集');
@@ -293,9 +306,8 @@ test('one PC app keeps the same Project through connected, cold offline and prep
     await revealCoordinateAdd(p); const owner = p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '再開するモデル.glb' }); await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
     const pin = p.getByRole('region', { name: '位置の調整', exact: true }); for (const axis of ['X', 'Y', 'Z']) await pin.getByLabel('位置 ' + axis, { exact: true }).fill(axis === 'Y' ? '.5' : '0'); await pin.getByRole('button', { name: 'ここに記録を作る', exact: true }).click();
     const detail = () => p.getByRole('region', { name: 'キャプションの詳細', exact: true });
-    await detail().getByLabel('タイトル', { exact: true }).fill('同じ記録'); await detail().getByLabel('本文', { exact: true }).fill('接続中に記録した本文'); await detail().getByRole('button', { name: '変更を適用', exact: true }).click();
-    await expect(p.getByText('変更を適用しました。', { exact: true })).toBeVisible();
-    const chooser = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await chooser).setFiles({ name: '現場.png', mimeType: 'image/png', buffer: smallPng() }); await p.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await expect(p.getByText('メディアを追加しました。', { exact: true })).toBeVisible();
+    await detail().getByLabel('タイトル', { exact: true }).fill('同じ記録'); await detail().getByLabel('本文', { exact: true }).fill('接続中に記録した本文'); await finishCaptionEditing(p, {});
+    const chooser = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await chooser).setFiles({ name: '現場.png', mimeType: 'image/png', buffer: smallPng() }); await finishCaptionEditing(p, {});
     const save = async (name: string) => {
       await p.locator('.lv-workspace-actions').getByRole('button', {name:'保存…',exact:true}).click(); const files = p.getByRole('region', { name: 'ファイル', exact: true }); await files.getByLabel('保存名（任意）', { exact: true }).fill(name);
       const [download] = await Promise.all([p.waitForEvent('download'), files.locator('.lv-file-primary').click()]); const path = info.outputPath(name + '.zip'); await download.saveAs(path); expect(await download.failure()).toBeNull();
@@ -307,7 +319,7 @@ test('one PC app keeps the same Project through connected, cold offline and prep
     await p.screenshot({ path: info.outputPath('workspace-settings.png'), fullPage: false });
     await context!.close(); context = undefined; await server.stop(); p = await open(true); await selected();
     await p.locator('.lv-caption-select').filter({ hasText: '同じ記録' }).click(); await expect(detail().getByLabel('本文', { exact: true })).toHaveValue('接続中に記録した本文');
-    await detail().getByLabel('本文', { exact: true }).fill('通信なしで追記した本文'); await detail().getByRole('button', { name: '変更を適用', exact: true }).click(); await expect(p.getByText('変更を適用しました。', { exact: true })).toBeVisible();
+    await detail().getByLabel('本文', { exact: true }).fill('通信なしで追記した本文'); await finishCaptionEditing(p, {});
     const saved = await save('offline-edit'); expect(saved.identity).toEqual(connected.identity); expect(saved.changes).toEqual(expect.arrayContaining(connected.changes)); expect(saved.bodies).toEqual(connected.bodies);
     await revealOfflineUtilities(p); await expect(offline().getByRole('status')).toBeHidden();
     await context!.setOffline(false); await server.start(); const cacheNames = await p.evaluate(() => caches.keys());

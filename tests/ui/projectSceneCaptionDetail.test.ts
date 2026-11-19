@@ -1,13 +1,38 @@
 import { describe, expect, it } from 'vitest';
 import { value, type Field } from '../../src/scene/types';
 import { normalizeCaptionText } from '../../src/domain/captionText';
-import { acceptCaptionApply, beginCaptionDraft, captionApplyIsCurrent, composeCaptionDraft, editCaptionDraft, editCaptionTextarea,
+import { acceptCaptionApply, acceptCaptionAutosave, beginCaptionDraft, captionApplyIsCurrent, composeCaptionDraft, editCaptionDraft, editCaptionTextarea, reanchorCaptionAutosave, settleCaptionAutosaveNoops,
   hasCaptionDraft, planCaptionApply, type CaptionApplyPlan, type CaptionEditField, type DetailContext, type DetailSource } from '../../src/ui/projectScene/captionDetailState';
 import { createCaptionDetailControls, type CaptionDetailEvent, type CaptionDetailProps } from '../../src/ui/projectScene/captionDetailControls';
 import { RecordedDocument, record } from './domRecorder';
 import { mapTextareaEdit, textareaText } from '../../src/ui/projectScene/textareaBody';
 
 const cap = 'cap_' + '1'.repeat(32), scn = 'scn_' + '1'.repeat(32);
+it('autosave acknowledges only the submitted text while preserving newer input and composition', () => {
+  const initial = edit(context(), 'body', '最初の変更'), plan = apply(initial);
+  const newer = composeCaptionDraft(editCaptionDraft(initial.draft!, initial.source, 'body', '続けて入力'), initial.source, 'body');
+  const observed = { ...source(), token: 'saved', caption: { ...source().caption, body: value('最初の変更') } };
+  const kept = acceptCaptionAutosave(plan, newer, observed);
+  expect(kept.edits.body).toBe('続けて入力'); expect(kept.base.body).toEqual(value('最初の変更')); expect(kept.composing).toBe('body');
+  expect(acceptCaptionAutosave(plan, initial.draft!, observed).edits).toEqual({});
+  const reverted = editCaptionDraft(initial.draft!, initial.source, 'body', '本文\r\n二行目');
+  expect(reverted.edits).toEqual({});
+  expect(acceptCaptionAutosave(plan, reverted, observed).edits.body).toBe('本文\r\n二行目');
+  expect(() => acceptCaptionAutosave(plan, newer, { ...observed, caption: { ...observed.caption, body: value('他の更新') } })).toThrow('保存結果');
+});
+it('autosave preserves settled NFD spelling and CRLF splice offsets without another save', () => {
+  const raw='Cafe\u0301\r\nx',current=edit(context(),'body',raw),plan=apply(current);
+  const observed={...source(),token:'saved',caption:{...source().caption,body:value(raw.normalize('NFC'))}};
+  const settled=acceptCaptionAutosave(plan,current.draft!,observed);
+  expect(hasCaptionDraft(settled)).toBe(false);expect(settled.savedRaw?.body).toBe(raw);
+  const continued=editCaptionTextarea(settled,observed,'Cafe\u0301\nx!',{start:7,end:7,inputType:'insertText'});
+  expect(continued.edits.body).toBe('Cafe\u0301\r\nx!');expect(continued.bodyInputIssue).toBeNull();
+  const equivalent=editCaptionDraft(settled,observed,'body',raw);
+  expect(hasCaptionDraft(settleCaptionAutosaveNoops(equivalent,observed))).toBe(false);
+  const reanchored=reanchorCaptionAutosave(settled,{...observed,token:'other'});
+  expect(reanchored.savedRaw?.body).toBe(raw);
+  expect(reanchorCaptionAutosave(settled,{...observed,caption:{...observed.caption,body:value('外部の更新')}}).savedRaw).toEqual({});
+});
 const unresolved = <T>(): Field<T> => ({ kind: 'unresolved', reason: 'conflict' });
 function source(): DetailSource & { kind: 'ready' } {
   return { kind: 'ready', token: 'one', sceneId: scn, sceneCount: value(2), caption: { id: cap, title: value('記録'),

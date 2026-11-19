@@ -5,7 +5,7 @@ import { CaptionRowLayout } from './captionRowLayout';
 
 /** Synthetic-port UI only. Host owns metadata, editor drafts and renderer effects. */
 export function createCaptionListControls(document: Document, onPlan: (plan: CaptionListPlan) => void,
-  onComposition: (active: boolean) => void, presentation?: { compact?:boolean;recordActions?:{available():boolean;invoke(action:'edit'|'delete',captionId:string,token:string,sceneId:string):void} }) {
+  onComposition: (active: boolean) => void, presentation?: { compact?:boolean;recordActions?:{selectsTarget?:boolean;available():boolean;invoke(action:'edit'|'delete',captionId:string,token:string,sceneId:string):void} }) {
   const make = <K extends keyof HTMLElementTagNameMap>(tag: K, text = '') => {
     const node = document.createElement(tag); node.textContent = text; return node;
   };
@@ -100,7 +100,9 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
       select.append(swatch, title, ownerText, note); node.append(select, action,edit,remove);
       const selectClick = () => request({ kind: 'select', captionId: item.id });
       const actionClick = () => { const current = rows.get(item.id); if (current) request({ kind: current.effect, captionId: item.id }); };
-      const invoke=(kind:'edit'|'delete')=>{if(!context||composing||context.pending||context.mutationBlock||!presentation?.recordActions?.available())return;const token=context.source.token,sceneId=context.source.sceneId;const selected=request({kind:'select',captionId:item.id});if(!selected||selected.kind==='blocked')return;if(context.source.token===token&&context.source.sceneId===sceneId&&context.memory.selectedCaptionId===item.id)presentation.recordActions.invoke(kind,item.id,token,sceneId);};
+      const invoke=(kind:'edit'|'delete')=>{if(!context||composing||context.pending||context.mutationBlock||!presentation?.recordActions?.available())return;const token=context.source.token,sceneId=context.source.sceneId;
+        if(presentation.recordActions.selectsTarget){presentation.recordActions.invoke(kind,item.id,token,sceneId);return;}
+        const selected=request({kind:'select',captionId:item.id});if(!selected||selected.kind==='blocked')return;if(context.source.token===token&&context.source.sceneId===sceneId&&context.memory.selectedCaptionId===item.id)presentation.recordActions.invoke(kind,item.id,token,sceneId);};
       const editClick=()=>invoke('edit'),deleteClick=()=>invoke('delete');
       select.addEventListener('click', selectClick); action.addEventListener('click', actionClick);edit.addEventListener('click',editClick);remove.addEventListener('click',deleteClick);
       entry = { node, select, title, owner: ownerText, note, swatch, action, edit, remove, effect: 'review', cleanup: () => {
@@ -114,7 +116,10 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
       if (button.hidden !== actionsHidden) button.hidden = actionsHidden;
       if (button.disabled !== disabled) button.disabled = disabled;
     }
-    label(entry.title, captionTitle(item)); label(entry.owner, captionOwnerLabel(item));
+    const preview = context!.preview;
+    const title = preview?.token === context!.source.token && preview.sceneId === context!.source.sceneId && preview.captionId === item.id
+      ? preview.title : undefined;
+    label(entry.title, title === undefined ? captionTitle(item) : title.trim() ? title : '無題'); label(entry.owner, captionOwnerLabel(item));
     entry.owner.hidden = item.pin === 'visible' && item.owner.kind === 'value';
     entry.select.setAttribute('aria-current', String(item.id === context!.memory.selectedCaptionId));
     entry.swatch.style.backgroundColor = row.color ?? ''; entry.swatch.hidden = row.color === null;

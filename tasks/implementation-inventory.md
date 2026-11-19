@@ -1,6 +1,6 @@
 # 実装・接続の全体棚卸し
 
-> 更新: 2026-11-19（06jの限定した中断復旧の接続を追記。07oの限定画像関連付けと型付き添付不可説明を反映。現PCの逐次取込み・高画素表示・実サムネイルの接続は保持。既存Point/GS・Proxy、Native・Mesh／標準材質変換と01gの範囲は保持。接続分類は2026-09-21時点、M14の任意化は2026-10-29のPO確認）。本書は機能対応の正本。
+> 更新: 2026-11-19（08dのCaption自動保存・即時表示と06kの限定した中断復旧を反映。06j、07o、高画素表示、既存Point/GS・Proxy、Native・Mesh／標準材質変換と01gの範囲は保持。接続分類は2026-09-21時点、M14の任意化は2026-10-29のPO確認）。本書は機能対応の正本。
 > 実装順・現在の作業tree・実行結果は [todo](todo.md) を参照し、ここへ重複記載しない。
 > 限定接続と製品受入れを区別し、通常画面・実機の新たな合格は主張しない。
 > [以前の棚卸しと監査記録](../docs/history/development-through-2026-09-14/tasks/implementation-inventory.md) は履歴。
@@ -25,6 +25,13 @@ PC候補の「共有」では渡すシーンを選び、選択したシーンで
 利用者の明示操作で確定済み内容から再開し、原本・既存履歴を残す。
 新規／復元済みの両経路を対象とし、部分書込みや破損の一般修復、自動保存化は含まない。
 実行結果と残る接続条件はtodoに集約し、全体採用・実機・公開の合格へ読み替えない。
+
+[08d](../docs/specs/08d-caption-autosave-workflow-proposal.md)の製品PC／オフライン経路は、
+Caption入力の即時表示と、既存Sessionを使う直列自動保存を実装し、PC・タッチ相当とオフラインで自動検証した。
+検証用harnessの明示適用は保持し、表示用下書きを保存済みproviderへ混ぜない。
+別承認の[06k](../docs/specs/06k-autosave-interruption-admission-proposal.md)は、
+無変更を証明できる未確定partの封印と、復元済みProjectの準備済み添付の再試行を追加する。
+壊れた管理記録の一般修復へは広げない。正確な検証範囲と実機残件はtodoを参照。
 
 [01f](../docs/specs/01f-desktop-smooth-composition-evaluation.md)の隔離PC評価と、
 承認済み[01g](../docs/specs/01g-desktop-smooth-display-proposal.md)の製品実装は別の証拠経路。

@@ -29,7 +29,7 @@ export function createValidationReceiveControls(document: Document, host: Return
   restoreStatus.setAttribute('role', 'status'); restoreStatus.className = 'lv-operation-status'; restoreArea.append(restoreSummary, restoreLabel, restoreStatus, restoreCommands);
   let restorePrepared = false, restoreCancel = false, restoreFeedback = '';
   const restoreChanges = () => !!restoreInput.files?.length || restorePrepared || restoreCancel;
-  const output = createValidationOutputControls(document, host, session, changed, () => otherInput() || busy || !!input.files?.length || !!selectedJob || !!selectedCopy || !!cancel || restoreChanges());
+  const output = createValidationOutputControls(document, host, session, changed, () => otherInput() && !session()?.canFlushCaption?.() || busy || !!input.files?.length || !!selectedJob || !!selectedCopy || !!cancel || restoreChanges());
   root.append(restoreArea, output.root);
   editOnly(form, restoreLabel);
   const guard = (recovery: boolean, restore = false) => {

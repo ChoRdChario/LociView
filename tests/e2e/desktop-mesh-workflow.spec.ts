@@ -1,7 +1,7 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { writeCleanImportFixture } from './cleanImportFixture';
 import { desktopEntry, desktopOrigin } from './desktopEntry';
-import { chooseHomeFiles, revealReviewFiles,chooseSharedScene, selectShareOutput,  closeFileSurface, beginMaterialEditing, revealCaptionList } from './workspaceUi';
+import { finishCaptionEditing, chooseHomeFiles, revealReviewFiles,chooseSharedScene, selectShareOutput,  closeFileSurface, beginMaterialEditing, revealCaptionList } from './workspaceUi';
 import { revealFileSurface, revealModelManagement, lookAlongFront } from './workspaceUi';
 import {expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
 import {writeFile} from 'node:fs/promises';
@@ -25,7 +25,7 @@ const detail=(p:Page)=>p.getByRole('region',{name:'キャプションの詳細',
 async function ready(p:Page,expected=title,notice:'clear'|'smooth'='clear'){await expect(p.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText(expected,{timeout:240000});const status=p.locator('.lv-project-viewport-status');if(notice==='smooth'){await expect(p.locator('.lv-drawing-notice')).toContainText('透過表示（近似）',{timeout:180000});await expect(status).not.toContainText(/読み込み中|準備しています|失敗|確認できません/);}else {await expect(status).toBeEmpty({timeout:180000});await expect(p.locator('.lv-drawing-notice')).toBeEmpty();}}
 async function open(p:Page,path:string){await chooseHomeFiles(p, path);}
 async function selectCaption(p:Page,label?:string){await revealCaptionList(p);await p.getByRole('tab',{name:'キャプション',exact:true}).click();const rows=p.getByRole('list',{name:'キャプション一覧',exact:true}).locator('.lv-caption-select');await(label?rows.filter({hasText:label}):rows.first()).click();}
-async function edit(p:Page,field:'タイトル'|'本文',text:string){await closeFileSurface(p);await detail(p).getByLabel(field,{exact:true}).fill(text);await detail(p).getByRole('button',{name:'変更を適用',exact:true}).click();await expect(p.getByText('変更を適用しました。',{exact:true})).toBeVisible({timeout:180000});}
+async function edit(p:Page,field:'タイトル'|'本文',text:string){await closeFileSurface(p);await detail(p).getByLabel(field,{exact:true}).fill(text);await finishCaptionEditing(p, {}, 180000);}
 async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWorkspace'|'contribution'|'review',base?:string,reviewScene?:string){
   const menu=p.locator('details.lv-project-files');if(await menu.count()&&!await menu.evaluate(n=>(n as HTMLDetailsElement).open))await menu.locator(':scope > summary').click();
   const area=files(p);

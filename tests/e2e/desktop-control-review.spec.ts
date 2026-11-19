@@ -5,7 +5,7 @@ import { openAsBlob } from 'node:fs';
 import * as A from '@automerge/automerge';
 import { ownedServer } from '../offline-e2e/server';
 import { triangleGlb, nativeSpatialBackup } from './fixtures';
-import { chooseHomeFiles, revealReviewFiles,chooseSharedScene, selectShareOutput, revealFileSurface, revealCaptionList, closeFileSurface } from './workspaceUi';
+import { finishCaptionEditing, chooseHomeFiles, revealReviewFiles,chooseSharedScene, selectShareOutput, revealFileSurface, revealCaptionList, closeFileSurface } from './workspaceUi';
 import { BackupArchive } from '../../src/projectPackage/backupArchive';
 import { validationMetadataLimits } from '../../src/projectFiles/validation';
 import { ReviewArchive } from '../../src/projectPackage/reviewArchive';
@@ -89,8 +89,7 @@ test('touch Review copy preserves Mesh, Point, GS, Proxy and photos through actu
     await expect(confirmation).toBeFocused(); await expect(confirmation).toBeInViewport();
     await p.getByRole('button', { name: 'コピーを作成', exact: true }).click(); await ready(p); await revealCaptionList(p);
     await p.locator('.lv-caption-select').first().click(); const detail = p.getByRole('region', { name: 'キャプションの詳細', exact: true });
-    await detail.getByLabel('本文', { exact: true }).fill('スマホで直接コピーを編集'); await detail.getByRole('button', { name: '変更を適用', exact: true }).click();
-    await expect(p.getByText('変更を適用しました。', { exact: true })).toBeVisible(); await p.screenshot({ path: info.outputPath('touch-edited.png') });
+    await detail.getByLabel('本文', { exact: true }).fill('スマホで直接コピーを編集'); await finishCaptionEditing(p, {}); await p.screenshot({ path: info.outputPath('touch-edited.png') });
     await revealFileSurface(p, '保存'); const area = p.getByRole('region', { name: 'ファイル', exact: true }); const [saved] = await Promise.all([p.waitForEvent('download'), area.locator('.lv-file-primary').click()]);
     const path = info.outputPath('mixed-saved.zip'); await saved.saveAs(path); expect(await saved.failure()).toBeNull();
     const backup = await BackupArchive.inspect(await openAsBlob(path), validationMetadataLimits), inspected = await inspectProjectCandidates(backup.source.read(), validationMetadataLimits);

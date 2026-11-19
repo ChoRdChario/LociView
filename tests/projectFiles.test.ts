@@ -3344,6 +3344,38 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await cold.dispose();
     const again = owned(await openValidationHost(f.options)); expect(again.read().source!.originalChanges()).toEqual(changes);
   });
+  it.each(['prepared', 'before publication', 'published'] as const)('06k resumes a restored prepared photo exactly once (%s)', async cut => {
+    const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));
+    const before = host.read().source!, provider = host.read().provider!;
+    if (provider.kind !== 'scene-provider') throw Error('Expected provider');
+    const sceneId = provider.state.defaultSceneId.kind === 'value' ? provider.state.defaultSceneId.value : '';
+    const attachmentId = `att_${newId()}`, eventId = `evt_${newId()}`;
+    const marker = cut === 'prepared' ? '/blobsVerified.json' : '/published.json', write = f.base.writeText.bind(f.base);
+    const fault = vi.spyOn(f.base, 'writeText').mockImplementation(async(path,value) => {
+      if (path.endsWith(marker) && cut === 'before publication') throw Error('interrupted photo');
+      await write(path,value); if(path.endsWith(marker))throw Error('interrupted photo');
+    });
+    try {
+      await expect(host.authority.addMediaFile!(before.token, {sceneId,captionId:f.captionId,attachmentId,eventId,orderKey:'zU',
+        file:{name:'復旧する写真.png',size:png.length,arrayBuffer:async()=>png.slice().buffer}})).rejects.toThrow();
+    } finally {fault.mockRestore();}
+    await host.dispose(); const cold=owned(await openValidationHost(f.options));
+    if(cut!=='published'){expect(cold.read().state).toBe('pending');await cold.authority.retry!();}
+    const saved=cold.read(), changes=saved.source!.originalChanges();
+    expect(saved.state).toBe('ready');expect(changes).toHaveLength(before.originalChanges().length+1);
+    expect(changes).toEqual(expect.arrayContaining(before.originalChanges()));
+    const rows=captionAttachments(cold.authority.read().mediaData,f.captionId).ready;
+    expect(rows.filter(row=>row.id===attachmentId)).toHaveLength(1);
+    const part=changes.find(bytes=>!before.originalChanges().some(old=>A.decodeChange(old).hash===A.decodeChange(bytes).hash))!;
+    const media=before.assertCaptionAttachmentIntroduction(part,provider);
+    expect(media).toMatchObject({blob:{digest:await digest(png)}});
+    const decoded=A.decodeChange(part), tampered=A.encodeChange({...decoded,ops:[...decoded.ops,...decoded.ops.slice(-1)]});
+    expect(()=>before.assertCaptionAttachmentIntroduction(tampered,provider)).toThrow();
+    await cold.authority.retry!();expect(cold.read().source!.originalChanges()).toEqual(changes);
+    await cold.dispose();const again=owned(await openValidationHost(f.options));
+    expect(again.read().source!.originalChanges()).toEqual(changes);
+    expect(captionAttachments(again.authority.read().mediaData,f.captionId).ready.filter(row=>row.id===attachmentId)).toHaveLength(1);
+  });
   it.each(['nontext', 'missing evidence', 'unprepared'] as const)('refuses cold text recovery for %s', async fault => {
     const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));
     const before = host.read().source!, edits = fault === 'nontext' ? { body: '本文と色', colorSrgb: [0.1, 0.2, 0.3] } : { body: '未確定の本文' };
@@ -6118,6 +6150,147 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     list.scrollTop = 30; list.fire('scroll'); h.refresh();
     expect(list.scrollTop).toBe(30); expect(markers.children[0] === marker).toBe(true); expect(marker.document.activeElement === marker).toBe(true);
     expect(h.host.read().source!.token).toBe(before); expect(h.dispatch).not.toHaveBeenCalled(); await h.ui.dispose();
+  });
+  it('08d preserves continued typing, native revert and search during a held save, then flushes the latest text before file output', async () => {
+    let navigationBlocked=false;
+    const h=await productWorkspaceFixture(true,false,false,'map2',undefined,{mountEditor:(doc,host,factory,tools,candidate,navigation)=>
+      createProductWorkspace(doc,host,factory,tools,candidate,{...navigation!,captionAutosave:true,projectNavigationBlocked:()=>navigationBlocked})});
+    h.named('キャプション一覧',h.editor).children[0]!.children[0]!.click();
+    navigationBlocked=true;h.refresh();expect(h.button('プロジェクトを選ぶ',h.editor).disabled).toBe(true);
+    navigationBlocked=false;h.refresh();expect(h.button('プロジェクトを選ぶ',h.editor).disabled).toBe(false);
+    const title=h.named('タイトル',h.editor),body=h.named('本文',h.editor),originalTitle=title.value,before=h.host.read().source!.token;
+    let release!:()=>void;const held=new Promise<void>(resolve=>{release=resolve;});caseDisposals.push(()=>release?.());
+    const write=h.f.fs.writeText.bind(h.f.fs);let once=true;
+    const pause=vi.spyOn(h.f.fs,'writeText').mockImplementation(async(path,text)=>{
+      if(once&&path.endsWith('/published.json')){once=false;await held;}return write(path,text);
+    });
+    title.value='保存中の表題';title.fire('input');
+    await vi.waitFor(()=>expect(h.status.dataset.busy).toBe('true'),{timeout:10000});
+    expect(title.readOnly).toBe(false);expect(h.named('本文',h.editor).readOnly).toBe(false);
+    expect((h.all(h.editor).find(n=>n.className==='lv-project-body')! as unknown as {inert:boolean}).inert).toBe(false);
+    title.value=originalTitle;title.fire('input');body.fire('compositionstart');body.value='保存中にも日本語を入力';body.fire('input');
+    const search=h.named('検索',h.editor);search.value='保存中';search.fire('input');expect(search.value).toBe('保存中');
+    release();await vi.waitFor(()=>expect(h.host.read().source!.token).not.toBe(before),{timeout:10000});
+    expect(title.value).toBe(originalTitle);expect(body.value).toBe('保存中にも日本語を入力');
+    body.fire('compositionend');search.value='';search.fire('input');
+    await vi.waitFor(()=>{const state=h.all(h.named('キャプションの詳細',h.editor)).find(n=>n.dataset.saveState==='saved');expect(state).toBeDefined();},{timeout:10000});
+    pause.mockRestore();expect(title.value).toBe(originalTitle);expect(body.value).toBe('保存中にも日本語を入力');
+    body.value='最後の入力も書き出す';body.fire('input');
+    h.button('ファイルに保存',h.named('ファイル')).click();
+    await vi.waitFor(()=>expect(h.downloads).toHaveBeenCalledOnce(),{timeout:10000});
+    const job=h.host.workspaceOutput.jobs.find(j=>j.purpose==='backup')!,backup=await BackupArchive.inspect(await h.host.workspaceOutput.download(job.id),metadata);
+    expect(backup.source.originalChanges()).toEqual(h.host.read().source!.originalChanges());
+    expect(h.host.authority.read().resources.captions[h.f.f.captionId]!.body).toEqual({kind:'value',value:'最後の入力も書き出す'});
+    await h.ui.dispose();
+  });
+  it('08d keeps exact retry reachable after the newest input reverts to its base during a failed save', async () => {
+    const h=await productWorkspaceFixture(true,false,false,'map2',undefined,{mountEditor:(doc,host,factory,tools,candidate,navigation)=>
+      createProductWorkspace(doc,host,factory,tools,candidate,{...navigation!,captionAutosave:true})});
+    h.named('キャプション一覧',h.editor).children[0]!.children[0]!.click();
+    const title=h.named('タイトル',h.editor),original=title.value,before=h.host.read().source!.originalChanges().length;
+    let release!:()=>void;const held=new Promise<void>(resolve=>{release=resolve;});caseDisposals.push(()=>release?.());
+    const write=h.f.fs.writeText.bind(h.f.fs);let once=true;
+    const pause=vi.spyOn(h.f.fs,'writeText').mockImplementation(async(path,text)=>{
+      if(once&&path.endsWith('/published.json')){once=false;await held;throw Error('injected publication failure');}return write(path,text);
+    });
+    title.value='保存中の変更';title.fire('input');
+    await vi.waitFor(()=>expect(h.status.dataset.busy).toBe('true'),{timeout:10000});
+    title.value=original;title.fire('input');release();
+    const detail=h.named('キャプションの詳細',h.editor),retry=h.button('保存を再試行',detail);
+    await vi.waitFor(()=>expect(retry.disabled).toBe(false),{timeout:10000});
+    expect(retry.hidden).toBe(false);expect(retry.parent!.hidden).toBe(false);expect(title.value).toBe(original);
+    pause.mockRestore();retry.click();
+    await vi.waitFor(()=>expect(h.all(detail).some(n=>n.dataset.saveState==='saved')).toBe(true),{timeout:10000});
+    expect(h.host.authority.read().resources.captions[h.f.f.captionId]!.title).toEqual({kind:'value',value:original});
+    expect(h.host.read().source!.originalChanges()).toHaveLength(before+2);expect(title.value).toBe(original);await h.ui.dispose();
+  });
+  it('08d waits for the latest text before honoring a different pin selection without moving the camera', async () => {
+    const h=await productWorkspaceFixture(true,false,false,'map2',undefined,{mountEditor:(doc,host,factory,tools,candidate,navigation)=>
+      createProductWorkspace(doc,host,factory,tools,candidate,{...navigation!,captionAutosave:true})});
+    const source=h.host.read().provider,captionId=`cap_${newId()}`;
+    if(source?.kind!=='scene-provider'||source.state.defaultSceneId.kind!=='value')throw Error('Expected source');
+    const asset=Object.values(source.resources.assets)[0]!;
+    if(asset.projection.kind!=='value')throw Error('Expected model');const model=asset.projection.value;
+    await h.host.dispatch(source.token,{kind:'addPin',sceneId:source.state.defaultSceneId.value,captionId,membershipId:`scm_${newId()}`,
+      eventId:`evt_${newId()}`,anchor:{kind:'asset',assetId:asset.id,assetFrameId:model.assetFrameId,positionAsset:[0,0,0],
+        authoredAssetRevisionId:model.revisionId,authoredAnchorCompatibilityId:model.anchorCompatibilityIds[0]!,hitEvidence:{method:'manual'}},colorSrgb:[.2,.3,.4]});h.refresh();
+    const markers=h.all(h.editor).find(n=>n.className==='lv-project-markers')!;
+    markers.children.find(n=>n.dataset.captionId===captionId)!.click();
+    const body=h.named('本文',h.editor);body.value='別のピンへ移る前の入力';body.fire('input');
+    const beforeCamera=h.payload();
+    markers.children.find(n=>n.dataset.captionId===h.f.f.captionId)!.click();
+    await vi.waitFor(()=>expect(h.named('本文',h.editor).value).not.toBe('別のピンへ移る前の入力'),{timeout:10000});
+    expect(h.host.authority.read().resources.captions[captionId]!.body).toEqual({kind:'value',value:'別のピンへ移る前の入力'});
+    expect(h.payload()).toEqual(beforeCamera);await h.ui.dispose();
+  });
+  it('08d keeps actionable media refusal beside the retained File without changing saved records', async () => {
+    const h=await productWorkspaceFixture(true,false,false,'map2',undefined,{mountEditor:(doc,host,factory,tools,candidate,navigation)=>
+      createProductWorkspace(doc,host,factory,tools,candidate,{...navigation!,captionAutosave:true})});
+    h.named('キャプション一覧',h.editor).children[0]!.children[0]!.click();
+    const before=h.host.read().source!,detail=h.named('キャプションの詳細',h.editor),input=h.named('メディアを追加',h.editor);
+    input.fire('click');Object.assign(input,{files:[new File([syntheticHeif().buffer],'unsupported.heic',{type:'image/heic'})]});input.fire('change');
+    await vi.waitFor(()=>expect(h.all(detail).some(n=>n.dataset.saveState==='failed')).toBe(true),{timeout:10000});
+    expect(h.all(detail).find(n=>n.dataset.saveState==='failed')!.textContent).toContain('端末で別のJPEG');
+    expect(h.host.read().source!.token).toBe(before.token);expect(h.host.read().source!.originalChanges()).toEqual(before.originalChanges());
+    h.button('選択を取り消す',h.named('メディア',h.editor)).click();
+    await vi.waitFor(()=>expect(h.all(detail).some(n=>n.dataset.saveState==='saved')).toBe(true),{timeout:10000});
+    expect(input.disabled).toBe(false);expect(h.host.read().source!.token).toBe(before.token);await h.ui.dispose();
+  });
+  it('08d keeps compact reading navigation synchronous while retaining invalid or still-saving input and blocking unrelated writes', async () => {
+    let workspace!:ReturnType<typeof createProductWorkspace>;
+    const h=await productWorkspaceFixture(true,false,false,'map2',undefined,{mountEditor:(doc,host,factory,tools,candidate,navigation)=>{
+      Object.assign(doc,{defaultView:{innerWidth:390,innerHeight:844,matchMedia:()=>({matches:true}),addEventListener(){},removeEventListener(){},setTimeout,clearTimeout}});
+      return workspace=createProductWorkspace(doc,host,factory,tools,candidate,{...navigation!,captionAutosave:true});
+    }});
+    h.named('キャプション一覧',h.editor).children[0]!.children[0]!.click();
+    const body=h.named('本文',h.editor),raw='保持する入力\u2028',before=h.host.read().source!,area=h.all(h.editor).find(n=>n.className==='lv-project-body')!;
+    body.value=raw;body.fire('input');
+    const local=h.all(h.named('キャプションの詳細',h.editor)).find(n=>n.dataset.saveState==='pending')!,issue=local.textContent;
+    expect(issue).toContain('本文');expect(await workspace.session.flushCaption()).toBe(false);
+    expect(local.textContent).toBe(issue);expect(h.status.textContent).not.toContain(issue);
+    h.button('一覧へ戻る',h.editor).click();expect(body.value).toBe(raw);
+    expect(h.all(h.editor).find(n=>n.className==='lv-retained-edit')!.hidden).toBe(false);
+    h.button('編集に戻る',h.editor).click();expect(body.value).toBe(raw);
+    for(const tab of ['モデル','描画']){
+      h.button(tab,h.editor).click();expect(h.all(h.editor).find(n=>n.className==='lv-retained-edit')!.hidden).toBe(false);
+      expect(h.button('編集に戻る',h.editor).disabled).toBe(false);
+      if(tab==='描画'){
+        const opacity=h.named('不透明度（%）',h.editor);expect(opacity.readOnly).toBe(true);
+        opacity.value='25';opacity.fire('input');
+      }
+    }
+    h.button('3D',h.editor).click();expect(area.dataset.surface).toBe('stage');
+    h.button('記録を検索',h.editor).click();expect(area.dataset.surface).toBe('panel');
+    expect(h.named('検索',h.editor).document.activeElement).toBe(h.named('検索',h.editor));
+    h.button('編集に戻る',h.editor).click();expect(body.value).toBe(raw);
+    expect(h.dispatch).not.toHaveBeenCalled();expect(h.host.read().source!.token).toBe(before.token);
+    h.button('取り消す',h.captionTextActions()).click();h.button('変更を取り消す',h.named('キャプションの詳細',h.editor)).click();
+    let release!:()=>void;const held=new Promise<void>(resolve=>{release=resolve;});caseDisposals.push(()=>release?.());
+    const write=h.f.fs.writeText.bind(h.f.fs);let once=true;
+    const pause=vi.spyOn(h.f.fs,'writeText').mockImplementation(async(path,text)=>{
+      if(once&&path.endsWith('/published.json')){once=false;await held;}return write(path,text);
+    });
+    body.value='保存中でも一覧へ';body.fire('input');
+    await vi.waitFor(()=>expect(h.status.dataset.busy).toBe('true'),{timeout:10000});
+    h.button('3D',h.editor).click();expect(area.dataset.surface).toBe('stage');
+    h.button('記録を検索',h.editor).click();expect(area.dataset.surface).toBe('panel');
+    expect(h.named('検索',h.editor).document.activeElement).toBe(h.named('検索',h.editor));
+    expect(body.value).toBe('保存中でも一覧へ');release();
+    await vi.waitFor(()=>expect(h.all(h.named('キャプションの詳細',h.editor)).some(n=>n.dataset.saveState==='saved')).toBe(true),{timeout:10000});
+    expect(h.host.authority.read().resources.captions[h.f.f.captionId]!.body).toEqual({kind:'value',value:'保存中でも一覧へ'});
+    expect(h.host.read().source!.originalChanges()).toHaveLength(before.originalChanges().length+1);pause.mockRestore();await h.ui.dispose();
+  });
+  it('08d retains final composition after authority loss and never writes it', async () => {
+    const h=await productWorkspaceFixture(true,false,false,'map2',undefined,{mountEditor:(doc,host,factory,tools,candidate,navigation)=>
+      createProductWorkspace(doc,host,factory,tools,candidate,{...navigation!,captionAutosave:true})});
+    h.named('キャプション一覧',h.editor).children[0]!.children[0]!.click();
+    const body=h.named('本文',h.editor),before=h.host.read().source!.token;
+    body.fire('compositionstart');body.value='途中の日本語';body.fire('input');
+    const readOnly=vi.spyOn(h.host.authority,'readOnly','get').mockReturnValue(true);h.refresh();
+    body.value='確定した日本語';body.fire('compositionend');h.refresh();
+    expect(body.value).toBe('確定した日本語');expect(body.readOnly).toBe(true);
+    await new Promise(resolve=>setTimeout(resolve,750));expect(h.host.read().source!.token).toBe(before);expect(h.dispatch).not.toHaveBeenCalled();
+    readOnly.mockRestore();await h.ui.dispose();
   });
   it('keeps Caption apply announcements outside the inert work area without duplicating the visual progress card', async () => {
     const h = await productWorkspaceFixture(true);

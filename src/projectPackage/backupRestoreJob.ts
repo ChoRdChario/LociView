@@ -7,6 +7,8 @@ import { newId, underWriteLease } from '../projectMetadata/persistence';
 import type { MetadataProjectSession, MetadataSessionRead, UnwrittenLocalEditRecovery } from '../projectMetadata/session';
 import { TransactionJournal, observeJournal } from '../projectMetadata/journal';
 import { MetadataRepository, type MetadataStorageFactory } from '../projectMetadata/repository';
+import { assertClosedLocalOriginals, closedLocalBase } from '../projectMetadata/closedLocal';
+import { recordBlobRefs } from '../domain/portableMedia';
 import type { BackupRestoreInput } from '../projectMetadata/packageRemote';
 import { packageByteHash } from './manifest';
 import { BackupArchive } from './backupArchive';
@@ -325,17 +327,23 @@ export class BackupRestoreJob {
         previous.effectivePublication?.start.transactionId !== read.publication || !restoreEqual(tail.start.baseHeads, read.source.heads))
         return fail('restore-destination-not-ready');
       if (!localRecovery) {
-      if (!tail.prepared ||
-        tail.prepared.remote || tail.prepared.stagedBlobs?.length || tail.prepared.changes.length !== 1)
+      if (!tail.prepared || tail.prepared.remote || tail.prepared.changes.length !== 1)
         return fail('restore-destination-not-ready');
       const parts = await journal.validateParts(tail.prepared), next = read.source.appendOriginal(parts);
       const change = next.read().history.changes.find(entry => entry.id === tail.prepared!.changes[0]!.expectedChangeHash);
       const path = change?.writes[0]?.path;
-      if (path?.[0] !== 'captionsById' || !path[1]) return fail('restore-destination-not-ready');
-      read.source.assertCaptionTextChange(parts[0]!, path[1], read.provider);
-      const current = await new MetadataRepository(ports.fs, factory, limits).read(tail.start.repositoryId, tail.start.proof);
-      if (!current || current.token !== next.token && (tail.durable || current.token !== read.source.token))
+      if (path?.[0] === 'captionsById' && path[1] && !tail.prepared.stagedBlobs?.length)
+        read.source.assertCaptionTextChange(parts[0]!, path[1], read.provider);
+      else {
+        const media = read.source.assertCaptionAttachmentIntroduction(parts[0]!, read.provider);
+        if (!restoreEqual(tail.prepared.stagedBlobs ?? [], recordBlobRefs(media))) return fail('restore-destination-not-ready');
+      }
+      const current = await new MetadataRepository(ports.fs, factory, limits).readForUnwrittenResolution(tail.start.repositoryId, tail.start.proof);
+      const expected = current?.token === next.token ? next : !tail.durable && current?.token === read.source.token ? read.source : null;
+      if (!current || !expected)
         return fail('restore-destination-database');
+      assertClosedLocalOriginals((await closedLocalBase(current.originalChanges(), limits)).originals,
+        (await closedLocalBase(expected.originalChanges(), limits)).originals);
       }
     }
     const saved = await measure('repository', () => new MetadataRepository(ports.fs, factory, limits).read(restored.entry.start.repositoryId, restored.source.proof, read.source!.heads));

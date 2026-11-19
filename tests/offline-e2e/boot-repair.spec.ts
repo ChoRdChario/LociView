@@ -5,7 +5,7 @@ import { openAsBlob } from 'node:fs';
 import * as A from '@automerge/automerge';
 import { ownedServer } from './server';
 import { triangleGlb } from '../e2e/fixtures';
-import { chooseHomeFiles, revealFileSurface, closeFileSurface, revealCoordinateAdd, revealOfflineUtilities } from '../e2e/workspaceUi';
+import { chooseHomeFiles, revealFileSurface, closeFileSurface, revealCoordinateAdd, revealOfflineUtilities, finishCaptionEditing } from '../e2e/workspaceUi';
 import { BackupArchive } from '../../src/projectPackage/backupArchive';
 import { validationMetadataLimits } from '../../src/projectFiles/validation';
 
@@ -57,8 +57,7 @@ for (const base of ['/', '/LociView/']) test(`same-build cold boot repairs missi
     for (const axis of ['X', 'Y', 'Z']) await position.getByLabel(`位置 ${axis}`, { exact: true }).fill('0');
     await position.getByRole('button', { name: 'ここに記録を作る', exact: true }).click();
     const detail = () => p.getByRole('region', { name: 'キャプションの詳細', exact: true });
-    await detail().getByLabel('本文', { exact: true }).fill('修復前の本文と原本を保持'); await detail().getByRole('button', { name: '変更を適用', exact: true }).click();
-    await expect(p.getByText('変更を適用しました。', { exact: true })).toBeVisible();
+    await detail().getByLabel('本文', { exact: true }).fill('修復前の本文と原本を保持'); await finishCaptionEditing(p, {body:'修復前の本文と原本を保持'}, 20_000);
     const before = await backup(p, info, 'before-repair'), direct = p.url();
     const entry = await p.locator('script[type="module"][src]').first().getAttribute('src'); expect(entry).toBeTruthy();
     const entryUrl = new URL(entry!, server.url).href;

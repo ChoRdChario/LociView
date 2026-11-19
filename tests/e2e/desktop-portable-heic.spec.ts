@@ -1,6 +1,6 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { writeCleanImportFixture } from './cleanImportFixture';
-import { chooseHomeFiles, selectShareOutput, closeFileSurface, revealCoordinateAdd, revealFileSurface, revealProjectSelection } from './workspaceUi';
+import { finishCaptionEditing, chooseHomeFiles, selectShareOutput, closeFileSurface, revealCoordinateAdd, revealFileSurface, revealProjectSelection } from './workspaceUi';
 import { desktopOrigin, desktopEntry } from './desktopEntry';
 import { expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
@@ -71,14 +71,14 @@ test('08c uses canvas generation, portable offline display/save/reopen and a por
     for (const [axis,value] of [['X','0'],['Y','.5'],['Z','0']]) await p.getByLabel(`位置 ${axis}`, { exact: true }).fill(value!);
     await p.getByRole('button', { name: 'ここに記録を作る', exact: true }).click(); await ready(p, 'ピンの位置を確定しました。');
     const settings=p.getByLabel('設定',{exact:true});await settings.locator(':scope > summary').click();await settings.getByLabel('編集者名',{exact:true}).fill('HEIC担当');await settings.getByLabel('このプロジェクトの今後の編集にこの名前を残す',{exact:true}).check();await settings.getByRole('button',{name:'編集者名を設定',exact:true}).click();
-    await p.getByLabel('本文',{exact:true}).fill('名前のみの履歴');await p.getByRole('button',{name:'変更を適用',exact:true}).click();await ready(p,'変更を適用しました。');
-    const chooser = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await chooser).setFiles('tests/fixtures/daily-media/owned-still.heic'); await p.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await ready(p, 'メディアを追加しました。');
+    await p.getByLabel('本文',{exact:true}).fill('名前のみの履歴');await finishCaptionEditing(p, {}, 90_000);
+    const chooser = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await chooser).setFiles('tests/fixtures/daily-media/owned-still.heic'); await finishCaptionEditing(p, {}, 90_000);
     await gallery(p); expect(await p.evaluate(() => (window as any).__heicDecodes)).toBe(1);
     const workspace = await output(p, info, 'portable-workspace', 'teamWorkspace');
     const inspected = await WorkspaceArchive.inspect(new Blob([Uint8Array.from(await readFile(workspace)).buffer]), limits); expect(inspected.archive.control.manifest.requiredCapabilities).toEqual(['editor-attribution-v1','portable-heic-display-v1']);
     const b = await launch(1); await open(b.p, workspace); await b.p.getByRole('button', { name: 'プロジェクトを取り込む', exact: true }).click(); await expect(b.p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 }); await gallery(b.p);
     // Already-loaded shell only: no claim of offline app cold startup/PWA caching.
-    await b.context.setOffline(true); await b.p.getByLabel('本文', { exact: true }).fill('オフラインの追記'); await b.p.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready(b.p, '変更を適用しました。');
+    await b.context.setOffline(true); await b.p.getByLabel('本文', { exact: true }).fill('オフラインの追記'); await finishCaptionEditing(b.p, {}, 90_000);
     const backup = await output(b.p, info, 'offline-backup', 'backup'); await gallery(b.p);
     await revealProjectSelection(b.p); await b.p.getByRole('button', { name: /^(?:プロジェクトを選ぶ|ファイルを開く|別のプロジェクトを開く)$/, exact: true }).click(); await b.p.getByRole('button', { name: '編集で開く', exact: true }).first().click(); await gallery(b.p); expect(await b.p.evaluate(() => (window as any).__heicDecodes)).toBe(0);
     await b.context.setOffline(false); await b.context.close(); contexts.delete(b.context);

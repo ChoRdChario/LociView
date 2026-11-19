@@ -5,10 +5,13 @@ import { textareaText, type TextareaEditRange } from './textareaBody';
 import { editOnly, viewOnly } from './modePresentation';
 
 export type CaptionDetailEvent = CaptionApplyPlan |
+  Readonly<{ kind: 'flush' }> |
+  Readonly<{ kind: 'retry' }> |
   Readonly<{ kind: 'draft'; baseDraft: CaptionDraft; draft: CaptionDraft }> |
   Readonly<{ kind: 'cancel'; draft: CaptionDraft }> |
   Readonly<{ kind: 'review'; captionId: string; field: CaptionEditField; token: string }>;
 export interface CaptionDetailProps extends DetailContext {
+  readonly autosave?: Readonly<{ saving: boolean; failed: boolean; inputBlock: string | null; error?: string }>;
   readonly editorFields?: readonly { label: string; names: readonly (string | null)[] }[];
   /** Temporary saved-text presentation; command guards remain unchanged. */
   readonly textOnly?: boolean;
@@ -71,6 +74,13 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
       onEvent({ kind: 'draft', baseDraft: props.draft, draft });
     };
     listen(input, 'input', changed);
+    const finishInput = (event: Event) => {
+      // Moving between this record's fields continues the same typing burst.
+      const target = (event as FocusEvent).relatedTarget as Node | null;
+      if (props?.autosave && hasCaptionDraft(props.draft) && !(target?.ownerDocument === document && root.contains(target)))
+        onEvent({ kind: 'flush' });
+    };
+    input.addEventListener('blur', finishInput); cleanups.push(() => input.removeEventListener('blur', finishInput));
     listen(input, 'compositionstart', () => {
       if (!props?.draft || input.readOnly) return;
       onEvent({ kind: 'draft', baseDraft: props.draft, draft: composeCaptionDraft(props.draft, props.source, field) });
@@ -95,7 +105,9 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
   const actions = make('div'); actions.className = 'lv-caption-detail-actions';
   actions.setAttribute('data-caption-completion', '');
   const apply = button('変更を適用'), cancel = button('取り消す');
-  actions.append(apply, cancel); root.append(properties, actions);
+  const retrySave = button('保存を再試行'); retrySave.hidden = true; retrySave.className = 'lv-caption-retry';
+  actions.append(apply, cancel, retrySave); root.append(properties, actions);
+  listen(retrySave, 'click', () => { if (!retrySave.disabled) onEvent({ kind: 'retry' }); });
   const confirmation = make('div'); confirmation.hidden = true;
   editOnly(actions, picker, confirmation);
   const confirm = button('変更を取り消す'), keep = button('編集を続ける');
@@ -139,7 +151,7 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
     for (const [field, control] of fields) {
       const current = source.kind === 'ready' ? source.caption[field] : null;
       control.value.textContent = current?.kind === 'value' ? current.value : '';
-      const raw = owned?.edits[field];
+      const raw = owned?.edits[field] ?? owned?.savedRaw?.[field];
       if (owned?.composing !== field) {
         const text = raw ?? (current?.kind === 'value' ? current.value : '');
         // Do not reassign an already displayed value after a keystroke: it can
@@ -151,7 +163,8 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
       if (field === 'color' && (source.kind === 'ready' && issue || raw !== undefined || owned?.composing === 'color')) properties.open = true;
       // Validation errors stay editable; source conflicts/stale baselines stay explicit.
       const unavailable = current?.kind !== 'value';
-      control.input.readOnly = owned?.composing !== field && (!owned || unavailable || next.mutationBlock !== null || inFlight || !!next.readonlyFields?.includes(field));
+      control.input.readOnly = owned?.composing !== field && (!owned || unavailable ||
+        (next.autosave ? next.autosave.inputBlock !== null : next.mutationBlock !== null || inFlight) || !!next.readonlyFields?.includes(field));
       control.note.textContent = [issue, raw !== undefined && issue && '入力内容は未適用です。',
         field === 'color' && raw === undefined && current?.kind === 'value' && current.value === '' && '未設定（標準色で表示）'].filter(Boolean).join(' ');
       control.note.hidden = empty || !control.note.textContent;
@@ -170,15 +183,28 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
     const emptyRecord = source.kind === 'ready' && source.caption.title.kind === 'value' && !source.caption.title.value.trim() &&
       source.caption.body.kind === 'value' && !source.caption.body.value.trim();
     const applyHint = next.mediaDraft ? '選んだメディアと入力をまとめて適用します。' : '写真や動画も選んでから、まとめて適用できます。';
-    const nextStatusText = [...new Set([next.feedback.kind === 'failed' && `適用できませんでした。${next.feedback.message} 入力は保持しています。`,
+    let nextStatusText = [...new Set([next.feedback.kind === 'failed' && `適用できませんでした。${next.feedback.message} 入力は保持しています。`,
       inFlight && '変更を適用中です。', unapplied && !inFlight && (applyIssue === null && next.feedback.kind !== 'failed' && !next.textOnly
         ? applyHint : '未適用の入力があります。'),
       emptyRecord && !unapplied && !inFlight && next.feedback.kind === 'idle' && !next.mutationBlock && !next.textOnly && 'タイトル・本文や写真を追加できます。',
       !inFlight && !next.textOnly && next.mutationBlock !== '閲覧中です。編集を開始してください。' && next.mutationBlock, source.kind !== 'ready' && (source.reason || 'キャプションを選択してください。'),
       (hasCaptionDraft(owned) || next.mediaDraft) && applyIssue && !inFlight && applyIssue].filter(Boolean))].join(' ');
+    if (next.autosave) {
+      nextStatusText = source.kind !== 'ready' ? source.reason : next.autosave.saving ? '保存中…' :
+        next.autosave.failed ? `${next.autosave.error ?? '保存できませんでした。'} 入力は保持しています。` :
+        next.autosave.inputBlock && unapplied ? next.autosave.inputBlock : owned?.composing ? '文字を入力中' :
+        unapplied ? (captionApplyIssue(next) ?? '保存待ち') : emptyRecord ? 'タイトル・本文や写真を追加できます。' : 'このブラウザに保存済み';
+      status.dataset.saveState = next.autosave.saving ? 'saving' : next.autosave.failed ? 'failed' : unapplied ? 'pending' : 'saved';
+      status.dataset.busy = String(next.autosave.saving);
+    }
     if (status.textContent !== nextStatusText) status.textContent = nextStatusText;
     apply.disabled = applyIssue !== null;
     actions.hidden = !hasCaptionDraft(owned) && !next.mediaDraft;
+    if (next.autosave) { apply.hidden = true; actions.hidden = next.autosave.saving ||
+      !next.autosave.failed && (!unapplied || !next.autosave.inputBlock && applyIssue === null); }
+    else apply.hidden = false;
+    retrySave.hidden = !next.autosave?.failed;
+    retrySave.disabled = !!next.autosave?.saving || !!owned?.composing || !!next.autosave?.inputBlock;
     cancel.disabled = !hasCaptionDraft(owned) && !next.mediaDraft || Boolean(owned?.composing) || inFlight || next.cancelBlock != null;
     confirm.disabled = cancel.disabled;
     const focus = returnFocus;
@@ -201,5 +227,6 @@ export function createCaptionDetailControls(document: Document, onEvent: (event:
   }
   function dispose(): void { disposed = true; for (const cleanup of cleanups) cleanup(); root.remove(); }
   return { root, mediaSlot, actions, confirmation, focusBody: () => fields.get('body')!.input.focus?.({preventScroll:false}),
+    hasTextFocus: () => [...fields.values()].some(field => field.input === document.activeElement),
     focusTitle: () => fields.get('title')!.input.focus?.({preventScroll:false}), render, dispose };
 }

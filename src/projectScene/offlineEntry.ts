@@ -22,7 +22,7 @@ export async function bootOfflineDesktopApp(root: HTMLElement) {
   const workspace = await createValidationBrowserWorkspace(document, {
     offline: offline.port, progressivePresentation: true, filePolicy: policy, residency: createGsResidency(500_000, 44_500_000),
     smoothDisplay: { budget: createTargetBudget(), plan: targetLayout, create: createSmoothComposite },
-    mountEditor: (host, factory, tools, candidate, navigation) => createProductWorkspace(document, host, factory, tools, candidate, { ...navigation, compactFiles: true }),
+    mountEditor: (host, factory, tools, candidate, navigation) => createProductWorkspace(document, host, factory, tools, candidate, { ...navigation, compactFiles: true, captionAutosave: true }),
   }, new URL(location.href).searchParams.get('run') ?? undefined);
   root.replaceChildren(workspace.root);workspaceAttached=true;
   window.addEventListener('beforeunload', event => { if (workspace.hasChanges()) { event.preventDefault(); event.returnValue = ''; } });

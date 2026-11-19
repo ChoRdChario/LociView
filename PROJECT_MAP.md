@@ -27,6 +27,10 @@ owns feature coverage. Read [document authority](docs/README.md) for contracts.
 Production application ports and composition live in `src/projectScene`; the ordinary
 Desktop graph imports no harness authority or fixtures. The same inspected file
 services receive split host policies and a shared whole-view/instance GS ledger.
+[08d](docs/specs/08d-caption-autosave-workflow-proposal.md) keeps Caption scheduling,
+settled raw spelling and immediate preview in UI only; typed Session commands own
+durability. [06k](docs/specs/06k-autosave-interruption-admission-proposal.md) owns the
+bounded interrupted-save admission. Todo owns qualification, not these links.
 [06h](docs/specs/06h-direct-review-copy-proposal.md) defines direct Review-copy
 initialization from one retained original and fixed metadata; old jobs retain
 their recovery. Public source/schema formats are unchanged; todo owns executed

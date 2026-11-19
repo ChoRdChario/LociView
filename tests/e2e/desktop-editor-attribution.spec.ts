@@ -1,7 +1,7 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { writeCleanImportFixture } from './cleanImportFixture';
 import { desktopOrigin, desktopEntry } from './desktopEntry';
-import { chooseHomeFiles, chooseSharedScene, selectShareOutput,  closeFileSurface, revealCoordinateAdd, revealFileSurface } from './workspaceUi';
+import { finishCaptionEditing, chooseHomeFiles, chooseSharedScene, selectShareOutput,  closeFileSurface, revealCoordinateAdd, revealFileSurface } from './workspaceUi';
 import { expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import * as A from '@automerge/automerge';
@@ -31,8 +31,7 @@ async function editor(p: Page, name: string, enabled = true) {
 }
 async function edit(p: Page, field: 'タイトル' | '本文', value: string) {await closeFileSurface(p);
   await detail(p).getByLabel(field, { exact: true }).fill(value);
-  await detail(p).getByRole('button', { name: '変更を適用', exact: true }).click();
-  await expect(p.getByText('変更を適用しました。', { exact: true })).toBeVisible({ timeout: 90_000 }); await settled(p);
+  await finishCaptionEditing(p, {}, 90_000); await settled(p);
 }
 async function output(p: Page, info: TestInfo, label: string, purpose: 'backup' | 'teamWorkspace' | 'contribution' | 'review', base?: string) {
   const menu = p.locator('details.lv-project-files'); if (!await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();

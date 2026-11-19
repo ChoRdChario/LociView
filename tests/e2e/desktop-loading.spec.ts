@@ -1,5 +1,5 @@
 import {ownedServer} from '../offline-e2e/server';
-import { chooseHomeFiles, revealFileSurface, revealModelManagement, lookAlongFront } from './workspaceUi';
+import { finishCaptionEditing, chooseHomeFiles, revealFileSurface, revealModelManagement, lookAlongFront } from './workspaceUi';
 import {test,expect,type Page,type TestInfo} from '@playwright/test';
 import {createHash} from 'node:crypto';
 import {openAsBlob} from 'node:fs';
@@ -31,8 +31,8 @@ test('PCでモデル読込中も記録を検索・閲覧し、準備済み点群
  const status=page.locator('.lv-project-viewport-status'),canvas=page.getByLabel('3Dモデルの表示',{exact:true});await expect(status).toHaveAttribute('data-busy','false',{timeout:90_000});
  await lookAlongFront(page);await page.getByRole('button',{name:'キャプションを追加',exact:true}).click();const box=(await canvas.boundingBox())!;await canvas.click({position:{x:box.width/2,y:box.height/2}});
  await page.getByRole('button',{name:'ここに記録を作る',exact:true}).click();await expect(page.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible();
- const detail=page.getByRole('region',{name:'キャプションの詳細',exact:true});await detail.getByLabel('タイトル',{exact:true}).fill('先に読める記録');await detail.getByLabel('本文',{exact:true}).fill('読み込み途中もこの文章を読めます');await detail.getByRole('button',{name:'変更を適用',exact:true}).click();await expect(page.getByText('変更を適用しました。',{exact:true})).toBeVisible();
- const image=page.waitForEvent('filechooser');await page.getByLabel('メディアを追加',{exact:true}).click();await(await image).setFiles({name:'写真.png',mimeType:'image/png',buffer:smallPng()});await page.getByRole('region',{name:'キャプションの詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await expect(page.getByText('メディアを追加しました。',{exact:true})).toBeVisible();
+ const detail=page.getByRole('region',{name:'キャプションの詳細',exact:true});await detail.getByLabel('タイトル',{exact:true}).fill('先に読める記録');await detail.getByLabel('本文',{exact:true}).fill('読み込み途中もこの文章を読めます');await finishCaptionEditing(page, {});
+ const image=page.waitForEvent('filechooser');await page.getByLabel('メディアを追加',{exact:true}).click();await(await image).setFiles({name:'写真.png',mimeType:'image/png',buffer:smallPng()});await finishCaptionEditing(page, {});
  await page.getByRole('tab',{name:'モデル',exact:true}).click();const model=page.waitForEvent('filechooser');await revealModelManagement(page); await page.getByRole('button',{name:'3Dモデルを追加',exact:true}).click();await(await model).setFiles({name:'後から表示する面.glb',mimeType:'model/gltf-binary',buffer:texturedTriangleGlb()});await expect(page.getByText('モデルを追加しました。',{exact:true})).toBeVisible({timeout:90_000});
  const before=await backup(page,info,'before-loading');await page.evaluate(()=>sessionStorage.setItem('lv-test-hold-bitmaps','1'));await page.reload();
  await expect(page.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText('読み込み中の作業',{timeout:90_000});await expect.poll(()=>page.evaluate(()=>(window as any).__heldBitmaps)).toBeGreaterThan(0);

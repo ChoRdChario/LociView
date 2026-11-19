@@ -106,6 +106,8 @@ export interface WorkspaceViewportPresentation {
   readonly pins: readonly { readonly id: string; readonly x: number; readonly y: number; readonly visible: boolean }[];
 }
 export interface WorkspaceFileInteraction {
+  canFlushCaption?(): boolean;
+  flushCaption?(): Promise<boolean>;
   readonly interactionPending: boolean | string | null;
   readonly acknowledgment: { readonly state: 'idle' | 'checking' | 'failed' };
   refreshHistory(): void;
@@ -119,6 +121,8 @@ export interface WorkspaceReadingSelection {
   readonly surface?: 'list' | 'detail';
 }
 export interface ProjectWorkspacePorts {
+  /** Product Caption input lane only; harnesses retain explicit Apply. */
+  readonly captionAutosave?: boolean;
   readonly initialReading?: WorkspaceReadingSelection;
   readonly initialSceneId?: string;
   readonly rasterResources?: RasterResources;

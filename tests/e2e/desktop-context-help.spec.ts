@@ -1,4 +1,4 @@
-import { chooseHomeFiles, revealCoordinateAdd, revealFileSurface, revealWorkPanel } from './workspaceUi';
+import { chooseHomeFiles, finishCaptionEditing, revealCoordinateAdd, revealFileSurface, revealWorkPanel } from './workspaceUi';
 import { test, expect, chromium } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import * as A from '@automerge/automerge';
@@ -52,12 +52,22 @@ test('delayed explanations stay readable and preserve a Caption draft through to
     await p.setViewportSize({ width: 320, height: 740 }); await help.tap(); await expect(tooltip).toBeVisible();
     const bounds = await tooltip.boundingBox(); expect(bounds!.x).toBeGreaterThanOrEqual(0); expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(320); expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(740);
     await p.screenshot({ path: info.outputPath('narrow-context-help.png'), fullPage: true }); await p.keyboard.press('Escape'); await expect(title).toHaveValue('説明を開いても入力を保持');
-    await p.setViewportSize({width:720,height:500});await revealWorkPanel(p);const detail=p.getByRole('region',{name:'キャプションの詳細',exact:true}),apply=detail.getByRole('button',{name:'変更を適用',exact:true});
-    const largeText=await p.addStyleTag({content:'.lv-context-help-note {font-size:24px!important;line-height:1.6!important}'});await help.focus();await help.press('Enter');await expect(tooltip).toBeVisible();await moveOverNote();
-    const tip=(await tooltip.boundingBox())!,action=(await apply.boundingBox())!,center={x:action.x+action.width/2,y:action.y+action.height/2};
+    await finishCaptionEditing(p, { title: '説明を開いても入力を保持' });
+    await p.setViewportSize({width:720,height:500});await revealWorkPanel(p);const detail=p.getByRole('region',{name:'キャプションの詳細',exact:true}),cancel=detail.getByRole('button',{name:'取り消す',exact:true});
+    // A retained validation issue has a real recovery action; routine Apply no longer exists.
+    await detail.getByLabel('本文',{exact:true}).fill('説明の下でも取り消せる入力\u2028');
+    const largeText=await p.addStyleTag({content:'.lv-context-help-note {font-size:24px!important;line-height:1.6!important}'});await help.focus();await help.press('Enter');await expect(tooltip).toBeVisible();
+    // Deliberately overlap the current recovery action, independent of label wrapping.
+    await cancel.scrollIntoViewIfNeeded();
+    const action=(await cancel.boundingBox())!,center={x:action.x+action.width/2,y:action.y+action.height/2};
+    await tooltip.evaluate((node,center)=>{const tip=node as HTMLElement,box=tip.getBoundingClientRect();
+      tip.style.left=`${Math.max(8,Math.min(center.x-box.width/2,innerWidth-box.width-8))}px`;
+      tip.style.top=`${Math.max(8,Math.min(center.y-box.height/2,innerHeight-box.height-8))}px`;
+    },center);
+    await moveOverNote();const tip=(await tooltip.boundingBox())!;
     expect(center.x>=tip.x&&center.x<tip.x+tip.width&&center.y>=tip.y&&center.y<tip.y+tip.height).toBe(true);
-    expect(await apply.evaluate(n=>{const r=n.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===n||n.contains(hit);})).toBe(true);
-    await apply.click();await expect(p.getByText('変更を適用しました。',{exact:true})).toBeVisible();await expect(tooltip).toHaveCount(0);await largeText.evaluate(n=>(n as HTMLStyleElement).remove());await p.setViewportSize({width:1440,height:1000});
+    expect(await cancel.evaluate(n=>{const r=n.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===n||n.contains(hit);})).toBe(true);
+    await cancel.click();await detail.getByRole('button',{name:'変更を取り消す',exact:true}).click();await finishCaptionEditing(p,{title:'説明を開いても入力を保持',body:''});await expect(tooltip).toHaveCount(0);await largeText.evaluate(n=>(n as HTMLStyleElement).remove());await p.setViewportSize({width:1440,height:1000});
     const menu = p.locator('details.lv-project-files'); if (!await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
     const files = p.getByRole('region', { name: 'ファイル', exact: true }); if(!await revealFileSurface(p,'保存')) await files.getByRole('button', { name: '保存', exact: true }).click();
     const [download] = await Promise.all([p.waitForEvent('download'), files.locator('button.lv-file-primary').click()]); const saved = info.outputPath('help-backup.zip'); await download.saveAs(saved);

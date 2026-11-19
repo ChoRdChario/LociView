@@ -1,18 +1,44 @@
 import * as A from '@automerge/automerge/slim';
 import type { EvidenceRef } from '../projectPackage/contract';
 import type { JournalStart, Publication } from './journal';
+import type { ProjectWorkspaceFS } from '../platform/fs';
 import { checkedChanges, fail, type MetadataLimits } from './format';
 import { digest, equalBytes, json, technicalId } from './persistence';
 
 /** Private terminal evidence only: this is neither an edit nor a publication. */
-export interface ClosedLocalReceipt {
-  schema: 'lociview-metadata-closed-local-1';
+interface ClosedLocalBaseReceipt {
   transactionId: string;
   repositoryId: string;
   start: EvidenceRef;
   effectivePublication: { transactionId: string; receipt: EvidenceRef; heads: string[] };
   baseChangeSet: { sha256: string; count: number };
   resolution: 'retain-published-state';
+}
+export interface UnpreparedLocalPart {
+  path: 'changes/00000000.amchange'; byteLength: number; sha256: string;
+}
+export type ClosedLocalReceipt = ClosedLocalBaseReceipt & (
+  { schema: 'lociview-metadata-closed-local-1' } |
+  { schema: 'lociview-metadata-closed-local-2'; unpreparedParts: [UnpreparedLocalPart] });
+
+/** One bounded file observation; unprepared bytes are sealed, never decoded. */
+export async function readUnpreparedLocalPart(fs: ProjectWorkspaceFS, path: string, limits: MetadataLimits): Promise<UnpreparedLocalPart | null> {
+  const file = await fs.readStream(path);
+  if (!file) return null;
+  if (!Number.isSafeInteger(file.size) || file.size < 0 || file.size > limits.maxTotalBytes) return fail('closed-local-part-budget');
+  const bytes = new Uint8Array(file.size), reader = file.stream().getReader();
+  let offset = 0, work = 0;
+  try {
+    for (;;) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      if (++work > limits.maxWork || !(chunk.value instanceof Uint8Array) || chunk.value.length > bytes.length - offset)
+        return fail('closed-local-part-read');
+      bytes.set(chunk.value, offset); offset += chunk.value.length;
+    }
+    if (offset !== bytes.length) return fail('closed-local-part-read');
+    return { path: 'changes/00000000.amchange', byteLength: bytes.length, sha256: await digest(bytes) };
+  } finally { try { await reader.cancel(); } finally { reader.releaseLock(); } }
 }
 
 export async function closedLocalReference(value: unknown): Promise<EvidenceRef> {
@@ -53,14 +79,22 @@ function evidence(value: unknown, limits: MetadataLimits): value is EvidenceRef 
 /** Structural binding; the Session separately proves complete source/DB equality. */
 export async function validateClosedLocal(receipt: ClosedLocalReceipt, start: JournalStart,
   effective: { start: JournalStart; publication: Publication }, limits: MetadataLimits) {
-  if (!keys(receipt, 'baseChangeSet,effectivePublication,repositoryId,resolution,schema,start,transactionId') ||
-    receipt.schema !== 'lociview-metadata-closed-local-1' || receipt.resolution !== 'retain-published-state' ||
+  const schema2 = receipt?.schema === 'lociview-metadata-closed-local-2';
+  if (!keys(receipt, schema2 ? 'baseChangeSet,effectivePublication,repositoryId,resolution,schema,start,transactionId,unpreparedParts' :
+    'baseChangeSet,effectivePublication,repositoryId,resolution,schema,start,transactionId') ||
+    !schema2 && receipt.schema !== 'lociview-metadata-closed-local-1' || receipt.resolution !== 'retain-published-state' ||
     start.purpose !== 'localCommand' || receipt.transactionId !== start.transactionId || receipt.repositoryId !== start.repositoryId ||
     !evidence(receipt.start, limits) || !keys(receipt.effectivePublication, 'heads,receipt,transactionId') ||
     !evidence(receipt.effectivePublication.receipt, limits) || !keys(receipt.baseChangeSet, 'count,sha256') ||
     !Number.isSafeInteger(receipt.baseChangeSet.count) || receipt.baseChangeSet.count <= 0 || receipt.baseChangeSet.count > limits.maxChanges ||
     typeof receipt.baseChangeSet.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(receipt.baseChangeSet.sha256))
     return fail('closed-local-receipt');
+  if (schema2) {
+    const parts = receipt.unpreparedParts, part = parts?.[0];
+    if (!Array.isArray(parts) || parts.length !== 1 || !keys(part, 'byteLength,path,sha256') ||
+      part.path !== 'changes/00000000.amchange' || !Number.isSafeInteger(part.byteLength) || part.byteLength < 0 || part.byteLength > limits.maxTotalBytes ||
+      typeof part.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(part.sha256)) return fail('closed-local-part');
+  }
   technicalId(receipt.transactionId); technicalId(receipt.repositoryId); technicalId(receipt.effectivePublication.transactionId);
   if (receipt.effectivePublication.transactionId !== effective.start.transactionId ||
     json(receipt.start) !== json(await closedLocalReference(start)) ||

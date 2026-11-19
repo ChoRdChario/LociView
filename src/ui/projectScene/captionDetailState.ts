@@ -13,6 +13,8 @@ export interface CaptionDraft {
   readonly base: Readonly<Record<CaptionEditField, Field<string>>>;
   /** Raw user edits only, not a lossy whole-entity replacement. */
   readonly edits: Readonly<Partial<Record<CaptionEditField, string>>>;
+  /** Settled local spelling only (for example NFD). Never pending or persisted. */
+  readonly savedRaw?: Readonly<Partial<Record<CaptionEditField, string>>>;
   readonly composing: CaptionEditField | null;
   readonly bodyInputIssue: string | null;
 }
@@ -28,6 +30,11 @@ export interface CaptionApplyPlan {
 }
 export interface CaptionMediaDraft {
   readonly token: string; readonly sceneId: string; readonly captionId: string; readonly selectionId: string;
+}
+/** Display-only input. Never a provider, command plan or verified source. */
+export interface CaptionTextPreview {
+  readonly token: string; readonly sceneId: string; readonly captionId: string;
+  readonly title?: string; readonly body?: string;
 }
 export type DetailFeedback = Readonly<{ kind: 'idle' }> |
   Readonly<{ kind: 'applying'; plan: CaptionApplyPlan }> |
@@ -57,15 +64,16 @@ function observedBase(draft: CaptionDraft, source: DetailSource, field: CaptionE
 }
 export function editCaptionDraft(draft: CaptionDraft, source: DetailSource, field: CaptionEditField, text: string): CaptionDraft {
   const bases = observedBase(draft, source, field), edits = { ...draft.edits }, base = bases[field];
+  const savedRaw = { ...draft.savedRaw }; delete savedRaw[field];
   if (base.kind === 'value' && base.value === text) delete edits[field]; else edits[field] = text;
-  return Object.freeze({ ...draft, base: bases, edits: Object.freeze(edits) });
+  return Object.freeze({ ...draft, base: bases, edits: Object.freeze(edits), savedRaw: Object.freeze(savedRaw) });
 }
 export function composeCaptionDraft(draft: CaptionDraft, source: DetailSource, field: CaptionEditField | null): CaptionDraft {
   return Object.freeze({ ...draft, base: field === null ? draft.base : observedBase(draft, source, field), composing: field });
 }
 export function editCaptionTextarea(draft: CaptionDraft, source: DetailSource, value: string, range?: TextareaEditRange): CaptionDraft {
   const base = observedBase(draft, source, 'body').body;
-  const previous = draft.edits.body ?? (base.kind === 'value' ? base.value : '');
+  const previous = draft.edits.body ?? draft.savedRaw?.body ?? (base.kind === 'value' ? base.value : '');
   const result = mapTextareaEdit(previous, value, range);
   const edited = editCaptionDraft(draft, source, 'body', result.text);
   return Object.freeze({ ...edited, bodyInputIssue: draft.bodyInputIssue ?? (result.kind === 'blocked' ? result.reason : null) });
@@ -137,4 +145,50 @@ export function acceptCaptionApply(plan: CaptionApplyPlan, draft: CaptionDraft, 
     const actual = observed.caption[field]; if (actual.kind !== 'value' || actual.value !== plan.changes[field]) return draft;
   }
   return beginCaptionDraft(observed)!;
+}
+
+/** Acknowledge only our submitted revision; preserve text typed while it saved. */
+export function acceptCaptionAutosave(plan: CaptionApplyPlan, draft: CaptionDraft, observed: DetailSource): CaptionDraft {
+  if (observed.kind !== 'ready' || observed.sceneId !== plan.sceneId || observed.caption.id !== plan.captionId ||
+      draft.captionId !== plan.captionId) throw Error('保存先の記録が変わっています。入力は保持しています。');
+  const base = { ...draft.base }, edits = { ...draft.edits }, savedRaw = { ...draft.savedRaw };
+  for (const field of Object.keys(plan.changes) as CaptionEditField[]) {
+    const actual = observed.caption[field];
+    if (actual.kind !== 'value' || actual.value !== plan.changes[field])
+      throw Error('保存結果を確認できませんでした。入力は保持しています。');
+    const visible = edits[field] ?? savedRaw[field] ?? (draft.base[field].kind === 'value' ? draft.base[field].value : undefined);
+    base[field] = actual;
+    delete savedRaw[field];
+    if (visible === plan.draft.edits[field] && draft.composing !== field) {
+      delete edits[field]; if (visible !== actual.value) savedRaw[field] = visible;
+    }
+    else if (visible !== undefined && edits[field] === undefined && visible !== actual.value) edits[field] = visible;
+  }
+  return Object.freeze({ ...draft, base: Object.freeze(base), edits: Object.freeze(edits), savedRaw: Object.freeze(savedRaw) });
+}
+
+/** Equivalent local input needs no command; do not manufacture a no-op edit. */
+export function settleCaptionAutosaveNoops(draft: CaptionDraft, source: DetailSource): CaptionDraft {
+  if (source.kind !== 'ready' || source.caption.id !== draft.captionId || draft.composing || draft.bodyInputIssue) return draft;
+  const edits = { ...draft.edits }, savedRaw = { ...draft.savedRaw };
+  for (const field of Object.keys(edits) as CaptionEditField[]) {
+    const current = source.caption[field], base = draft.base[field], raw = edits[field]!;
+    if (base.kind !== 'value' || current.kind !== 'value' || base.value !== current.value) continue;
+    try {
+      if (normalized(field, raw) !== current.value) continue;
+      delete edits[field]; if (raw !== current.value) savedRaw[field] = raw;
+    } catch { /* Invalid input stays pending with its ordinary field error. */ }
+  }
+  return Object.freeze({ ...draft, edits: Object.freeze(edits), savedRaw: Object.freeze(savedRaw) });
+}
+
+/** Preserve settled spelling only while it still represents this confirmed text. */
+export function reanchorCaptionAutosave(draft: CaptionDraft, source: DetailSource): CaptionDraft {
+  if (source.kind !== 'ready' || source.caption.id !== draft.captionId || hasCaptionDraft(draft)) return draft;
+  const savedRaw: Partial<Record<CaptionEditField, string>> = {};
+  for (const field of Object.keys(draft.savedRaw ?? {}) as CaptionEditField[]) {
+    const current = source.caption[field], raw = draft.savedRaw![field]!;
+    if (current.kind === 'value' && normalized(field, raw) === current.value) savedRaw[field] = raw;
+  }
+  return Object.freeze({ ...beginCaptionDraft(source)!, savedRaw: Object.freeze(savedRaw) });
 }

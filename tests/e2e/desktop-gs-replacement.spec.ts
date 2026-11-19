@@ -1,6 +1,6 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { desktopEntry, desktopOrigin } from './desktopEntry';
-import { chooseHomeFiles, selectShareOutput,  closeFileSurface, revealFileSurface, revealModelManagement, lookAlongFront } from './workspaceUi';
+import { finishCaptionEditing, chooseHomeFiles, selectShareOutput,  closeFileSurface, revealFileSurface, revealModelManagement, lookAlongFront } from './workspaceUi';
 import {expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
 
 import {openAsBlob} from 'node:fs';
@@ -47,7 +47,7 @@ test('50万点SH4を新しい本体へ差し替え、旧資源の解放・2世�
   const canvas=p.getByLabel('3Dモデルの表示',{exact:true}),box=(await canvas.boundingBox())!,extent=4*Math.exp(Math.fround(Math.log(.0007))),bounds={min:[-500/300-extent,-250/300-extent,-extent] as const,max:[499/300+extent,249/300+extent,.0006+extent] as const},pose=fittedPose(bounds,defaultPose(),box.width/box.height,'+z');
   if(pose.projection.kind!=='perspective')throw Error('Perspective');const camera=new THREE.PerspectiveCamera(pose.projection.verticalFov*180/Math.PI,box.width/box.height,.000001,1e9);camera.position.set(...pose.position);camera.up.set(...pose.up);camera.lookAt(new THREE.Vector3(...pose.target));camera.updateMatrixWorld(true);const hit=new THREE.Vector3(.1,.2,0).project(camera);await canvas.click({position:{x:(hit.x+1)*box.width/2,y:(1-hit.y)*box.height/2}});
   await p.getByText('座標で微調整',{exact:true}).click(); await p.getByLabel('位置 X',{exact:true}).fill('0.2');await p.getByRole('button',{name:'ここに記録を作る',exact:true}).click();await expect(p.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible({timeout:240_000});
-  const detail=p.getByRole('region',{name:'キャプションの詳細',exact:true});await detail.getByLabel('本文',{exact:true}).fill('差し替えても残す記録');await detail.getByRole('button',{name:'変更を適用',exact:true}).click();await expect(p.getByText('変更を適用しました。',{exact:true})).toBeVisible({timeout:240_000});
+  const detail=p.getByRole('region',{name:'キャプションの詳細',exact:true});await detail.getByLabel('本文',{exact:true}).fill('差し替えても残す記録');await finishCaptionEditing(p, {}, 240_000);
   const workspace=await WorkspaceArchive.inspect(await openAsBlob(await output(p,info,'before-replacement',true)),validationMetadataLimits),oldInspection=await inspectProjectCandidates(workspace.source.read(),validationMetadataLimits);if(oldInspection.kind!=='project-candidate-inspection')throw Error('Workspace');const oldRecords=oldInspection.unambiguousRecords as Record<string,any>,old=active(oldRecords),caption=Object.values(oldRecords.captionsById)[0] as any;
   const beforePixel=(await presentedCanvas(canvas)).sample;await mark('original-workspace',p);
   await p.getByRole('tab',{name:'モデル',exact:true}).click();await models(p).locator('.lv-model-select').first().click();const chooser=p.waitForEvent('filechooser');await revealModelManagement(p); await models(p).getByRole('button',{name:'モデルを差し替える',exact:true}).click();await(await chooser).setFiles(updated);await expect(models(p).getByText(/ピン配置用モデルは未設定になります/)).toBeVisible();await models(p).getByRole('button',{name:'差し替えを確定',exact:true}).click();await expect(p.getByText('モデルを差し替えました。配置と記録を保持しています。',{exact:true})).toBeVisible({timeout:600_000});await ready(p);

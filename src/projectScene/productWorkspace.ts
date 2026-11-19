@@ -18,7 +18,7 @@ type Host = ReturnType<typeof createValidationModeHost>;
 type Tools = ReturnType<typeof createValidationReceiveControls>;
 /** Validation-only adapter. No synthetic Session or string-map writes enter product UI. */
 export function createProductWorkspace(document: Document, host: Host, factory: ViewportFactory, tools?: Tools, renderCandidate?: ModelCandidateRenderer,
-  navigation?: { utilitiesRoot?:HTMLElement;fileActionsRoot?:HTMLElement;compactFiles?:boolean;smoothDisplay?:boolean;presentation?():{busy:boolean;reason:string}|null;projectNavigationBlocked?():boolean;openProject(): void; resumedLastProject(): boolean; changed(): void; storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>>;localSettings?:{read():string;save(displayName:string):boolean}; initialReading?: WorkspaceReadingSelection; initialSceneId?: string }) {
+  navigation?: { captionAutosave?:boolean;utilitiesRoot?:HTMLElement;fileActionsRoot?:HTMLElement;compactFiles?:boolean;smoothDisplay?:boolean;presentation?():{busy:boolean;reason:string}|null;projectNavigationBlocked?():boolean;openProject(): void; resumedLastProject(): boolean; changed(): void; storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>>;localSettings?:{read():string;save(displayName:string):boolean}; initialReading?: WorkspaceReadingSelection; initialSceneId?: string }) {
   const root = document.createElement('section'), mode = document.createElement('button'), status = document.createElement('p');
   root.className = 'lv-project-shell';
   const utilitiesParent=navigation?.utilitiesRoot?.parentElement;
@@ -58,8 +58,11 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   filePanel.addEventListener('keydown', event => { if(event.key==='Escape' && !event.isComposing && !event.defaultPrevented){event.preventDefault();event.stopPropagation();closeFiles();} });
   const fileEntry = (label:string,surface:'save'|'share'|'receive'|'restore') => {
     const b=document.createElement('button'); b.type='button'; b.textContent=label; b.setAttribute('data-lv-edit-only','');
-    b.addEventListener('click',()=>{if(!fileMenu||b.disabled)return;if(!fileMenu.open)fileOrigin=b;
-      if(tools!.showSurface(surface)){core?.dismissDisclosures();fileMenu.open=true;if(b.getAttribute('role')!=='tab')filePanel.focus?.({preventScroll:true});}}); return b;
+    b.addEventListener('click',()=>{void(async()=>{if(!fileMenu||b.disabled)return;
+      const owner=core;if(owner?.inputPending()&&!await owner.flushCaption())return;
+      if(disposed||core!==owner||switching||tools!.hasChanges())return;
+      if(!fileMenu.open)fileOrigin=b;
+      if(tools!.showSurface(surface)){core?.dismissDisclosures();fileMenu.open=true;if(b.getAttribute('role')!=='tab')filePanel.focus?.({preventScroll:true});}})();}); return b;
   };
   const saveEntry=fileEntry('保存…','save'), shareEntry=fileEntry('共有','share'), receiveEntry=fileEntry('更新を読み込む','receive'), restoreEntry=fileEntry('復元','restore');
   saveEntry.className='lv-workspace-primary'; shareEntry.className='lv-workspace-share';
@@ -115,13 +118,13 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     fileCloseNote.textContent=output ? '作成中も記録を読めます。' : tools?.closeReason() ?? ''; fileCloseNote.hidden=!fileCloseNote.textContent;
     restoreEntry.hidden=!host.backupRestore.enabled;
     const selectedSurface=tools?.currentSurface(); fileNavigation.hidden=host.mode!.current==='view';
-    for(const b of [saveEntry,shareEntry,...fileTabs.values()])b.disabled=switching||!!navigation?.presentation?.()||!!core?.inputPending()||!!tools?.hasChanges()||!!startup?.hasChanges();
+    for(const b of [saveEntry,shareEntry,...fileTabs.values()])b.disabled=switching||!!navigation?.presentation?.()||!!core?.inputPending()&&!core.canFlushCaption()||!!tools?.hasChanges()||!!startup?.hasChanges();
     for(const [surface,tab] of fileTabs){tab.setAttribute('aria-selected',String(surface===selectedSurface));tab.tabIndex=surface===selectedSurface?0:-1;if(surface===selectedSurface)fileContent.setAttribute('aria-labelledby',tab.id);}
     if(host.mode!.current==='view'){fileContent.removeAttribute('aria-labelledby');fileContent.setAttribute('aria-label','作成したファイル');}else fileContent.removeAttribute('aria-label');
     tools?.render(); mode.textContent = switching ? '切替中…' : host.mode!.current === 'view' ? '編集する' : '閲覧する';
     mode.className=[host.mode!.current==='view'?'lv-workspace-primary':'', switching?'lv-mode-switching':''].filter(Boolean).join(' ');
     mode.setAttribute('aria-busy', String(switching));
-    mode.disabled = switching || retiringCore || !!navigation?.presentation?.() || !!core?.inputPending() || !!startup?.hasChanges() || !!tools?.hasChanges();
+    mode.disabled = switching || retiringCore || !!navigation?.presentation?.() || !!core?.inputPending()&&!core.canFlushCaption() || !!startup?.hasChanges() || !!tools?.hasChanges();
     if (core) { core.root.inert = switching || !!startup?.busy(); core.setExternalBusy(!!tools?.busy()); }
     startup?.render();
     retryStartup.hidden = !startup?.recoveryPending(); retryStartup.disabled = switching || !!navigation?.presentation?.() || !!host.authority.readOnly || !!tools?.hasChanges() || !!startup?.busy();
@@ -146,6 +149,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   const mountCore = () => {
     if (disposed || retiringCore || core || startup?.busy() || startup?.recoveryPending() || host.hasPending() || !chooseStartupScene(read().state).sceneId) return;
     core = createProjectWorkspace(document, {
+    captionAutosave: navigation?.captionAutosave,
     ...productSources(host,navigation?.smoothDisplay),
     openProject: navigation?.openProject, projectNavigationBlocked: navigation?.projectNavigationBlocked, resumedLastProject: navigation?.resumedLastProject, storageEstimate: navigation?.storageEstimate,
     initialReading: navigation?.initialReading,
@@ -372,7 +376,10 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   ensureStartup();
   mountCore();
   mode.addEventListener('click', () => { void (async () => {
-    if (disposed || mode.disabled || core?.inputPending() || startup?.hasChanges() || tools?.hasChanges()) return;
+    if (disposed || mode.disabled || startup?.hasChanges() || tools?.hasChanges()) return;
+    const owner=core;
+    if(owner?.inputPending()&&!await owner.flushCaption())return;
+    if(disposed||core!==owner||switching||tools?.hasChanges())return;
     const recovery = host.mode!.current === 'view' && (host.read().state === 'pending' || host.mode!.recoveryAvailable);
     if (host.hasPending() && !recovery) { status.textContent = '更新を再試行してから切り替えてください。'; return; }
     modeFeedback = ''; switching = true; changed();
@@ -383,6 +390,8 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   const unmount = () => { if (!disposed) { disposed = true; document.defaultView?.removeEventListener('resize',positionFiles); if(navigation?.utilitiesRoot)utilitiesParent?.append(navigation.utilitiesRoot);if(navigation?.fileActionsRoot)fileActionsParent?.append(navigation.fileActionsRoot); startup?.dispose(); retirement = retireCore(); root.remove(); } return retirement ?? Promise.resolve(); };
   changed();
   const interaction = { get interactionPending() { return core?.session.interactionPending || !!startup?.hasChanges(); },
+    canFlushCaption: () => !!core?.canFlushCaption() && !switching && !startup?.hasChanges(),
+    flushCaption: async () => !switching && !startup?.hasChanges() && !!await core?.flushCaption(),
     get acknowledgment() { return startup?.busy() || startup?.recoveryPending() ? { state: startup.busy() ? 'checking' as const : 'failed' as const } : core?.session.acknowledgment ?? { state: 'idle' as const }; },
     refreshHistory: render };
   return { root, session: interaction, render, hasProjectHeader: () => !!core,

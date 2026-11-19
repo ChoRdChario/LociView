@@ -1,10 +1,11 @@
 import {test,createBrowserProfile} from '../helpers/browserProfile';
 import {expect,chromium,type BrowserContext,type Page} from '@playwright/test';
 import {appendFile,readFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import * as A from '@automerge/automerge';
 import {ownedServer} from '../offline-e2e/server';
 import {nativeConversionBackup,smallPng,triangleGlb} from './fixtures';
-import { chooseHomeFiles, revealCaptionList,revealCoordinateAdd,revealWorkPanel,revealFileSurface } from './workspaceUi';
+import { chooseHomeFiles, finishCaptionEditing, revealCaptionList,revealCoordinateAdd,revealWorkPanel,revealFileSurface } from './workspaceUi';
 import {BackupArchive} from '../../src/projectPackage/backupArchive';
 import {inspectProjectCandidates} from '../../src/domain/projectCandidates';
 import {validationMetadataLimits} from '../../src/projectFiles/validation';
@@ -51,13 +52,14 @@ for(const touch of [false,true])test(`native capacity recovery retains drafts an
     const model=p.getByLabel('追加先モデル',{exact:true});await model.focus();await model.selectOption({label:'容量確認.glb'});
     await p.getByRole('button',{name:'このモデルに追加',exact:true}).click();for(const axis of ['X','Y','Z'])await p.getByLabel('位置 '+axis,{exact:true}).fill(axis==='Y'?'.5':'0');
     await p.getByRole('button',{name:'ここに記録を作る',exact:true}).click();const detail=p.getByRole('region',{name:'キャプションの詳細',exact:true});
-    await expect(detail.getByLabel('本文',{exact:true})).toBeEnabled();await detail.getByLabel('タイトル',{exact:true}).fill('保持する記録');await detail.getByLabel('本文',{exact:true}).fill('容量不足でも失わない本文');
-    await fault(p,'edit');let started=Date.now();await detail.getByRole('button',{name:'変更を適用',exact:true}).click();
-    const retry=p.getByRole('button',{name:'更新を再試行',exact:true});await expect(retry).toBeEnabled();await expect(p.locator('.lv-project-workspace > header > .lv-operation-status')).toContainText('保存容量が不足');
-    const detailStatus=detail.getByRole('status').filter({hasText:'未適用の入力'});await expect(detailStatus).toContainText('保存容量が不足');expect((await detailStatus.innerText()).split('保存容量が不足しています。')).toHaveLength(2);await expect(detailStatus).not.toContainText('Native quota exhausted');
+    await expect(detail.getByLabel('タイトル',{exact:true})).toBeEditable();await fault(p,'edit');let started=Date.now();
+    await detail.getByLabel('タイトル',{exact:true}).fill('保持する記録');await detail.getByLabel('本文',{exact:true}).fill('容量不足でも失わない本文');
+    const retry=detail.getByRole('button',{name:'保存を再試行',exact:true});await expect(retry).toBeEnabled();
+    const detailStatus=detail.locator('[data-save-state="failed"]');await expect(detailStatus).toContainText('保存容量が不足');expect((await detailStatus.innerText()).split('保存容量が不足しています。')).toHaveLength(2);await expect(detailStatus).not.toContainText('Native quota exhausted');
     measurements.editFailureMs=Date.now()-started;await expect(detail.getByLabel('本文',{exact:true})).toHaveValue('容量不足でも失わない本文');await p.screenshot({path:info.outputPath('quota-edit.png'),fullPage:true});
     await fault(p,'');started=Date.now();await retry.click();
-    await expect(retry).toBeHidden().catch(async error=>{await info.attach('edit-retry-diagnostic',{body:JSON.stringify({text:await p.locator('body').innerText(),fault:await p.evaluate(()=>(window as any).__capacityFault),errors}),contentType:'application/json'});throw error;});measurements.editRecoveryMs=Date.now()-started;
+    await expect(retry).toBeHidden().catch(async error=>{await info.attach('edit-retry-diagnostic',{body:JSON.stringify({text:await p.locator('body').innerText(),fault:await p.evaluate(()=>(window as any).__capacityFault),errors}),contentType:'application/json'});throw error;});
+    await finishCaptionEditing(p,{body:'容量不足でも失わない本文'});measurements.editRecoveryMs=Date.now()-started;
     await revealFileSurface(p,'保存');const files=p.getByRole('region',{name:'ファイル',exact:true});
     const [previous]=await Promise.all([p.waitForEvent('download'),files.locator('.lv-file-primary').click()]);
     await previous.saveAs(info.outputPath('retained-before-cleanup.zip'));
@@ -111,7 +113,7 @@ for(const touch of [false,true])test(`native capacity recovery retains drafts an
   }finally{await context?.close();await server.stop();}
 });
 
-for (const restored of [true, false]) for (const touch of [false, true]) test(`renderer crashes before writing, before publication and immediately after success preserve the confirmed text exactly once (${touch ? 'touch' : 'desktop'}, ${restored ? 'restored' : 'original'})`, async ({}, info) => {
+for (const restored of [true, false]) for (const touch of [false, true]) test(`renderer crashes before writing, during photo publication and after autosave preserve confirmed records exactly once (${touch ? 'touch' : 'desktop'}, ${restored ? 'restored' : 'original'})`, async ({}, info) => {
   A.getHeads(A.init());
   const testStarted = Date.now(); let launches = 0;
   const phase = (name: string) => appendFile(info.outputPath('crash-phases.jsonl'), JSON.stringify({ phase: name, milliseconds: Date.now() - testStarted }) + '\n');
@@ -177,19 +179,20 @@ for (const restored of [true, false]) for (const touch of [false, true]) test(`r
     await crashed;
     await phase('renderer-crash.event'); await close();
   };
-  const crashAt = async (page: Page, fileName: string) => {
+  const crashAt = async (page: Page, fileName: string, action: () => Promise<unknown>, afterCreation = false) => {
     const signal = page.waitForEvent('console', msg => msg.text() === 'text write paused');
-    await page.evaluate(fileName => {
+    await page.evaluate(({fileName,afterCreation}) => {
       const openFile = FileSystemDirectoryHandle.prototype.getFileHandle;
       FileSystemDirectoryHandle.prototype.getFileHandle = async function(name, options) {
         if (options?.create && name === fileName) {
+          if (afterCreation) await openFile.call(this, name, options);
           console.info('text write paused');
           await new Promise<void>(() => {});
         }
         return openFile.call(this, name, options);
       };
-    }, fileName);
-    await detail(page).getByRole('button', { name: '変更を適用', exact: true }).click();
+    }, {fileName,afterCreation});
+    await action();
     await signal;
     await crash(page);
   };
@@ -229,8 +232,7 @@ for (const restored of [true, false]) for (const touch of [false, true]) test(`r
     await expect(page.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled();
     const field = await record(page);
     await expect(field).toHaveValue('本文を保持');
-    await field.fill('最初の書き込み前に終了する文章');
-    await crashAt(page, 'staging.json');
+    await crashAt(page, 'staging.json', () => field.fill('最初の書き込み前に終了する文章'));
     const run = (before.source.proof.identity.projectId as string).slice(4);
     const afterPreparation = await open(receiver, '?run=' + run);
     const enter = afterPreparation.getByRole('button', { name: '編集する', exact: true });
@@ -238,8 +240,16 @@ for (const restored of [true, false]) for (const touch of [false, true]) test(`r
     if (await enter.isVisible()) await enter.click();
     const previous = await record(afterPreparation);
     await expect(previous).toHaveValue('本文を保持');
+    await expect(detail(afterPreparation).getByRole('region',{name:'添付メディア',exact:true}).locator('figure')).toHaveCount(2);
     await previous.fill(text);
-    await crashAt(afterPreparation, 'published.json');
+    await finishCaptionEditing(afterPreparation, {body:text});
+    // Cover both finite retry forms: reused media and new immutable media.
+    const photo = smallPng(restored ? 180 : 40);
+    await crashAt(afterPreparation, 'published.json', async () => {
+      const chooser=afterPreparation.waitForEvent('filechooser');
+      await detail(afterPreparation).getByLabel('メディアを追加',{exact:true}).click();
+      await(await chooser).setFiles({name:'中断しても残る写真.png',mimeType:'image/png',buffer:photo});
+    });
     const resume = await open(receiver, '?run=' + run);
     const retry = resume.getByRole('button', { name: '更新を再試行', exact: true });
     const edit = resume.getByRole('button', { name: '編集する', exact: true });
@@ -250,16 +260,22 @@ for (const restored of [true, false]) for (const touch of [false, true]) test(`r
     const after = await backup(resume, 'after');
     expect(after.source.proof).toEqual(before.source.proof);
     const originals = before.source.originalChanges(), changes = after.source.originalChanges();
-    expect(changes).toHaveLength(originals.length + 1);
+    expect(changes).toHaveLength(originals.length + 2);
     expect(changes).toEqual(expect.arrayContaining(originals));
-    expect(after.archive.control.manifest.blobs).toEqual(before.archive.control.manifest.blobs);
+    const retainedBlobs = after.archive.control.manifest.blobs;
+    expect(retainedBlobs).toEqual(expect.arrayContaining([...before.archive.control.manifest.blobs]));
+    expect(retainedBlobs).toHaveLength(before.archive.control.manifest.blobs.length + (restored ? 1 : 0));
+    const photoHash = createHash('sha256').update(photo).digest('hex');
+    const photoEntry = retainedBlobs.find(entry => entry.sha256 === photoHash);
+    expect(photoEntry).toBeDefined();
+    expect(await after.archive.entryBlob(photoEntry!.path).arrayBuffer()).toEqual(Uint8Array.from(photo).buffer);
+    await expect(detail(resume).getByRole('region',{name:'添付メディア',exact:true}).locator('figure')).toHaveCount(3);
     for (const entry of before.archive.control.entries.filter(e => e.path.startsWith('blobs/'))) {
       expect(await after.archive.entryBlob(entry.path).arrayBuffer()).toEqual(await before.archive.entryBlob(entry.path).arrayBuffer());
     }
     const confirmed = '完了表示の直後に終了しても残る本文';
     await (await record(resume)).fill(confirmed);
-    await detail(resume).getByRole('button', { name: '変更を適用', exact: true }).click();
-    await expect(resume.getByText('変更を適用しました。', { exact: true })).toBeVisible();
+    await finishCaptionEditing(resume, {body:confirmed});
     await crash(resume);
     const cold = await open(receiver, '?run=' + run);
     await expect(cold.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('Nativeから引き継ぐ記録');
@@ -269,16 +285,17 @@ for (const restored of [true, false]) for (const touch of [false, true]) test(`r
     const reopened = await backup(cold, 'reopened');
     expect(reopened.source.originalChanges()).toEqual(expect.arrayContaining(changes));
     expect(reopened.source.originalChanges()).toHaveLength(changes.length + 1);
-    expect(reopened.archive.control.manifest.blobs).toEqual(before.archive.control.manifest.blobs);
+    expect(reopened.archive.control.manifest.blobs).toEqual(retainedBlobs);
     {
-      // Persist a real staging start, then crash before writing its change data.
+      // Persist a real start and empty part, then crash before its writer opens.
       // Resolution is explicit and must retain every already-present byte.
-      await (await record(cold)).fill('準備データが確定する前に終了する本文');
-      await crashAt(cold, '00000000.amchange');
+      const unprepared=await record(cold);
+      await crashAt(cold, '00000000.amchange', () => unprepared.fill('準備データが確定する前に終了する本文'), true);
       const blocked = await open(receiver, '?run=' + run);
       const proceed = blocked.getByRole('button', { name: '最後に保存された内容で続ける', exact: true });
       await expect(proceed).toBeEnabled();
       const preserved = await projectFiles(blocked, run);
+      expect(preserved.some(file=>file.path.endsWith('/changes/00000000.amchange')&&file.size===0)).toBe(true);
       await expect(blocked.getByRole('region', { name: '再開の確認', exact: true })).toBeVisible();
       await expect(blocked.getByRole('region', { name: '再開の確認', exact: true })).toContainText('保存途中の変更は反映されません。');
       const leave = blocked.getByRole('button', { name: '別のプロジェクトを開く', exact: true });
@@ -292,7 +309,9 @@ for (const restored of [true, false]) for (const touch of [false, true]) test(`r
       await blocked.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
       await expect(blocked.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('ほかの正常な作業');
       await revealFileSurface(blocked, '保存');
+      await phase('selector.return.start');
       await blocked.getByRole('button', { name: 'プロジェクトを選ぶ', exact: true }).click();
+      await phase('selector.return.clicked');
       await blocked.locator('.lv-recent-project').filter({ hasText: 'Nativeから引き継ぐ記録' }).getByRole('button', { name: '編集で開く', exact: true }).click();
       await expect(proceed).toBeEnabled();
       expect(await projectFiles(blocked, run)).toEqual(preserved);
@@ -312,19 +331,30 @@ for (const restored of [true, false]) for (const touch of [false, true]) test(`r
       expect(resolvedFiles.filter(file => priorPaths.has(file.path))).toEqual(preserved);
       expect(resolvedFiles.filter(file => !priorPaths.has(file.path)).map(file => file.path)).toEqual([expect.stringMatching(/\/closedLocal\.json$/)]);
       const recoveredText = '中断から再開して保存した本文';
-      await (await record(blocked)).fill(recoveredText); await detail(blocked).getByRole('button', { name: '変更を適用', exact: true }).click();
-      await expect(blocked.getByText('変更を適用しました。', { exact: true })).toBeVisible();
+      await (await record(blocked)).fill(recoveredText); await finishCaptionEditing(blocked,{body:recoveredText});
       const repaired = await backup(blocked, 'repaired');
       expect(repaired.source.originalChanges()).toHaveLength(reopened.source.originalChanges().length + 1);
       expect(repaired.source.originalChanges()).toEqual(expect.arrayContaining(reopened.source.originalChanges()));
-      expect(repaired.archive.control.manifest.blobs).toEqual(before.archive.control.manifest.blobs);
+      expect(repaired.archive.control.manifest.blobs).toEqual(retainedBlobs);
       await close();
       const fresh = await open(await createBrowserProfile('backup-rescue'));
       await chooseHomeFiles(fresh, info.outputPath('repaired.zip'));
       await fresh.getByRole('button', { name: 'このファイルから再開', exact: true }).click();
       await expect(fresh.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('Nativeから引き継ぐ記録', { timeout: 120_000 });
       await expect(await record(fresh)).toHaveValue(recoveredText);
+      await expect(detail(fresh).getByRole('region',{name:'添付メディア',exact:true}).locator('figure')).toHaveCount(3);
       await fresh.screenshot({ path: info.outputPath('clean-browser-backup-resumed.png') });
     }
+  } catch (error) {
+    const active = context?.pages().find(page => !page.isClosed());
+    if (active) {
+      await active.screenshot({path:info.outputPath('crash-workflow-failure.png')}).catch(()=>{});
+      await info.attach('crash-workflow-failure',{body:JSON.stringify({url:active.url(),
+        text:await active.locator('body').innerText().catch(()=>''),
+        rows:await active.locator('.lv-recent-project').allTextContents().catch(()=>[]),
+        listBusy:await active.locator('.lv-validation-home [aria-busy]').evaluateAll(nodes=>nodes.map(node=>node.getAttribute('aria-busy'))).catch(()=>[]),
+      }),contentType:'application/json'}).catch(()=>{});
+    }
+    throw error;
   } finally { await close(); await server.stop(); }
 });

@@ -8,6 +8,26 @@ export async function chooseHomeFiles(page: Page, files: Parameters<Locator['set
   await picker.setFiles(files);
 }
 
+/** Wait for the latest Caption input, never infer durable saving from its live preview. */
+export async function finishCaptionEditing(page: Page,
+  expected: Readonly<{ title?: string; body?: string; color?: string }> = {}, timeout = 15_000) {
+  const detail = page.getByRole('region', { name: 'キャプションの詳細', exact: true });
+  const state = detail.locator('[data-save-state]');
+  if (await state.count()) {
+    await expect(state).toHaveAttribute('data-save-state', 'saved', { timeout });
+    await expect(detail.getByRole('button', { name: '変更を適用', exact: true })).toBeHidden();
+  } else {
+    // Retained validation/harness entry uses its existing explicit command.
+    await detail.getByRole('button', { name: '変更を適用', exact: true }).click();
+    await expect(page.getByText(/^(?:変更を適用しました。|メディアを追加しました。)$/)).toBeVisible({ timeout });
+  }
+  for (const [field, label] of [['title', 'タイトル'], ['body', '本文'], ['color', 'ピンの色']] as const) {
+    if (expected[field] !== undefined) await expect(detail.getByLabel(label, { exact: true })).toHaveValue(expected[field]!);
+  }
+  await expect(page.locator('main.lv-project-workspace > header > .lv-operation-status')).toHaveAttribute('data-busy', 'false');
+  await expect(page.getByRole('button', { name: '保存を再試行', exact: true })).toBeHidden();
+}
+
 export async function expectResumedProject(page: Page, title: string, timeout: number) {
   await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout });
   const help = page.getByRole('group', { name: 'ヘルプ', exact: true });

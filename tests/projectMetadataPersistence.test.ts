@@ -1592,16 +1592,111 @@ describe('new-workspace metadata persistence service (memory ports, not device/a
     expect(saved.source!.requiredCapabilities).toEqual([]);
   });
 
-  it.each(['empty-part', 'partial-part', 'complete-part', 'extra-history', 'torn-closure', 'unknown-capability', 'corrupt-publication'] as const)
+  it.each(['empty-part', 'partial-part', 'complete-part'] as const)('06k seals %s without modifying its bytes or the published database', async defect => {
+    const h = setup(), writer = h.session(), initial = await writer.create(h.records);
+    h.fs.reject = path => path.endsWith('/changes/00000000.amchange');
+    await expect(writer.editCaption(initial.source!.token, id('cap'), 'body', '未確定')).rejects.toThrow(); h.fs.reject = () => false;
+    const journal = new TransactionJournal(h.fs, limits), pending = (await journal.entries()).at(-1)!;
+    const path = journal.path(pending.start.transactionId, 'changes/00000000.amchange');
+    const bytes = defect === 'empty-part' ? new Uint8Array() : defect === 'partial-part' ? Uint8Array.of(1, 2) : initial.source!.originalChanges()[0]!;
+    await h.fs.writeBytes(path, bytes);
+    const cold = h.session(), ticket = (await cold.inspectUnwrittenLocalEdit())!;
+    expect(ticket).not.toBeNull();
+    const rows = structuredClone([...h.rows]), files = new Map(await Promise.all((await h.fs.list('')).map(async p => [p, (await h.fs.readBytes(p))!.slice()] as const)));
+    const result = await cold.resolveUnwrittenLocalEdit(ticket);
+    expect(result.state).toBe('ready'); expect(result.source!.originalChanges()).toEqual(initial.source!.originalChanges());
+    expect([...h.rows]).toEqual(rows);
+    for (const [p, original] of files) expect(await h.fs.readBytes(p), p).toEqual(original);
+    const receipt = (await journal.entries()).at(-1)!.closedLocal!;
+    expect(receipt.schema).toBe('lociview-metadata-closed-local-2');
+    if (receipt.schema === 'lociview-metadata-closed-local-2') expect(receipt.unpreparedParts).toEqual([{path:'changes/00000000.amchange',byteLength:bytes.length,sha256:await digest(bytes)}]);
+    await cold.editCaption(result.source!.token, id('cap'), 'body', '続き');
+    expect((await h.session().read()).state).toBe('ready');
+    await h.fs.writeBytes(path, Uint8Array.of(9, 9));
+    await expect(journal.entries()).rejects.toThrow('closed-local-part-changed');
+    expect((await h.session().read()).state).toBe('repair-required');
+  });
+
+  it.each(['appear', 'disappear', 'change'] as const)('06k rejects a part that can %s after ticket inspection', async defect => {
+    const h=setup(), writer=h.session(), initial=await writer.create(h.records);
+    h.fs.reject=p=>p.endsWith('/changes/00000000.amchange');
+    await expect(writer.editCaption(initial.source!.token,id('cap'),'body','中断')).rejects.toThrow();h.fs.reject=()=>false;
+    const journal=new TransactionJournal(h.fs,limits), tail=(await journal.entries()).at(-1)!;
+    const path=journal.path(tail.start.transactionId,'changes/00000000.amchange');
+    if(defect!=='appear')await h.fs.writeBytes(path,Uint8Array.of(1,2));
+    const cold=h.session(),ticket=(await cold.inspectUnwrittenLocalEdit())!;
+    if(defect==='disappear')await h.fs.remove(path);else await h.fs.writeBytes(path,Uint8Array.of(3,4));
+    const writes=h.fs.writes;
+    await expect(cold.resolveUnwrittenLocalEdit(ticket)).rejects.toThrow('closed-local-stale');
+    expect(h.fs.writes).toBe(writes);
+    expect(await h.fs.exists(journal.path(tail.start.transactionId,'closedLocal.json'))).toBe(false);
+  });
+
+  it.each(['empty', 'duplicate', 'path', 'negative', 'fractional', 'budget', 'extra', 'hash', 'schema1'] as const)
+    ('06k refuses a malformed sealed-part descriptor (%s)', async defect => {
+      const h=setup(), writer=h.session(), initial=await writer.create(h.records);
+      h.fs.reject=p=>p.endsWith('/changes/00000000.amchange');
+      await expect(writer.editCaption(initial.source!.token,id('cap'),'body','中断')).rejects.toThrow();h.fs.reject=()=>false;
+      const journal=new TransactionJournal(h.fs,limits), tail=(await journal.entries()).at(-1)!;
+      const part=journal.path(tail.start.transactionId,'changes/00000000.amchange');await h.fs.writeBytes(part,Uint8Array.of(1,2));
+      const cold=h.session();await cold.resolveUnwrittenLocalEdit((await cold.inspectUnwrittenLocalEdit())!);
+      const path=journal.path(tail.start.transactionId,'closedLocal.json'),receipt=JSON.parse((await h.fs.readText(path))!);
+      const descriptor=receipt.unpreparedParts[0];
+      if(defect==='empty')receipt.unpreparedParts=[];
+      if(defect==='duplicate')receipt.unpreparedParts.push({...descriptor});
+      if(defect==='path')descriptor.path='changes/00000001.amchange';
+      if(defect==='negative')descriptor.byteLength=-1;
+      if(defect==='fractional')descriptor.byteLength=.5;
+      if(defect==='budget')descriptor.byteLength=limits.maxTotalBytes+1;
+      if(defect==='extra')descriptor.extra=true;
+      if(defect==='hash')descriptor.sha256='A'.repeat(64);
+      if(defect==='schema1')receipt.schema='lociview-metadata-closed-local-1';
+      await h.fs.writeText(path,json(receipt));const writes=h.fs.writes,rows=structuredClone([...h.rows]);
+      await expect(journal.entries()).rejects.toThrow(/closed-local-(part|receipt|directory)/);
+      expect(h.fs.writes).toBe(writes);expect([...h.rows]).toEqual(rows);expect(await h.fs.readBytes(part)).toEqual(Uint8Array.of(1,2));
+    });
+
+  it('06k bounds an unprepared part before opening its stream', async () => {
+    const h=setup(),writer=h.session(),initial=await writer.create(h.records);
+    h.fs.reject=p=>p.endsWith('/changes/00000000.amchange');
+    await expect(writer.editCaption(initial.source!.token,id('cap'),'body','中断')).rejects.toThrow();h.fs.reject=()=>false;
+    const journal=new TransactionJournal(h.fs,limits),tail=(await journal.entries()).at(-1)!;
+    const part=journal.path(tail.start.transactionId,'changes/00000000.amchange');await h.fs.writeBytes(part,Uint8Array.of(1));
+    const read=h.fs.readStream.bind(h.fs),stream=vi.fn(()=>{throw Error('must not allocate');});
+    const probe=vi.spyOn(h.fs,'readStream').mockImplementation(async path=>path===part?{size:limits.maxTotalBytes+1,stream}:read(path));
+    const writes=h.fs.writes;await expect(h.session().inspectUnwrittenLocalEdit()).rejects.toThrow('closed-local-part-budget');
+    expect(stream).not.toHaveBeenCalled();expect(h.fs.writes).toBe(writes);probe.mockRestore();
+  });
+
+  it('06k refuses a part changed while closing and never recreates a deleted historic part', async () => {
+    const h=setup(),writer=h.session(),initial=await writer.create(h.records);
+    h.fs.reject=p=>p.endsWith('/changes/00000000.amchange');
+    await expect(writer.editCaption(initial.source!.token,id('cap'),'body','中断')).rejects.toThrow();h.fs.reject=()=>false;
+    const journal=new TransactionJournal(h.fs,limits),tail=(await journal.entries()).at(-1)!;
+    const part=journal.path(tail.start.transactionId,'changes/00000000.amchange');await h.fs.writeBytes(part,Uint8Array.of(1,2));
+    const cold=h.session(),ticket=(await cold.inspectUnwrittenLocalEdit())!,write=h.fs.writeText.bind(h.fs);
+    const race=vi.spyOn(h.fs,'writeText').mockImplementation(async(path,text)=>{
+      await write(path,text);if(path.endsWith('/closedLocal.json'))await h.fs.writeBytes(part,Uint8Array.of(3,4));
+    });
+    await expect(cold.resolveUnwrittenLocalEdit(ticket)).rejects.toThrow('closed-local-part-changed');race.mockRestore();
+    expect(await h.fs.readBytes(part)).toEqual(Uint8Array.of(3,4));
+    expect(await h.fs.exists(journal.path(tail.start.transactionId,'closedLocal.json'))).toBe(true);
+    // Restoring the exact retained part permits validation, not a rewritten closure.
+    await h.fs.writeBytes(part,Uint8Array.of(1,2));
+    const ready=await h.session().read();expect(ready.state).toBe('ready');
+    await h.session().editCaption(ready.source!.token,id('cap'),'body','後続');
+    await h.fs.remove(part);const writes=h.fs.writes;
+    await expect(journal.entries()).rejects.toThrow('closed-local-part-changed');
+    expect((await h.session().read()).state).toBe('repair-required');expect(h.fs.writes).toBe(writes);expect(await h.fs.exists(part)).toBe(false);
+  });
+
+  it.each(['extra-history', 'torn-closure', 'unknown-capability', 'corrupt-publication'] as const)
     ('06j refuses %s without erasing or rewriting any evidence', async defect => {
       const h = setup(), writer = h.session(), initial = await writer.create(h.records);
       h.fs.reject = path => path.endsWith('/changes/00000000.amchange');
       await expect(writer.editCaption(initial.source!.token, id('cap'), 'body', '中断')).rejects.toThrow(); h.fs.reject = () => false;
       const journal = new TransactionJournal(h.fs, limits), entries = await journal.entries(), pending = entries.at(-1)!;
       const part = journal.path(pending.start.transactionId, 'changes/00000000.amchange');
-      if (defect === 'empty-part') await h.fs.writeBytes(part, new Uint8Array());
-      if (defect === 'partial-part') await h.fs.writeBytes(part, Uint8Array.of(1, 2));
-      if (defect === 'complete-part') await h.fs.writeBytes(part, initial.source!.originalChanges()[0]!);
       if (defect === 'extra-history') {
         const other = await initial.source!.prepareCaptionText(initial.source!.token, id('cap'), 'body', '別の履歴');
         await underWriteLease(h.fs, () => new MetadataRepository(h.fs, h.storage, limits).persist(pending.start.repositoryId, other));
@@ -1611,8 +1706,7 @@ describe('new-workspace metadata persistence service (memory ports, not device/a
       if (defect === 'corrupt-publication') await h.fs.writeText(journal.path(initial.publication!, 'published.json'), json({ ...entries[0]!.publication, exactChangeSetDigest: 'f'.repeat(64) }));
       const before = new Map(await Promise.all((await h.fs.list('')).map(async path => [path, (await h.fs.readBytes(path))!.slice()] as const))), rows = structuredClone([...h.rows]), writes = h.fs.writes;
       const candidate = h.session().inspectUnwrittenLocalEdit();
-      if (['empty-part', 'partial-part', 'complete-part'].includes(defect)) await expect(candidate).resolves.toBeNull();
-      else await expect(candidate).rejects.toThrow(defect === 'extra-history' ? 'closed-local-repository-changed' :
+      await expect(candidate).rejects.toThrow(defect === 'extra-history' ? 'closed-local-repository-changed' :
         defect === 'torn-closure' ? 'receipt-invalid' : defect === 'corrupt-publication' ? 'publication-receipt' : '対応したLociView');
       expect(h.fs.writes).toBe(writes); expect([...h.rows]).toEqual(rows);
       expect(await h.fs.list('')).toEqual([...before.keys()]);

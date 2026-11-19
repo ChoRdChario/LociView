@@ -1,4 +1,5 @@
 import { captionTitle, type CaptionListSource } from './captionListState';
+import type { CaptionTextPreview } from './captionDetailState';
 import { captionWindowView, planCaptionWindow, type CaptionWindowIntent, type CaptionWindowMemory,
   type CaptionWindowPlan, type WindowRect } from './captionWindowState';
 
@@ -7,6 +8,7 @@ export interface WindowContext {
   readonly selectedId: string | null; readonly moveBlock: string | null;
   /** Suspend owned galleries with hidden previews; keep window memory intact. */
   readonly visible?: boolean;
+  readonly preview?: CaptionTextPreview;
 }
 export interface WindowProjection {
   readonly ready: boolean; readonly width: number; readonly height: number;
@@ -173,9 +175,11 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
       if (item.mediaCount.kind === 'value' && item.mediaCount.value > 0 && card.initial.height === 200 && !next.memory.placements.some(p => p.captionId === id)) {
         card.initial = { ...card.initial, width: 280, height: 300 }; initialPositions.get(scope)!.set(id, card.initial);
       }
-      const title = captionTitle(item); if (card.title.textContent !== title) card.title.textContent = title;
+      const preview = next.preview?.token === next.source.token && next.preview.sceneId === next.source.sceneId && next.preview.captionId === id ? next.preview : undefined;
+      const title = preview?.title === undefined ? captionTitle(item) : preview.title.trim() ? preview.title : '無題';
+      if (card.title.textContent !== title) card.title.textContent = title;
       card.root.setAttribute('aria-label', title);
-      const body = item.body.kind === 'value' ? item.body.value : '本文の更新候補を確認してください。';
+      const body = preview?.body ?? (item.body.kind === 'value' ? item.body.value : '本文の更新候補を確認してください。');
       if (card.body.textContent !== body) card.body.textContent = body;
       card.content?.render(next.visible !== false && projection.width > 0 && projection.height > 0);
       card.note.textContent = [item.needsReview || item.pin === 'needsReview' ? '要確認：ピン位置を確認してください。' : '',

@@ -1,4 +1,4 @@
-import { chooseHomeFiles, beginMaterialEditing } from './workspaceUi';
+import { finishCaptionEditing, chooseHomeFiles, beginMaterialEditing } from './workspaceUi';
 import { revealCameraPositions, revealWorkPanel, revealCoordinateAdd, revealProjectSelection, beginSceneCreation, revealModelManagement, selectShareOutput } from './workspaceUi';
 import { test, expect, chromium } from '@playwright/test';
 import { ownedServer } from '../offline-e2e/server';
@@ -29,7 +29,7 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await detail.getByLabel('タイトル', { exact: true }).fill('柱の接合部'); await detail.getByLabel('本文', { exact: true }).fill('梁との隙間を確認する。');
     const chooseImage = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await chooseImage).setFiles({ name: '現場写真.png', mimeType: 'image/png', buffer: smallPng() });
     await expect(detail.locator('.lv-record-media-draft')).toContainText('現場写真.png');
-    await detail.getByRole('button', { name: '変更を適用', exact: true }).click(); await ready('変更を適用しました。');
+    await finishCaptionEditing(p, {}, 15000);
     await expect(detail.locator('.lv-caption-properties')).not.toHaveAttribute('open');
     expect(await detail.evaluate(root => {
       const body = root.querySelector('[data-caption-field="body"]')!.parentElement!, media = root.querySelector('.lv-caption-media-slot')!, props = root.querySelector('.lv-caption-properties')!;
@@ -122,12 +122,12 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await files.getByRole('button', { name: '選択を取り消す', exact: true }).click();
     await expect(partial).toBeChecked(); await expect(partial).toBeFocused(); await expect(scope).toBeVisible();
     await menu.getByRole('button', { name: '閉じる', exact: true }).click(); await expect(p.getByRole('button', { name: '共有', exact: true })).toBeFocused();
-    await detail.getByLabel('本文',{exact:true}).fill('手元でも同じ本文を更新しました。');await detail.getByRole('button',{name:'変更を適用',exact:true}).click();await ready('変更を適用しました。');
+    await detail.getByLabel('本文',{exact:true}).fill('手元でも同じ本文を更新しました。');await finishCaptionEditing(p, {}, 15000);
     const peerContext = await browser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true }), peer = await peerContext.newPage(); peer.on('pageerror', e => errors.push(e.message));
     await peerContext.route('**/*', route => { const u = new URL(route.request().url()); if (u.origin === new URL(server.url).origin || ['data:', 'blob:'].includes(u.protocol)) return route.continue(); remote.push(u.href); return route.abort(); });
     await peer.goto(server.url); await chooseHomeFiles(peer, workspacePath); await peer.getByRole('button', { name: 'プロジェクトを取り込む', exact: true }).click(); await expect(peer.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('現地調査', { timeout: 90_000 });
     await peer.getByRole('region', { name: 'シーン', exact: true }).getByRole('button', { name: '接合部', exact: true }).click(); await peer.locator('.lv-caption-select').filter({ hasText: '柱の接合部' }).click();
-    const peerDetail = peer.getByRole('region', { name: 'キャプションの詳細', exact: true }); await peerDetail.getByLabel('本文', { exact: true }).fill(receivedBody); await peerDetail.getByRole('button', { name: '変更を適用', exact: true }).click(); await expect(peer.getByText('変更を適用しました。', { exact: true })).toBeVisible();
+    const peerDetail = peer.getByRole('region', { name: 'キャプションの詳細', exact: true }); await peerDetail.getByLabel('本文', { exact: true }).fill(receivedBody); await finishCaptionEditing(peer, {});
     await peer.getByRole('button', { name: '共有', exact: true }).click(); const peerFiles = peer.getByRole('region', { name: 'ファイル', exact: true }); await selectShareOutput(peerFiles, 'contribution');
     const base = peerFiles.getByLabel('元にする作業一式', { exact: true }), baseId = await base.locator('option').evaluateAll(ns => ns.map(n => (n as HTMLOptionElement).value).find(Boolean)); expect(baseId).toBeTruthy(); await base.selectOption(baseId!);
     const [update] = await Promise.all([peer.waitForEvent('download'), peerFiles.locator('.lv-file-primary').click()]), updatePath = info.outputPath('returned-update.zip'); await update.saveAs(updatePath); expect(await update.failure()).toBeNull(); await peerContext.close();

@@ -2,7 +2,7 @@ import { chromium, expect, test } from '@playwright/test';
 import { openAsBlob } from 'node:fs';
 import { PackageArchive } from '../../src/projectPackage/zipArchive';
 import { ownedServer } from '../offline-e2e/server';
-import { chooseHomeFiles, chooseSharedScene } from './workspaceUi';
+import { chooseHomeFiles, chooseSharedScene, finishCaptionEditing } from './workspaceUi';
 import { nativeConversionBackup, smallPng, triangleGlb } from './fixtures';
 
 test('phone record list, body and completion stay usable when the viewport shrinks', async ({}, info) => {
@@ -16,7 +16,6 @@ test('phone record list, body and completion stay usable when the viewport shrin
   const detail = page.getByRole('region', { name: 'キャプションの詳細', exact: true });
   const record = list.locator('.lv-caption-select').filter({ hasText: '既存のピン' });
   const body = detail.getByLabel('本文', { exact: true });
-  const apply = detail.getByRole('button', { name: '変更を適用', exact: true });
   try {
     await page.goto(server.url);
     const source = await nativeConversionBackup(triangleGlb(), smallPng(), 100);
@@ -65,25 +64,28 @@ test('phone record list, body and completion stay usable when the viewport shrin
     await body.press('End'); await body.press('x'); await body.press('Backspace');
     expect(await unchangedStatus.evaluate(value => value.stop())).toBe(0); await unchangedStatus.dispose();
     await body.dispatchEvent('compositionstart');await expect(detail.getByRole('button',{name:'次の記録',exact:true})).toBeDisabled();
-    await body.dispatchEvent('compositionend');
+    await expect(page.getByRole('button', { name: '閲覧する', exact: true })).toBeDisabled();
     await page.setViewportSize({ width: 320, height: 365 });
-    for (const control of [body, apply, detail.getByRole('button', { name: '取り消す', exact: true })]) {
+    for (const control of [body]) {
       await expect.poll(() => control.evaluate(node => {
         const rect = node.getBoundingClientRect();
         const target = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
         return target !== null && node.contains(target);
       })).toBe(true);
     }
+    await expect(detail.getByRole('button', { name: '変更を適用', exact: true })).toBeHidden();
     await page.screenshot({ path: info.outputPath('short-portrait-draft.png') });
-    await apply.tap();
-    await expect(page.getByText('変更を適用しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
+    await body.dispatchEvent('compositionend');
+    await finishCaptionEditing(page, { body: '狭い画面から本文を編集' }, 90_000);
     await expect(body).toHaveValue('狭い画面から本文を編集');
     const completedRecord = detail.getByRole('heading', { name: '既存のピン', exact: true });
-    await expect(completedRecord).toBeFocused(); await expect(completedRecord).toBeInViewport();
-    await body.fill('取り消す前の未適用入力');
+    await expect(body).toBeFocused(); await expect(body).toBeInViewport();
+    // Invalid input stays local and cancellable; acknowledged autosave is never undone by Cancel.
+    const invalidBody = '取り消す前の入力\u2028未対応文字';
+    await body.fill(invalidBody);
     const cancelRecord = detail.getByRole('button', { name: '取り消す', exact: true });
     await cancelRecord.tap(); await detail.getByRole('button', { name: '編集を続ける', exact: true }).tap();
-    await expect(body).toHaveValue('取り消す前の未適用入力'); await expect(cancelRecord).toBeFocused();
+    await expect(body).toHaveValue(invalidBody); await expect(cancelRecord).toBeFocused();
     await cancelRecord.tap(); await detail.getByRole('button', { name: '変更を取り消す', exact: true }).tap();
     await expect(body).toHaveValue('狭い画面から本文を編集');
     await expect(completedRecord).toBeFocused(); await expect(completedRecord).toBeInViewport();
@@ -152,6 +154,11 @@ test('phone record list, body and completion stay usable when the viewport shrin
     await destination.getByRole('button', { name: '既存に取り込む', exact: true }).tap();
     await expect(page.getByText('更新を取り込みました。', { exact: true })).toBeVisible({ timeout: 90_000 });
     await record.tap(); await expect(body).toHaveValue('狭い画面から本文を編集');
+  } catch (error) {
+    await page.screenshot({path:info.outputPath('phone-workflow-failure.png')}).catch(()=>{});
+    await info.attach('phone-workflow-failure',{body:JSON.stringify({text:await page.locator('body').innerText(),
+      timings:await page.evaluate(()=>performance.getEntriesByType('measure').map(entry=>({name:entry.name,milliseconds:entry.duration})))},null,2),contentType:'application/json'}).catch(()=>{});
+    throw error;
   } finally {
     await context.close(); await browser.close(); await server.stop();
   }
