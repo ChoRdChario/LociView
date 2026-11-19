@@ -47,6 +47,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const headerActions = make('div'); headerActions.className = 'lv-workspace-actions';
   const projectTitle = make('h1'), resumeStatus = make('p'), fileStatus = make('p'), help = make('details');
   projectTitle.setAttribute('aria-label', 'プロジェクト名'); resumeStatus.setAttribute('aria-label', '再開データの状態'); fileStatus.setAttribute('aria-label', '保存ファイルの状態');
+  fileStatus.tabIndex = -1;
   help.setAttribute('aria-label', 'ヘルプ'); help.append(make('summary', 'ヘルプ'), introduction);
   for (const [title, text] of [
     ['はじめる', 'プロジェクトを選び、変更するときは「編集する」を選択します。シーンを切り替えても「開始シーン」は変わりません。'],
@@ -1333,14 +1334,18 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       const failed = pending || ports.status().kind === 'failed';
       resumeStatus.textContent = saving ? autosave?.saving ? '保存中…' : '変更を適用中' : failed ? '更新が未完了です。入力を保持しています。再試行してください。' :
         hasDraft ? autosave && (hasCaptionDraft(draft) || selectedMedia) ? '保存待ち' : '未適用の変更' : summary.resumable ? autosave ? '保存済み' : '再開できます' : '再開データを確認してください。';
-      resumeStatus.hidden = readDuringOutput();
+      const fileWorking = readDuringOutput();
+      resumeStatus.hidden = fileWorking;
       browserState.hidden = resumeStatus.hidden;
-      fileStatus.hidden = !!(hasDraft || saving || failed);
+      fileStatus.hidden = !fileWorking && !!(hasDraft || saving || failed);
       savedFileState.hidden = fileStatus.hidden;
       resumeStatus.dataset.state = saving ? 'busy' : failed ? 'error' : hasDraft ? 'draft' : summary.resumable ? 'ready' : 'attention';
-      fileStatus.textContent = summary.backup === 'verified' ? '選択ファイルと一致' : summary.backup === 'download-started' ? 'ダウンロード開始・保存先で確認' :
+      let fileText = summary.backup === 'verified' ? '選択ファイルと一致' : summary.backup === 'download-started' ? 'ダウンロード開始・保存先で確認' :
         summary.backup === 'unavailable' ? '保存ファイルを確認してください。' : summary.backupOutdated ? '更新が必要' : '保存未確認';
-      fileStatus.title = summary.backup === 'download-started' ? '保存先で完了を確認してください。' : '';
+      if (fileWorking) fileText = '作成中…';
+      if (fileStatus.textContent !== fileText) fileStatus.textContent = fileText;
+      fileStatus.dataset.fileBusy = String(fileWorking);
+      fileStatus.title = !fileWorking && summary.backup === 'download-started' ? '保存先で完了を確認してください。' : '';
       fileStatus.dataset.state = summary.backup === 'verified' ? 'verified' : summary.backup === 'unavailable' || summary.backupOutdated ? 'attention' : 'unconfirmed';
       const nextGestureContext = JSON.stringify([p.token, sceneId, ports.readOnly, ports.imageScope(), ports.otherPending(), models?.hidden(), memory().pinColors]);
       if (gestureContext !== nextGestureContext) { gestureContext = nextGestureContext; gesture = null; gestureGeneration++; }
@@ -1546,7 +1551,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     else if (reading.focus === 'detail' && memory().selectedCaptionId) detailHeading.focus({ preventScroll: true });
     else list.focusSearch();
   });
-  return { root, headerActions, projectNavigation: otherProject, utilityArea: settingsSheet, clearNotice(){if(!pending&&ports.status().kind==='idle')feedback='';}, dismissDisclosures(){help.open=false;organization!.settingsRoot.open=false;}, setExternalBusy: (active:boolean) => { const reading=readDuringOutput(), changed=externalBusy!==active||outputReading!==reading; externalBusy=active;outputReading=reading;if(changed)render();body.inert=busy&&!autosave?.saving||active&&!readDuringOutput(); }, render, session: interaction, activeScene: () => sceneId, inputPending: () => dirty() || busy,
+  return { root, headerActions, fileStatus, projectNavigation: otherProject, utilityArea: settingsSheet, clearNotice(){if(!pending&&ports.status().kind==='idle')feedback='';}, dismissDisclosures(){help.open=false;organization!.settingsRoot.open=false;}, setExternalBusy: (active:boolean) => { const reading=readDuringOutput(), changed=externalBusy!==active||outputReading!==reading; externalBusy=active;outputReading=reading;if(changed)render();body.inert=busy&&!autosave?.saving||active&&!readDuringOutput(); }, render, session: interaction, activeScene: () => sceneId, inputPending: () => dirty() || busy,
     canFlushCaption, flushCaption,
     hasChanges: () => dirty() || busy || !!pending,
     unmount() {

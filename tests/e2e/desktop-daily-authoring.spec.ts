@@ -1,8 +1,9 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { desktopOrigin, desktopEntry } from './desktopEntry';
+import { ownedServer } from '../offline-e2e/server';
 import { finishCaptionEditing, chooseHomeFiles, selectShareOutput,  revealCoordinateAdd, revealFileSurface } from './workspaceUi';
 import { expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
-import { readFile } from 'node:fs/promises';
+import { appendFile, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import * as A from '@automerge/automerge';
 import { triangleGlb, smallPng } from './fixtures';
@@ -12,12 +13,19 @@ import { inspectProjectCandidates } from '../../src/domain/projectCandidates';
 import { validationMetadataLimits as limits } from '../../src/projectFiles/validation';
 
 async function ready(page: Page, text: string) { await expect(page.getByText(text, { exact: true })).toBeVisible({ timeout: 90_000 }); await expect(page.locator('main.lv-project-workspace > header > p.lv-operation-status')).toHaveAttribute('data-busy', 'false'); }
+async function phase(info: TestInfo, name: string) {
+  await appendFile(info.outputPath('daily-phases.jsonl'), JSON.stringify({ phase: name, timestamp: Date.now() }) + '\n');
+}
 async function output(page: Page, info: TestInfo, name: string, purpose: 'backup' | 'teamWorkspace') {
+  await phase(info, `output.${name}.start`);
   const menu = page.locator('details.lv-project-files'); if (!await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
   const area = page.getByRole('region', { name: 'ファイル', exact: true }); if(!await revealFileSurface(page,purpose==='backup'?'保存':'共有')) await area.getByRole('button', { name: purpose === 'backup' ? '保存' : '相手に渡す', exact: true }).click();
   if (purpose === 'backup') await area.getByLabel('保存名（任意）', { exact: true }).fill(name); else await selectShareOutput(area, purpose);
   const primary = area.locator('button.lv-file-primary'); await expect(primary).toBeEnabled();
-  const [download] = await Promise.all([page.waitForEvent('download', { timeout: 90_000 }), primary.click()]), path = info.outputPath(name + '.zip'); await download.saveAs(path);
+  await phase(info, `output.${name}.ready`);
+  const [download] = await Promise.all([page.waitForEvent('download', { timeout: 90_000 }), primary.click().then(() => phase(info, `output.${name}.clicked`))]), path = info.outputPath(name + '.zip');
+  await phase(info, `output.${name}.download`); await download.saveAs(path);
+  await phase(info, `output.${name}.file-saved`);
   expect(await download.failure()).toBeNull(); await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false', { timeout: 90_000 }); await menu.getByRole('button',{name:'閉じる',exact:true}).click(); return path;
 }
 async function backupRecords(path: string) {
@@ -26,12 +34,17 @@ async function backupRecords(path: string) {
 }
 test('daily Scene and Caption organization, tags, alignment, settings and files survive a full cold restart', async ({}, info) => {
   test.setTimeout(600_000); A.getHeads(A.init()); const profile = await createBrowserProfile('daily');
+  await phase(info, 'test.start');
+  const server = process.env.LOCIVIEW_E2E_ARTIFACT ? await ownedServer(process.env.LOCIVIEW_E2E_ARTIFACT) : undefined;
+  const origin = server ? new URL(server.url).origin : desktopOrigin, entry = server?.url ?? desktopEntry;
   const contexts = new Set<BrowserContext>(), errors: string[] = [], remote: string[] = [];
   const launch = async (ownedProfile=profile) => {
     const context = await chromium.launchPersistentContext(ownedProfile, { channel: 'chromium', headless: true, viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true }); contexts.add(context);
     await context.addInitScript(()=>{const urls:string[]=[];(window as any).__releasedMediaUrls=urls;const revoke=URL.revokeObjectURL;URL.revokeObjectURL=function(url:string){urls.push(url);return revoke.call(URL,url);};});
-    await context.route('**/*', route => { const u = new URL(route.request().url()); if (u.origin === desktopOrigin || ['blob:', 'data:'].includes(u.protocol)) return route.continue(); remote.push(u.href); return route.abort('blockedbyclient'); });
-    const page = context.pages()[0] ?? await context.newPage(); page.setDefaultTimeout(15_000); page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); }); await page.goto(desktopEntry); return { page, context };
+    await context.route('**/*', route => { const u = new URL(route.request().url()); if (u.origin === origin || ['blob:', 'data:'].includes(u.protocol)) return route.continue(); remote.push(u.href); return route.abort('blockedbyclient'); });
+    const page = context.pages()[0] ?? await context.newPage(); page.setDefaultTimeout(15_000); page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+    const url = new URL(entry); if (process.env.LOCIVIEW_E2E_TIMINGS === '1') url.searchParams.set('timings', '1');
+    await page.goto(url.href); return { page, context };
   };
   try {
     const first = await launch(), p = first.page;
@@ -44,6 +57,7 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
     await p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('日常の編集'); await p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
     await expect(p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('日常の編集', { timeout: 90_000 }); await expect(p.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false');
     console.log('daily: project created');
+    await phase(info, 'project.ready');
     const originalSceneName = await p.getByRole('region', { name: 'シーン', exact: true }).locator('select[aria-label="シーン"] option:checked').innerText();
     expect(originalSceneName).toBe('シーン 1');
     await revealCoordinateAdd(p); const owner = p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '基準.glb' }); await expect(p.getByRole('button', { name: 'このモデルに追加', exact: true })).toBeEnabled(); await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
@@ -77,6 +91,7 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
     if(nativeHeic)await finishCaptionEditing(p,{},90_000);else{await expect(p.getByRole('region',{name:'記録の詳細',exact:true}).locator('[data-save-state]')).toHaveAttribute('data-save-state','failed');await expect(p.getByRole('region',{name:'記録の詳細',exact:true})).toContainText('端末で別のJPEG');await p.getByRole('region',{name:'メディア',exact:true}).getByRole('button',{name:'選択を取り消す',exact:true}).click();await expect(p.locator('main.lv-project-workspace > header > p.lv-operation-status')).toHaveText('');}
     await info.attach('native-media-environment',{body:JSON.stringify({browser:first.context.browser()?.version()??await p.evaluate(()=>navigator.userAgent),nativeHeic,avcAacMp3:'actual initial decode and play time/frame progression passed'},null,2),contentType:'application/json'});
     console.log('daily: original media playback and HEIC capability verified');
+    await phase(info, 'media.ready');
     const tags = p.getByLabel('分類タグ', { exact: true }); await tags.locator(':scope > summary').click(); await tags.locator('.lv-tag-settings > summary').click(); await tags.getByLabel('タグ名', { exact: true }).fill('現地'); await tags.getByRole('button', { name: 'タグを追加', exact: true }).click(); await ready(p, 'タグを保存しました。');
     await tags.getByRole('button', { name: 'この記録にタグを付ける', exact: true }).click(); await ready(p, '記録のタグを変更しました。');
     await p.getByRole('button', { name: '記録を複製', exact: true }).click(); await ready(p, '記録を複製しました。元の記録は変わりません。');
@@ -104,6 +119,7 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
     await p.locator('.lv-caption-select').filter({ hasText: '元の記録' }).click(); await expect(nextWindow).toHaveCount(1);
     await p.locator('.lv-caption-select').filter({ hasText: '複製の記録' }).click();
     console.log('daily: records and undo verified');
+    await phase(info, 'records.ready');
     const search = p.getByRole('region', { name: '記録', exact: true }).locator('.lv-caption-search').getByLabel('検索', { exact: true });
     await search.fill('複製'); await expect(p.getByRole('button', { name: '次の記録', exact: true })).toBeDisabled(); await search.fill('');
     await p.getByText('シーンを管理', { exact: true }).click(); await p.getByRole('button', { name: 'シーンを複製', exact: true }).click(); await p.getByLabel('複製するシーン名', { exact: true }).fill('現地調査'); await p.getByRole('button', { name: '複製を作成', exact: true }).click(); await ready(p, 'シーンを複製しました。記録は別々に編集できます。');
@@ -111,6 +127,7 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
     await p.getByRole('button', { name: '開始シーンにする', exact: true }).click(); await p.getByRole('button', { name: '開始シーンを設定', exact: true }).click(); await ready(p, '開始シーンを設定しました。');
     await p.getByRole('combobox', { name: 'シーン', exact: true }).selectOption({ label: originalSceneName }); await p.getByRole('button', { name: 'シーンを削除', exact: true }).click(); await p.getByRole('button', { name: 'このシーンを削除する', exact: true }).click(); await ready(p, 'シーンを削除しました。記録・モデル・画像はプロジェクトに残っています。');
     console.log('daily: Scene organization verified');
+    await phase(info, 'scenes.ready');
     await p.getByRole('tab', { name: 'モデル', exact: true }).click(); const models = p.getByRole('tabpanel', { name: 'モデル', exact: true });
     await models.locator('.lv-model-select').filter({ hasText: '移動するモデル.glb' }).click(); await models.getByRole('button', { name: '配置を調整', exact: true }).click(); await models.getByLabel('モデル位置 X', { exact: true }).fill('5'); await models.getByLabel('モデル倍率', { exact: true }).fill('2'); await models.getByRole('button', { name: '配置を確定', exact: true }).click(); await ready(p, 'モデルの配置を確定しました。');
     await models.getByLabel('位置合わせ', { exact: true }).locator('summary').click(); await models.locator('.lv-model-select').filter({ hasText: '基準.glb' }).click(); await models.getByRole('button', { name: 'このモデルを基準にする', exact: true }).click(); await expect(models.getByRole('button', { name: '配置を調整', exact: true })).toBeDisabled();
@@ -119,7 +136,8 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
     await models.getByLabel('回転・拡縮の基準', { exact: true }).selectOption('centre'); await models.getByRole('button', { name: '配置を調整', exact: true }).click(); await models.getByLabel('モデル回転 Z', { exact: true }).fill('90'); await models.getByRole('button', { name: '配置を確定', exact: true }).click(); await ready(p, 'モデルの配置を確定しました。');
     await models.getByRole('button', { name: '読み込み時の配置に戻す', exact: true }).click(); await models.getByRole('button', { name: '配置を取り消す', exact: true }).click();
     console.log('daily: alignment verified');
-    const settings = p.getByLabel('設定', { exact: true }); await settings.locator(':scope > summary').click(); await settings.locator('.lv-local-name > summary').click(); await settings.getByLabel('このブラウザの表示名', { exact: true }).fill('現地担当'); await settings.getByRole('button', { name: '表示名を設定', exact: true }).click(); await expect(settings.getByRole('status')).toHaveText('このブラウザの表示名を設定しました。'); await expect(p.getByLabel('このブラウザの利用者', { exact: true })).toHaveText('現地担当');
+    await phase(info, 'alignment.ready');
+    const settings = p.getByLabel('設定', { exact: true }); await settings.locator(':scope > summary').click(); await settings.locator('.lv-local-name > summary').click(); await settings.getByLabel('このブラウザの表示名', { exact: true }).fill('現地担当'); await settings.getByRole('button', { name: '表示名を設定', exact: true }).click(); await expect(settings.locator('.lv-local-name + [role=status]')).toHaveText('このブラウザの表示名を設定しました。'); await expect(p.getByLabel('このブラウザの利用者', { exact: true })).toHaveText('現地担当');
     await p.screenshot({ path: info.outputPath('daily-authoring.png'), fullPage: true });
     const saved = await output(p, info, 'daily-backup', 'backup'), before = await backupRecords(saved), workspace = await output(p, info, 'daily-workspace', 'teamWorkspace');
     const sent = await WorkspaceArchive.inspect(new Blob([Uint8Array.from(await readFile(workspace)).buffer]), limits); expect(sent.source.originalChanges()).toEqual(before.archive.source.originalChanges());
@@ -140,5 +158,5 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
     await cold.page.setViewportSize({width:320,height:740});await play(cold.page,'video','owned-video.mp4');await cold.page.screenshot({path:info.outputPath('daily-media-320.png'),fullPage:true});
     const recipient=await launch(await createBrowserProfile('daily-recipient'));await chooseHomeFiles(recipient.page, workspace);await recipient.page.getByRole('button',{name:'プロジェクトを取り込む',exact:true}).click();await expect(recipient.page.getByRole('heading',{name:'プロジェクト名',exact:true})).toHaveText('日常の編集',{timeout:90000});await recipient.page.getByRole('list',{name:'記録一覧',exact:true}).locator('.lv-caption-select').filter({hasText:'複製の記録'}).click();await play(recipient.page,'video','owned-video.mp4');const received=await backupRecords(await output(recipient.page,info,'daily-recipient-backup','backup'));expect(received.records).toEqual(before.records);expect(received.archive.source.originalChanges()).toEqual(before.archive.source.originalChanges());
     expect(errors).toEqual([]); expect(remote).toEqual([]);
-  } finally { for (const context of contexts) await context.close(); }
+  } finally { for (const context of contexts) await context.close(); await server?.stop(); }
 });

@@ -336,7 +336,7 @@ test('one PC app keeps the same Project through connected, cold offline and prep
     await detail().getByLabel('タイトル', { exact: true }).fill('同じ記録'); await detail().getByLabel('本文', { exact: true }).fill('接続中に記録した本文'); await finishCaptionEditing(p, {});
     const chooser = p.waitForEvent('filechooser'); await p.getByLabel('メディアを追加', { exact: true }).click(); await (await chooser).setFiles({ name: '現場.png', mimeType: 'image/png', buffer: smallPng() }); await finishCaptionEditing(p, {});
     const save = async (name: string) => {
-      await p.locator('.lv-workspace-actions').getByRole('button', {name:'保存…',exact:true}).click(); const files = p.getByRole('region', { name: 'ファイル', exact: true }); await files.getByLabel('保存名（任意）', { exact: true }).fill(name);
+      await revealFileSurface(p,'保存'); const files = p.getByRole('region', { name: 'ファイル', exact: true }); await files.getByLabel('保存名（任意）', { exact: true }).fill(name);
       const [download] = await Promise.all([p.waitForEvent('download'), files.locator('.lv-file-primary').click()]); const path = info.outputPath(name + '.zip'); await download.saveAs(path); expect(await download.failure()).toBeNull();
       await expect(files.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false'); await p.locator('details.lv-project-files').getByRole('button', { name: '閉じる', exact: true }).click(); return inspect(path);
     };

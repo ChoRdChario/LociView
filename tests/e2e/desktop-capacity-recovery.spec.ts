@@ -215,10 +215,14 @@ for (const restored of [true, false]) for (const touch of [false, true]) test(`r
   }, run);
   try {
     const author = await open(restored ? await createBrowserProfile('author') : receiver);
+    await phase('conversion.inspect.start');
     await chooseHomeFiles(author, {
       name: '記録.zip', mimeType: 'application/zip', buffer: await nativeConversionBackup(triangleGlb(), smallPng()) });
+    await phase('conversion.inspect.selected');
     await author.getByRole('button', { name: '新しいプロジェクトに変換', exact: true }).click();
+    await phase('conversion.command.started');
     await expect(author.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled();
+    await phase('conversion.command.ready');
     const before = await backup(author, 'before');
     await close();
     const page = await open(receiver);
@@ -354,6 +358,11 @@ for (const restored of [true, false]) for (const touch of [false, true]) test(`r
         text:await active.locator('body').innerText().catch(()=>''),
         rows:await active.locator('.lv-recent-project').allTextContents().catch(()=>[]),
         listBusy:await active.locator('.lv-validation-home [aria-busy]').evaluateAll(nodes=>nodes.map(node=>node.getAttribute('aria-busy'))).catch(()=>[]),
+        timings:await active.evaluate(()=>{
+          document.dispatchEvent(new Event('lociview-timing-snapshot'));
+          return performance.getEntriesByType('measure').filter(entry=>entry.name.startsWith('lociview.'))
+            .map(entry=>({...entry.toJSON(),detail:(entry as PerformanceMeasure).detail}));
+        }).catch(()=>[]),
       }),contentType:'application/json'}).catch(()=>{});
     }
     throw error;

@@ -5954,7 +5954,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       return matches.find(exposed)??matches[0]!;
     };
     await vi.waitFor(() => expect(all(root).some(n => n.className === 'lv-project-workspace')).toBe(true));
-    const editor = all(root).find(n => n.className === 'lv-project-workspace')!, status = all(editor).find(n => n.className === 'lv-operation-status')!;
+    const editor = all(root).find(n => n.className === 'lv-project-workspace')!;
+    const status = editor.children.find(n => n.tag === 'header')!.children.find(n => n.className === 'lv-operation-status')!;
     // Observe the existing final-render signals in this recorded-DOM fixture.
     // Product edits and file receipt have distinct owners; neither host token
     // publication nor an arbitrary polling deadline proves UI completion.
@@ -6162,7 +6163,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   it('08d preserves continued typing, native revert and search during a held save, then flushes the latest text before file output', async () => {
     let navigationBlocked=false;
     const h=await productWorkspaceFixture(true,false,false,'map2',undefined,{mountEditor:(doc,host,factory,tools,candidate,navigation)=>
-      createProductWorkspace(doc,host,factory,tools,candidate,{...navigation!,captionAutosave:true,projectNavigationBlocked:()=>navigationBlocked})});
+      createProductWorkspace(doc,host,factory,tools,candidate,{...navigation!,captionAutosave:true,compactFiles:true,projectNavigationBlocked:()=>navigationBlocked})});
     h.named('記録一覧',h.editor).children[0]!.children[0]!.click();
     navigationBlocked=true;h.refresh();expect(h.button('プロジェクトを選ぶ',h.editor).disabled).toBe(true);
     navigationBlocked=false;h.refresh();expect(h.button('プロジェクトを選ぶ',h.editor).disabled).toBe(false);
@@ -6184,11 +6185,28 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await vi.waitFor(()=>{const state=h.all(h.named('記録の詳細',h.editor)).find(n=>n.dataset.saveState==='saved');expect(state).toBeDefined();},{timeout:10000});
     pause.mockRestore();expect(title.value).toBe(originalTitle);expect(body.value).toBe('保存中にも日本語を入力');
     body.value='最後の入力も書き出す';body.fire('input');
-    h.button('ファイルに保存',h.named('ファイル')).click();
+    const save = h.button('ファイルに保存',h.editor); save.click(); save.click();
     await vi.waitFor(()=>expect(h.downloads).toHaveBeenCalledOnce(),{timeout:10000});
+    expect(h.host.workspaceOutput.jobs).toHaveLength(1);
     const job=h.host.workspaceOutput.jobs.find(j=>j.purpose==='backup')!,backup=await BackupArchive.inspect(await h.host.workspaceOutput.download(job.id),metadata);
     expect(backup.source.originalChanges()).toEqual(h.host.read().source!.originalChanges());
     expect(h.host.authority.read().resources.captions[h.f.f.captionId]!.body).toEqual({kind:'value',value:'最後の入力も書き出す'});
+    await h.ui.dispose();
+  });
+  it('defers ordinary file output until the latest edit introducing an editor name is disclosed', async () => {
+    const h = await productWorkspaceFixture(true,false,false,'map2',undefined,{
+      editorSettings:{read:()=>({enabled:true,name:'記録担当'}),save:()=>true},
+      mountEditor:(doc,host,factory,tools,candidate,navigation)=>createProductWorkspace(doc,host,factory,tools,candidate,
+        {...navigation!,captionAutosave:true,compactFiles:true})});
+    expect(h.host.workspaceOutput.privacy.backupIncludesNames).toBe(false);
+    h.named('記録一覧',h.editor).children[0]!.children[0]!.click();
+    const body=h.named('本文',h.editor);body.value='保存直前の本文';body.fire('input');
+    h.button('ファイルに保存',h.editor).click();
+    await vi.waitFor(()=>expect(h.all(h.root).find(n=>n.className==='lv-project-files')!.open).toBe(true),{timeout:10000});
+    expect(h.host.workspaceOutput.jobs).toHaveLength(0);expect(h.downloads).not.toHaveBeenCalled();
+    expect(h.host.workspaceOutput.privacy.backupIncludesNames).toBe(true);
+    expect(h.host.authority.read().resources.captions[h.f.f.captionId]!.body).toEqual({kind:'value',value:'保存直前の本文'});
+    expect(h.all(h.root).some(n=>n.textContent==='記録された編集者名を含みます。対応版のLociViewで開いてください。')).toBe(true);
     await h.ui.dispose();
   });
   it('08d keeps exact retry reachable after the newest input reverts to its base during a failed save', async () => {
@@ -6342,8 +6360,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(h.all(detail).find(n => n.attributes.get('role') === 'status')!.textContent).toBe('変更を適用中です。'); expect(h.named('本文', h.editor).readOnly).toBe(true);
     await saving; expect(h.status.dataset.captionApplying).toBe('false'); expect(title.value).toBe('更新した題名'); await h.ui.dispose();
   });
-  it.each(['handoff', 'disclosure'] as const)('focuses the File result only after a completed %s', async result => {
-    const h = await productWorkspaceFixture(true), output = h.all(h.root).find(n => n.className === 'lv-file-output')!;
+  it.each(['handoff', 'disclosure', 'direct-handoff', 'direct-disclosure'] as const)('focuses the File result only after a completed %s', async variant => {
+    const direct = variant.startsWith('direct-'), result = variant.endsWith('disclosure') ? 'disclosure' : 'handoff';
+    const h = await productWorkspaceFixture(true,false,false,'map1',undefined,{mountEditor:(doc,host,factory,tools,candidate,navigation)=>
+      createProductWorkspace(doc,host,factory,tools,candidate,{...navigation!,compactFiles:true})}), output = h.all(h.root).find(n => n.className === 'lv-file-output')!;
     const primary = () => h.all(output).find(n => n.className === 'lv-file-primary')!;
     // Supply only native selector behavior absent from the DOM recorder.
     Object.assign(output, { querySelector: (selector: string) => selector === '.lv-file-primary' ? primary() : null });
@@ -6355,20 +6375,28 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       return id;
     });
     const status = () => h.all(output).find(n => n.attributes.get('role') === 'status')!;
-    const origin = primary(); origin.focus(); const focused = origin.focusCalls.length, resultFocused = status().focusCalls.length; origin.click();
+    const origin = direct ? h.button('ファイルに保存',h.editor) : primary(); origin.focus();
+    const focused = primary().focusCalls.length, resultFocused = status().focusCalls.length; origin.click();
+    await vi.waitFor(() => expect(h.host.workspaceOutput.jobs).toHaveLength(1), { timeout: 10000 });
     await vi.waitFor(() => expect(status().dataset.busy).toBe('false'), { timeout: 10000 });
     expect(status().textContent).toBe(result === 'handoff' ? `${(h.downloads.mock.contexts[0] as unknown as HTMLAnchorElement).download} のダウンロードを開始しました。保存先で完了を確認してください。` : '作成したファイルの内容を確認し、ダウンロードしてください。');
     expect(primary().focusCalls.length - focused).toBe(0);
-    expect(status().focusCalls.length - resultFocused).toBe(result === 'handoff' ? 1 : 0); expect(h.downloads).toHaveBeenCalledTimes(result === 'handoff' ? 1 : 0);
+    expect(status().focusCalls.length - resultFocused).toBe(result === 'handoff' && !direct ? 1 : 0); expect(h.downloads).toHaveBeenCalledTimes(result === 'handoff' ? 1 : 0);
     expect(fresh).not.toHaveBeenCalled();
     if (result === 'disclosure') {
+      if (direct) {
+        const menu = h.all(h.root).find(n=>n.className==='lv-project-files')!;
+        expect(menu.open).toBe(true);h.button('閉じる',menu).click();expect(menu.open).toBe(false);
+        origin.click();await vi.waitFor(()=>expect(menu.open).toBe(true));
+        expect(h.host.workspaceOutput.jobs).toHaveLength(1);expect(h.downloads).not.toHaveBeenCalled();
+      }
       h.all(output).find(n => n.tag === 'button' && n.textContent === 'ダウンロード')!.click();
       await vi.waitFor(() => expect(status().dataset.busy).toBe('false'), { timeout: 10000 });
       expect(fresh).toHaveBeenCalledOnce(); expect(h.downloads).toHaveBeenCalledOnce();
     }
-    h.refresh(); h.refresh(); await Promise.resolve(); expect(primary() === origin).toBe(true);
+    h.refresh(); h.refresh(); await Promise.resolve(); if (!direct) expect(primary() === origin).toBe(true);
     if (result === 'handoff') {
-      expect(origin.document.activeElement === status()).toBe(true);
+      expect(origin.document.activeElement === (direct ? h.named('保存ファイルの状態',h.editor) : status())).toBe(true);
       const row = h.host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!, fileStatus = () => h.named('保存ファイルの状態', h.editor).textContent;
       expect(row.stale).toBeUndefined(); expect(fileStatus()).toBe('ダウンロード開始・保存先で確認');
       // Unknown freshness must never be promoted into a verified-file claim.
@@ -6414,7 +6442,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   });
   it('discloses known portable output before handoff and reuses only its freshly verified download URL', async () => {
     const raw = imageFor('heic'), raster = portablePng();
-    const h = await productWorkspaceFixture(true, false, false, 'map2', undefined, { mediaDecoders: {
+    const h = await productWorkspaceFixture(true, false, false, 'map2', undefined, { mountEditor:(doc,host,factory,tools,candidate,navigation)=>
+      createProductWorkspace(doc,host,factory,tools,candidate,{...navigation!,compactFiles:true}), mediaDecoders: {
       heic: async () => ({ width: 96, height: 64, close() {} }), raster: async () => new Blob([raster.slice().buffer], { type: 'image/png' }) } });
     const host = h.host, output = h.all(h.root).find(n => n.className === 'lv-file-output')!;
     const status = () => h.all(output).find(n => n.attributes.get('role') === 'status')!;
@@ -6429,6 +6458,9 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
         file: { name: '原本.heic', size: raw.length, arrayBuffer: async () => raw.slice().buffer } });
       h.refresh(); expect(host.workspaceOutput.privacy).toMatchObject({ sourceRequiresPortableMediaReader: true, backupRequiresPortableMediaReader: true });
       expect(h.all(output).some(n => n.textContent === 'HEIC原本と表示用PNGの組に対応したLociViewで開いてください。')).toBe(true);
+      h.button('ファイルに保存',h.editor).click();
+      await vi.waitFor(() => expect(h.all(h.root).find(n=>n.className==='lv-project-files')!.open).toBe(true));
+      expect(host.workspaceOutput.jobs).toHaveLength(0); expect(h.downloads).not.toHaveBeenCalled();
       primary().click(); await vi.waitFor(() => expect(status().dataset.busy).toBe('false'), { timeout: 10000 });
       expect(h.downloads).toHaveBeenCalledTimes(1); expect(status().textContent).toBe(`${(h.downloads.mock.contexts[0] as unknown as HTMLAnchorElement).download} のダウンロードを開始しました。保存先で完了を確認してください。`);
       expect(fresh).not.toHaveBeenCalled();

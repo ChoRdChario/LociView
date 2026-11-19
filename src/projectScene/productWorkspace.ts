@@ -33,7 +33,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   const fileNavigation=document.createElement('div'); fileNavigation.setAttribute('role','tablist'); fileNavigation.setAttribute('aria-label','ファイルの操作');
   const fileCloseNote=document.createElement('p');fileCloseNote.textContent='入力・確認を完了するか、取り消してください。';
   fileClose.type = 'button'; fileClose.textContent = '閉じる'; fileNotice.setAttribute('role', 'status');
-  fileNotice.className = 'lv-operation-status';
+  fileNotice.className = 'lv-operation-status'; fileNotice.id = `${fileContent.id}-notice`;
   if(fileMenu){fileMenu.className='lv-project-files';const summary=document.createElement('summary');fileSummary=summary;summary.textContent='ファイル';
     fileContent.append(tools!.root); filePanel.append(fileHeader,fileNavigation,fileCloseNote,fileContent); fileMenu.append(summary,filePanel);
     if (navigation?.fileActionsRoot) filePanel.append(navigation.fileActionsRoot);
@@ -56,15 +56,28 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     (fileOrigin?.getClientRects?.().length && !(fileOrigin as HTMLButtonElement).disabled ? fileOrigin : fileSummary)?.focus?.({preventScroll:true}); };
   fileClose.addEventListener('click', closeFiles);
   filePanel.addEventListener('keydown', event => { if(event.key==='Escape' && !event.isComposing && !event.defaultPrevented){event.preventDefault();event.stopPropagation();closeFiles();} });
-  const fileEntry = (label:string,surface:'save'|'share'|'receive'|'restore') => {
+  const fileEntry = (label:string,surface:'save'|'share'|'receive'|'restore',ordinarySave=false) => {
     const b=document.createElement('button'); b.type='button'; b.textContent=label; b.setAttribute('data-lv-edit-only','');
-    b.addEventListener('click',()=>{void(async()=>{if(!fileMenu||b.disabled)return;
-      const owner=core;if(owner?.inputPending()&&!await owner.flushCaption())return;
+    b.addEventListener('click',()=>{const owner=core;void(async()=>{if(!fileMenu||b.disabled)return;
+      if(owner?.inputPending()&&!await owner.flushCaption())return;
       if(disposed||core!==owner||switching||tools!.hasChanges())return;
       if(!fileMenu.open)fileOrigin=b;
-      if(tools!.showSurface(surface)){core?.dismissDisclosures();fileMenu.open=true;if(b.getAttribute('role')!=='tab')filePanel.focus?.({preventScroll:true});}})();}); return b;
+      if(!tools!.showSurface(surface))return;
+      if(ordinarySave&&!fileMenu.open){
+        fileNotice.dataset.compact='true';
+        const result=await tools!.requestSave();
+        if(disposed||core!==owner||switching||result==='blocked')return;
+        if(result==='completed'){
+          if(document.activeElement===b&&core&&!core.fileStatus.hidden)core.fileStatus.focus({preventScroll:true});
+          return;
+        }
+      }
+      fileNotice.dataset.compact='false';
+      core?.dismissDisclosures();fileMenu.open=true;if(b.getAttribute('role')!=='tab')filePanel.focus?.({preventScroll:true});})().catch(error=>{
+        if(!disposed&&core===owner){outputNotice=error instanceof Error?error.message:'ファイル処理を完了できません。';fileNotice.dataset.compact='false';changed();}
+      });}); return b;
   };
-  const saveEntry=fileEntry('保存…','save'), shareEntry=fileEntry('共有','share'), receiveEntry=fileEntry('更新を読み込む','receive'), restoreEntry=fileEntry('復元','restore');
+  const saveEntry=fileEntry('ファイルに保存','save',true), shareEntry=fileEntry('共有','share'), receiveEntry=fileEntry('更新を読み込む','receive'), restoreEntry=fileEntry('復元','restore');
   saveEntry.className='lv-workspace-primary'; shareEntry.className='lv-workspace-share';
   filePanel.tabIndex=-1;
   const fileTabs = new Map([['save',fileEntry('保存','save')],['share',fileEntry('共有','share')],['receive',receiveEntry],['restore',restoreEntry]] as const);
@@ -112,7 +125,9 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     if (outputOperation) outputNotice = outputOperation.message;
     else if (wasReadingOutput) outputNotice = tools?.outputFeedback() ?? '';
     wasReadingOutput = !!outputOperation;
-    fileNotice.textContent=outputOperation ? outputOperation.message : needsFiles?['未完了のファイル操作があります。',host.mode!.current==='view'?'編集を開始して「ファイル」から再開してください。':'「ファイル」から再開できます。',host.workspaceOutput.error,host.workspaceFiles.error,host.workspaceFiles.reviewCopyError,host.backupRestore.error].filter(Boolean).join(' '):outputNotice;
+    const notice=outputOperation ? outputOperation.message : needsFiles?['未完了のファイル操作があります。',host.mode!.current==='view'?'編集を開始して「ファイル」から再開してください。':'「ファイル」から再開できます。',host.workspaceOutput.error,host.workspaceFiles.error,host.workspaceFiles.reviewCopyError,host.backupRestore.error].filter(Boolean).join(' '):outputNotice;
+    if(fileNotice.textContent!==notice)fileNotice.textContent=notice;
+    if(needsFiles&&!outputOperation&&!tools?.busy())fileNotice.dataset.compact='false';
     fileNotice.hidden=!fileNotice.textContent || !!fileMenu?.open; fileNotice.dataset.busy=String(!!outputOperation);
     fileClose.disabled=!!tools?.hasChanges() && !output;
     fileCloseNote.textContent=output ? '作成中も記録を読めます。' : tools?.closeReason() ?? ''; fileCloseNote.hidden=!fileCloseNote.textContent;
@@ -357,6 +372,10 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     },
     });
     root.append(core.root);
+    core.fileStatus.setAttribute('aria-describedby',fileNotice.id);
+    core.fileStatus.addEventListener('keydown',event=>{
+      if(event.key==='Escape'&&!event.isComposing&&!event.defaultPrevented){event.preventDefault();event.stopPropagation();closeFiles();changed();}
+    });
     core.headerActions.append(mode); if(fileMenu)core.headerActions.append(saveEntry,shareEntry,fileMenu);
     if(fileMenu)fileHeader.insertBefore(core.projectNavigation,fileClose);
     if(navigation?.utilitiesRoot)core.utilityArea.append(navigation.utilitiesRoot);

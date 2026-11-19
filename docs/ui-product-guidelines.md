@@ -656,6 +656,18 @@ sufficient.
 > this does not establish ordinary-home or device acceptance. Current connection
 > coverage belongs in [the inventory](../tasks/implementation-inventory.md).
 
+- A pristine ordinary file-save intent starts the existing full Backup from the
+  header without requiring a second default execute action. Recalculate HEIC and
+  editor-name disclosure after the latest text is durably flushed. Keep naming,
+  unfinished choices, disclosure, existing failed/generated results and readonly
+  handling in the same File sheet; never silently replace their intent. Duplicate
+  activation shares the existing execution guard. Success announces actual
+  download initiation without stealing focus; failure exposes the same retained
+  result and retry. The ordinary File tab still opens its options without saving.
+  Use the existing header file-state field for ordinary progress and completion;
+  a long result filename must not push the reading/3D workspace down. Retain the
+  full result in the existing File surface and its accessible description.
+
 - Internal working-data retention is not announced as Project save success. Where
   necessary, say `ファイルに未反映の変更があります`; contextual help explains
   that browser-held work is for resume and can be lost with site data. Do not

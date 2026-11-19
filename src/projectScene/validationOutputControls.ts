@@ -36,20 +36,27 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   let handoffFileName = '';
   let storageFailure:{diagnostic:string|null|undefined;text:string}|undefined;
   let readingToken: string | null = null;
-  let primaryAction = () => {};
+  type OutputExecution = 'completed' | 'attention';
+  let primaryAction: (focus?: 'origin') => Promise<OutputExecution> | undefined = () => undefined;
   let preparingPrimary = false;
-  primary.addEventListener('click', () => { void(async () => {
-    if (disposed || primary.disabled || preparingPrimary) return;
+  async function activatePrimary(ordinarySave = false): Promise<OutputExecution | 'blocked' | 'confirm'> {
+    if (disposed || preparingPrimary || busy || composing || otherBusy() || !ordinarySave && primary.disabled) return 'blocked';
     const owner = session(), flushing = !!(owner?.interactionPending && owner.flushCaption);
     preparingPrimary = true;
     try {
-      if (flushing && (!owner!.canFlushCaption?.() || !await owner!.flushCaption?.())) return;
-      if (disposed || busy || composing || otherBusy() || flushing && session() !== owner) return;
+      if (flushing && (!owner!.canFlushCaption?.() || !await owner!.flushCaption?.())) return 'blocked';
+      if (disposed || busy || composing || otherBusy() || flushing && session() !== owner) return 'blocked';
       // Refresh closure/token/disclosure after saving, before acquiring file busy.
-      if (flushing) render();
-      if (!primary.disabled) primaryAction();
+      render();
+      if (ordinarySave && (presentation !== 'save' || purpose !== 'backup' || host.authority.readOnly ||
+        checkpointName !== '' || choicePending || selected || cancellation ||
+        host.workspaceOutput.error || feedback && !completedFeedback || privacyNotice(currentDisclosure()))) return 'confirm';
+      if (primary.disabled) return 'blocked';
+      const execution = primaryAction(ordinarySave ? 'origin' : undefined);
+      return execution ? await execution : 'blocked';
     } finally { preparingPrimary = false; }
-  })(); });
+  }
+  primary.addEventListener('click', () => { void activatePrimary(); });
   type Presentation = 'all' | 'save' | 'share';
   let presentation: Presentation = 'all';
   type OutputPurpose = 'teamWorkspace' | 'contribution' | 'backup' | 'clean' | 'review';
@@ -115,7 +122,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     completed?: () => void;
     workingMessage?: string;
     allowReading?: boolean;
-    focusOnSuccess?: 'primary' | 'result';
+    focusOnSuccess?: 'primary' | 'result' | 'origin';
   };
   const perform = (action: () => Promise<unknown>, message: string | (() => string), {
     writes = true, completed, workingMessage = 'ファイルを確認しています。', allowReading = false, focusOnSuccess = 'primary',
@@ -127,21 +134,25 @@ export function createValidationOutputControls(document: Document, host: ReturnT
       completedFeedback = false; feedback = '入力・操作を確定するか、取り消してから実行してください。'; render(); return;
     }
     const origin = document.activeElement;
-    let ownsFocus = (origin as HTMLElement | null)?.className === 'lv-file-primary';
+    let ownsFocus = focusOnSuccess === 'origin' || (origin as HTMLElement | null)?.className === 'lv-file-primary';
     const moved = (event: Event) => { if (event.target !== origin && event.target !== document.body) ownsFocus = false; };
     document.addEventListener?.('focusin', moved);
     let succeeded = false;
     completedFeedback = false; storageFailure=undefined; busy = true; readingToken = allowReading ? host.read().source?.token ?? null : null; feedback = workingMessage; render(); changed();
-    void (async () => {
+    return (async (): Promise<OutputExecution> => {
       try { await action(); if (!disposed) { feedback = typeof message === 'function' ? message() : message; completedFeedback = true; completed?.(); succeeded = completedFeedback; } }
       catch (error) { completedFeedback = false; if (!disposed) {const text=storageFailureText(error);storageFailure=text?{diagnostic:host.workspaceOutput.error,text}:undefined;feedback=text??(error instanceof Error ? error.message : 'ファイル処理を完了できません。');} }
       finally { busy = false; readingToken = null; if (!disposed) { render(); changed(); }
         document.removeEventListener?.('focusin', moved);
         const primaryTarget = root.querySelector?.<HTMLButtonElement>('.lv-file-primary');
-        const target = focusOnSuccess === 'result' ? status : primaryTarget;
-        if (!disposed && succeeded && ownsFocus && target && (target === status || !primaryTarget?.disabled) &&
-          (document.activeElement === origin || document.activeElement === document.body)) target.focus({ preventScroll: false });
+        let target: HTMLElement | null | undefined = primaryTarget;
+        if (focusOnSuccess === 'origin') target = origin as HTMLElement | null;
+        else if (focusOnSuccess === 'result') target = status;
+        const targetDisabled = !!target && 'disabled' in target && !!(target as HTMLButtonElement).disabled;
+        if (!disposed && succeeded && ownsFocus && target && !targetDisabled &&
+          (document.activeElement === origin || document.activeElement === document.body)) target.focus({ preventScroll: focusOnSuccess === 'origin' });
       }
+      return succeeded ? 'completed' : 'attention';
     })();
   };
   const button = (parent: HTMLElement, text: string, action: () => void, writes = true) => {
@@ -163,7 +174,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     return { includesDeclaredEditorNames: purpose === 'contribution' ? !!base?.deltaIncludesDeclaredEditorNames : requires, requiresEditorAttributionReader: requires,
       requiresPortableMediaReader: portable };
   };
-  const generateAndDownload = (generate: (observeFile?: BackupFileObserver) => Promise<string>) => {
+  const generateAndDownload = (generate: (observeFile?: BackupFileObserver) => Promise<string>, focusOnSuccess: 'result' | 'origin' = 'result') => {
     const expected = currentDisclosure(); let needsDisclosure = false;
     return perform(async () => {
     let offered: BackupFileHandoff | undefined, accepting = true;
@@ -180,7 +191,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     await handoff(id, offered);
     } finally { accepting = false; offered = undefined; }
   }, handoffMessage, { completed: () => { if (needsDisclosure) { feedback = '作成したファイルの内容を確認し、ダウンロードしてください。'; completedFeedback = false; } },
-    workingMessage: 'ファイルを作成しています。', allowReading: true, focusOnSuccess: 'result' }); };
+    workingMessage: 'ファイルを作成しています。', allowReading: true, focusOnSuccess }); };
   const handoff = async (id: string, offered?: BackupFileHandoff) => {
     feedback = 'ダウンロードを準備しています。'; render();
     try {
@@ -317,21 +328,21 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     create.textContent = purpose === 'clean' && !cleanConfirmed || purpose === 'review' && !reviewConfirmed ? '内容を確認' :
       purpose === 'backup' ? 'ファイルに保存' : 'ダウンロード';
     create.disabled = busy || composing || otherBusy() || !!host.authority.readOnly;
-    primaryAction = () => {
+    primaryAction = focus => {
       const token = host.read().source?.token; if (!token) return;
       if (purpose === 'contribution') {
-        if (chosen) generateAndDownload(() => host.workspaceOutput.generateContribution(token, chosen.selection));
+        if (chosen) return generateAndDownload(() => host.workspaceOutput.generateContribution(token, chosen.selection));
       } else if (purpose === 'clean') {
-        if (!cleanConfirmed) perform(async () => { cleanPreview = await host.workspaceOutput.previewClean(token); }, 'コピーに含める内容を確認してください。');
-        else generateAndDownload(() => host.workspaceOutput.generateClean(token));
+        if (!cleanConfirmed) return perform(async () => { cleanPreview = await host.workspaceOutput.previewClean(token); }, 'コピーに含める内容を確認してください。');
+        return generateAndDownload(() => host.workspaceOutput.generateClean(token));
       } else if (purpose === 'review') {
         const selected = selection();
-        if (!reviewConfirmed) perform(async () => { reviewPreview = await host.workspaceOutput.previewReview(token, selected); previewKey = JSON.stringify(selected); }, '渡す内容を確認してください。');
-        else generateAndDownload(() => host.workspaceOutput.generateReview(token, selected));
+        if (!reviewConfirmed) return perform(async () => { reviewPreview = await host.workspaceOutput.previewReview(token, selected); previewKey = JSON.stringify(selected); }, '渡す内容を確認してください。');
+        return generateAndDownload(() => host.workspaceOutput.generateReview(token, selected));
       } else if (purpose === 'backup') {
         const name = checkpointName.trim().normalize('NFC') || undefined;
-        generateAndDownload(offer => host.workspaceOutput.generateBackup(token, name, offer));
-      } else generateAndDownload(() => host.workspaceOutput.generate(token));
+        return generateAndDownload(offer => host.workspaceOutput.generateBackup(token, name, offer), focus);
+      } else return generateAndDownload(() => host.workspaceOutput.generate(token));
     };
     create.disabled ||= purpose === 'contribution' && !chosen || purpose === 'review' && !sceneIds.length || !!selected || !!cancellation;
     create.className = 'lv-file-primary';
@@ -420,7 +431,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   nameInput.addEventListener('input', () => { if (!nameInput.disabled) { checkpointName = nameInput.value; choicePending = true; changed(); } });
   nameInput.addEventListener('compositionstart', () => { composing = true; choicePending = true; changed(); });
   nameInput.addEventListener('compositionend', () => { checkpointName = nameInput.value; composing = false; choicePending = true; changed(); });
-  render(); return { root, render, choosePurpose, hasHandedOff: (jobId: string) => handedOff.has(jobId), setPresentation(value: typeof presentation) {
+  render(); return { root, render, choosePurpose, requestSave: () => activatePrimary(true), hasHandedOff: (jobId: string) => handedOff.has(jobId), setPresentation(value: typeof presentation) {
       if (value !== presentation) {
         choices.set(presentation, { purpose, baseId, checkpointName, choicePending, sceneIds, omitted, autoBase });
         presentation = value;

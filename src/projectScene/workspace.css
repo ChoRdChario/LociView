@@ -96,15 +96,17 @@
 .lv-development-notice, .lv-development-message { padding: 8px 20px; border-bottom: 1px solid var(--lv-rule); background: var(--lv-panel); }
 .lv-development-message { border-left: 3px solid #6e5639; }
 .lv-development-working { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px 20px; background: var(--lv-panel); border-bottom: 1px solid var(--lv-rule); }
-.lv-operation-status[data-busy="true"]::before, .lv-project-viewport-status[data-busy="true"]::before, .lv-mode-switching::before {
+.lv-operation-status[data-busy="true"]::before, .lv-project-viewport-status[data-busy="true"]::before, .lv-mode-switching::before, .lv-save-state > [data-file-busy="true"]::before {
   content: ""; display: inline-block; width: 1em; height: 1em; box-sizing: border-box;
   margin-right: .5em; vertical-align: -.125em; border: 2px solid var(--lv-rule);
   border-top-color: var(--lv-action); border-radius: 50%; animation: lv-operation-spin .9s linear infinite;
 }
 @keyframes lv-operation-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
-  .lv-operation-status[data-busy="true"]::before, .lv-project-viewport-status[data-busy="true"]::before, .lv-mode-switching::before { animation: none; }
+  .lv-operation-status[data-busy="true"]::before, .lv-project-viewport-status[data-busy="true"]::before, .lv-mode-switching::before, .lv-save-state > [data-file-busy="true"]::before { animation: none; }
 }
+.lv-project-shell > .lv-operation-status[data-compact="true"] { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.lv-save-state > [tabindex="-1"]:focus-visible { outline: 2px solid var(--lv-action); outline-offset: 3px; }
 .lv-development-content { display: grid; grid-template-columns: minmax(0, 1fr) 360px; flex: 1; min-height: 0; }
 .lv-development-stage { display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: 20px; gap: 20px; }
 .lv-development-composition { flex: 0 0 auto; padding: 16px; border: 1px solid var(--lv-rule); background: var(--lv-hover); }

@@ -178,6 +178,7 @@ export function createValidationReceiveControls(document: Document, host: Return
   render();
   const hasChanges = () => busy || output.hasChanges() || restoreChanges() || !!input.files?.length || !!selectedJob || !!selectedCopy || !!cancel;
   return { root, render, busy: () => busy || output.busy(), hasChanges, hasHandedOff: output.hasHandedOff,
+    requestSave: () => hasChanges() ? Promise.resolve('blocked' as const) : output.requestSave(),
     readingOutput: () => busy || restoreChanges() || input.files?.length || selectedJob || selectedCopy || cancel ? null : output.readingOutput(),
     outputFeedback: output.outputFeedback,
     dismissCompletedOutputFeedback: output.dismissCompletedFeedback,
