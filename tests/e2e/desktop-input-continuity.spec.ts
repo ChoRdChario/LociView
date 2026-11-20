@@ -133,7 +133,7 @@ for (const touch of [false, true]) test(`autosaved text and photos survive file 
     await nativeBody.press('Control+z');await expect(nativeBody).toHaveValue('元のバックアップ本文');
     await finishCaptionEditing(page,{body:'元のバックアップ本文'});
     await expect(detail.getByLabel('本文', { exact: true })).toBeFocused();
-    await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toHaveText('保存未確認');
+    await expect(page.getByLabel('保存ファイルの状態', { exact: true }).locator(':scope > span').first()).toHaveText('未出力');
     const rowEdit = page.locator('.lv-caption-row').first().getByRole('button', { name: '編集', exact: true, includeHidden: true });
     const rowDescription = await rowEdit.getAttribute('aria-describedby'); expect(rowDescription).toBeTruthy();
     await expect(page.locator('#' + rowDescription)).toHaveText('再開時の記録');
@@ -147,8 +147,8 @@ for (const touch of [false, true]) test(`autosaved text and photos survive file 
     await expect(files.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false');
     await expect(files.locator('.lv-operation-status')).toContainText(download.suggestedFilename());
     await closeFileSurface(page);
-    await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toHaveText('ダウンロード開始・保存先で確認');
-    await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toHaveAttribute('title','保存先で完了を確認してください。');
+    await expect(page.getByLabel('保存ファイルの状態', { exact: true }).locator(':scope > span').first()).toHaveText('ダウンロード開始');
+    await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toHaveAttribute('title',`${download.suggestedFilename()}\n保存先で完了を確認してください。`);
     await expect(page.locator('.lv-project-shell > .lv-operation-status').filter({hasText:download.suggestedFilename()})).toHaveCount(1);
     if(!touch){
       const notice=page.getByLabel('保存ファイルの状態',{exact:true});
@@ -214,6 +214,7 @@ for (const touch of [false, true]) test(`autosaved text and photos survive file 
     const restoreTimeLeft = () => Math.max(1, restoreStarted! + 90_000 - Date.now());
     const firstReader = resumed.getByRole('region', { name: '復元中の記録', exact: true });
     await expect(firstReader).toBeVisible(); await expect.poll(() => resumed.evaluate(() => (window as any).firstRestoreGate.held)).toBeGreaterThan(0);
+    await expect(firstReader.getByRole('status')).toContainText('記録・写真・モデルを保存して照合');
     await expect(resumed.locator('main.lv-project-workspace')).toHaveCount(0); await expect(firstReader.locator('textarea,input[type=file],canvas,img,video,audio')).toHaveCount(0);
     await expect(resumed.getByRole('button', { name: 'キャンセル', exact: true })).toBeDisabled();
     if (touch) await resumed.setViewportSize({ width: 320, height: 365 });

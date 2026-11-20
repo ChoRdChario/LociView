@@ -18,6 +18,17 @@ reopen using the existing ProjectScene PC candidate. UI sends finite typed
 MetadataEdit commands through MetadataProjectSession. The provider owns complete
 candidate reads and command preparation. No UI storage writes or generic patch API.
 
+## Authorized UI search refinement —2026-11-21
+
+The PO authorized the grouped followup audit repairs. The existing Scene-local
+search includes resolved names of tags actually assigned to that record, alongside
+its title/body; no new filter screen, taxonomy, saved search or storage format.
+Unknown tag definitions or memberships retain uncertain matches instead of becoming
+confirmed absence. Resolve names once per provider-derived list projection and use
+the same display-only information in admitted Review views. Tag creation, assignment,
+removal, durability and recovery commands are unchanged. Offscreen selections may
+guide the existing manual full-view action; selection alone never moves the camera.
+
 ## Product-direction amendment —Caption autosave,2026-11-18
 
 The owner's supplied followup discussion chooses automatic Caption saving without

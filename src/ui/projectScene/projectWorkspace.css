@@ -6,6 +6,9 @@
 .lv-save-location { font-size: 12px; color: var(--lv-muted); }
 .lv-save-location::after { content: ':'; }
 .lv-save-state > p { margin: 0; font-size: 13px; line-height: 1.45; color: var(--lv-muted); overflow-wrap: anywhere; }
+.lv-save-state > p { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.lv-save-state > p > :first-child { flex: 0 0 auto; }
+.lv-save-filename { flex: 0 1 18rem; min-width: 0; max-width: min(18rem, 30vw); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--lv-muted); font-weight: 400; }
 .lv-save-state > p:is([data-state="ready"],[data-state="verified"]) { color: #35482f; }
 .lv-save-state > p:is([data-state="draft"],[data-state="attention"]) { color: #74401f; font-weight: 600; }
 .lv-save-state > p[data-state="error"] { color: var(--lv-danger); font-weight: 600; }
@@ -107,6 +110,9 @@
 .lv-camera-fit > span { display: inline-block; width: 16px; height: 16px; vertical-align: middle; background: linear-gradient(currentColor,currentColor) left top/6px 2px, linear-gradient(currentColor,currentColor) left top/2px 6px, linear-gradient(currentColor,currentColor) right top/6px 2px, linear-gradient(currentColor,currentColor) right top/2px 6px, linear-gradient(currentColor,currentColor) left bottom/6px 2px, linear-gradient(currentColor,currentColor) left bottom/2px 6px, linear-gradient(currentColor,currentColor) right bottom/6px 2px, linear-gradient(currentColor,currentColor) right bottom/2px 6px; background-repeat: no-repeat; }
 
 .lv-camera-fit > span, .lv-camera-pan > span { color: var(--lv-field); }
+.lv-project-camera .lv-camera-fit[data-suggested="true"] { box-shadow: inset 0 0 0 1px var(--lv-field); background: var(--lv-ink); }
+.lv-failure-details { font-size: 12px; min-width: 0; }
+.lv-failure-details pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 10rem; overflow: auto; }
 .lv-model-task [aria-label="配置の操作"] button[aria-pressed="true"] { background: var(--lv-selected); border-color: var(--lv-action); box-shadow: inset 0 -2px var(--lv-action); }
 .lv-caption-tag { padding: 6px 0; }
 .lv-caption-tag > span:first-child { display: inline-flex; align-items: center; gap: 6px; }
@@ -249,7 +255,14 @@
   .lv-header-tools { flex: 1 1 100%; gap: 4px; justify-content: space-between; }
   .lv-workspace-actions { gap: 2px; }
   .lv-header-tools :is(button,summary) { padding-inline: 6px; white-space: nowrap; }
-  .lv-project-workspace .lv-workspace-share { display: none; }
+  .lv-save-summary { display: grid; grid-template-rows: repeat(2, 19px); gap: 0; }
+  .lv-save-summary > :first-child { grid-row: 1; }
+  .lv-save-summary > :last-child { grid-row: 2; }
+  .lv-save-summary:has([data-state="error"]) { grid-template-rows: auto auto; min-height: 38px; }
+  .lv-save-state { flex-wrap: nowrap; }
+  .lv-save-state > p { flex: 1; overflow: hidden; }
+  .lv-save-state > p[data-state="error"] { overflow: visible; }
+  .lv-save-filename { max-width: none; flex: 1 1 0; }
   .lv-project-body { height: calc(100dvh - 168px); }
   .lv-project-body > aside { padding: 12px; }
   .lv-project-body [role="tab"] { flex: 1 1 auto; padding-inline: 2px; white-space: nowrap; }
@@ -283,7 +296,7 @@
 .lv-project-body > aside > .lv-caption-task[data-selected="true"]:not([data-editing="true"]):has(> .lv-caption-browser[data-few-rows="true"]):not([data-mobile-surface]) { --lv-caption-rows: fit-content(62%) minmax(0, 1fr); }
 .lv-caption-task:not([data-editing="true"]) > .lv-caption-browser[data-few-rows="true"] .lv-caption-list { flex: 0 0 auto; height: auto; }
 .lv-caption-task, .lv-caption-browser, .lv-caption-reading { min-width: 0; }
-.lv-caption-task > .lv-caption-browser { min-height: 0; height: auto; display: flex; flex-direction: column; gap: 4px; overflow: auto; }
+.lv-caption-task > .lv-caption-browser { min-height: 0; height: auto; display: flex; flex-direction: column; gap: 4px; overflow: auto; scroll-padding-block: 8px; }
 .lv-caption-toolbar { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; min-width: 0; }
 .lv-caption-toolbar > [aria-label="ピンの操作"] { flex: 0 0 auto; }
 .lv-caption-browser-compact .lv-caption-toolbar > .lv-caption-search { flex: 1 1 0; min-width: 0; }
@@ -374,7 +387,10 @@
 
 .lv-caption-add { font-size: 0 !important; min-width: 44px; }
 .lv-caption-add::before { content: '+'; font-size: 26px; line-height: 1; }
-.lv-caption-row { display:grid;grid-template-columns: minmax(0,1fr) repeat(3,auto); }
+.lv-caption-row { display: flex; flex-wrap: wrap; align-items: start; }
+.lv-caption-row > .lv-caption-select { width: 100%; }
+.lv-caption-row > :is(.lv-caption-row-edit,.lv-caption-row-remove) { display: none; }
+.lv-caption-row:is([data-selected="true"],:focus-within) > :is(.lv-caption-row-edit,.lv-caption-row-remove) { display: block; }
 .lv-caption-row > button:not(.lv-caption-select) { padding-inline: 6px; }
 
 /* Wide pointer workspaces keep the selected record beside its list, not below it. */
@@ -393,13 +409,25 @@
   .lv-caption-task[data-selected="true"] .lv-caption-color-menu > .lv-caption-colors {
     position: static; width: auto; max-width: 100%; box-sizing: border-box; box-shadow: none;
   }
-  .lv-caption-task[data-selected="true"] .lv-caption-row { grid-template-columns: repeat(3, minmax(44px, 1fr)); }
-  .lv-caption-task[data-selected="true"] .lv-caption-row > .lv-caption-select { grid-column: 1 / -1; }
   .lv-caption-task[data-selected="true"] .lv-caption-heading > h2 { font-size: 18px; }
-  .lv-caption-task[data-selected="true"] .lv-record-tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .lv-caption-task[data-selected="true"] .lv-record-tools { display: flex; flex-direction: column; align-items: stretch; }
   .lv-caption-task[data-selected="true"] .lv-record-tools > button,
-  .lv-caption-task[data-selected="true"] .lv-record-tools > details > summary { padding-inline: 3px; line-height: 1.4; }
+  .lv-caption-task[data-selected="true"] .lv-record-tools > details > summary { padding-inline: 8px; line-height: 1.4; text-align: left; }
 }
+
+.lv-project-workspace[data-mobile-layout="true"] .lv-caption-toolbar {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 8px;
+}
+.lv-project-workspace[data-mobile-layout="true"] .lv-caption-toolbar > [aria-label="ピンの操作"] { grid-column: 1; grid-row: 2; }
+.lv-project-workspace[data-mobile-layout="true"] .lv-caption-toolbar > .lv-caption-search { display: contents; }
+.lv-project-workspace[data-mobile-layout="true"] .lv-caption-toolbar .lv-caption-search > label { grid-column: 1 / -1; grid-row: 1; min-width: 0; }
+.lv-project-workspace[data-mobile-layout="true"] .lv-caption-toolbar .lv-caption-count { grid-column: 2; grid-row: 2; justify-self: end; margin: 0; }
+.lv-project-workspace[data-mobile-layout="true"] .lv-caption-toolbar .lv-caption-color-menu { grid-column: 3; grid-row: 2; }
+.lv-project-workspace[data-mobile-layout="true"] .lv-caption-toolbar .lv-caption-color-menu[open] { grid-column: 1 / -1; grid-row: 3; }
+.lv-project-workspace[data-mobile-layout="true"] .lv-caption-task[data-empty="true"] .lv-caption-toolbar > [aria-label="ピンの操作"] { grid-column: 1 / -1; grid-row: 1; }
+.lv-project-workspace[data-mobile-layout="true"] .lv-caption-task[data-empty="true"] .lv-caption-toolbar .lv-caption-search > label { grid-row: 2; }
+.lv-project-workspace[data-mobile-layout="true"] .lv-caption-task[data-empty="true"] .lv-caption-toolbar :is(.lv-caption-count,.lv-caption-color-menu) { grid-row: 3; }
+.lv-project-workspace[data-mobile-layout="true"] .lv-caption-task[data-empty="true"] .lv-caption-toolbar .lv-caption-color-menu[open] { grid-row: 4; }
 .lv-caption-reading [aria-label="削除の確認"]:not([hidden]) { position:fixed;z-index:30;right:12px;bottom:12px;width:min(380px,calc(100vw - 24px));max-height:70dvh;overflow:auto;box-sizing:border-box;padding:16px;background:var(--lv-field);border:1px solid var(--lv-line);border-radius:8px;box-shadow:0 8px 24px #25282033; }
 
 .lv-material-numeric { cursor: ew-resize; touch-action: pan-y; }
@@ -414,6 +442,7 @@
 }
 @media (max-height: 640px) {
   .lv-project-body > aside { gap: 4px; padding-block: 8px; }
+  .lv-project-body .lv-caption-excerpt { display: none; }
   .lv-project-shell .lv-project-body [aria-label="シーン"] { padding-bottom: 0; }
   .lv-project-body > aside > .lv-caption-task[data-selected="true"]:not([data-editing="true"]):not([data-mobile-surface]) { --lv-caption-rows: minmax(0, 1fr) minmax(0, 1fr); }
   .lv-project-body > aside > .lv-caption-task[data-selected="true"]:not([data-editing="true"]):has(> .lv-caption-browser[data-few-rows="true"]):not([data-mobile-surface]) { --lv-caption-rows: fit-content(50%) minmax(0, 1fr); }

@@ -1,6 +1,7 @@
 import './styles.css';
 import { createValidationBrowserWorkspace, validationBrowserLimits } from './validationBrowser';
 import { createProductWorkspace } from './productWorkspace';
+import { homeSampleFiles } from './homeSample';
 import { projectFilePolicy, desktopStaticRasterLimits } from '../projectFiles/validation';
 import { createGsResidency } from '../viewer/gsDecodeQueue';
 import { createTargetBudget, targetLayout } from '../viewer/targetBudget';
@@ -20,6 +21,7 @@ export async function bootOfflineDesktopApp(root: HTMLElement) {
   const policy = projectFilePolicy({ nonGs: { ...validationBrowserLimits, ...desktopStaticRasterLimits },
     gs: { ...validationBrowserLimits, maxFileBytes: 512 * 1024 * 1024, maxItems: 500_000, maxValues: 44_500_000 }, projectBodyBytes: 512 * 1024 * 1024 });
   const workspace = await createValidationBrowserWorkspace(document, {
+    sampleFiles: homeSampleFiles,
     offline: offline.port, progressivePresentation: true, filePolicy: policy, residency: createGsResidency(500_000, 44_500_000),
     smoothDisplay: { budget: createTargetBudget(), plan: targetLayout, create: createSmoothComposite },
     mountEditor: (host, factory, tools, candidate, navigation) => createProductWorkspace(document, host, factory, tools, candidate, { ...navigation, compactFiles: true, captionAutosave: true }),

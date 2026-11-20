@@ -7,6 +7,8 @@ export interface CaptionListItem {
   readonly id: string;
   readonly title: Field<string>;
   readonly body: Field<string>;
+  /** Resolved UI-only names. Uncertain memberships never become confirmed absence. */
+  readonly searchTags?: Readonly<{ labels: readonly string[]; uncertain: boolean }>;
   /** Explicit resolved presentation color. Unknown never means default yellow. */
   readonly color: Field<string>;
   readonly owner: Field<Readonly<{ kind: 'project' }> | Readonly<{ kind: 'none' }> |
@@ -71,7 +73,8 @@ function matchSearch(item: CaptionListItem, query: string): boolean | null {
   if (!query) return true;
   const fields = [item.title, item.body];
   if (fields.some(field => field.kind === 'value' && field.value.toLowerCase().includes(query))) return true;
-  return fields.some(field => field.kind !== 'value') ? null : false;
+  if (item.searchTags?.labels.some(label => label.toLowerCase().includes(query))) return true;
+  return fields.some(field => field.kind !== 'value') || item.searchTags?.uncertain ? null : false;
 }
 export interface CaptionListRow {
   readonly item: CaptionListItem;

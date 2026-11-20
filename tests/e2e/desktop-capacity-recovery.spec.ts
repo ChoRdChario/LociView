@@ -65,6 +65,8 @@ for(const touch of [false,true])test(`native capacity recovery retains drafts an
     await previous.saveAs(info.outputPath('retained-before-cleanup.zip'));
     await files.getByLabel('保存名（任意）',{exact:true}).fill('保持する保存名');await fault(p,'output');
     started=Date.now();await files.locator('.lv-file-primary').click();await expect(files.locator('.lv-operation-status')).toContainText('保存容量が不足');await expect(files.getByRole('button',{name:'生成を再開',exact:true})).toBeEnabled();measurements.outputFailureMs=Date.now()-started;
+    await expect(files.locator('.lv-failure-details:visible')).toHaveCount(1);
+    await expect(p.locator('.lv-project-shell > .lv-failure-details')).toBeHidden();
     await expect(files.getByLabel('保存名（任意）',{exact:true})).toHaveValue('保持する保存名');await p.screenshot({path:info.outputPath('quota-output.png'),fullPage:true});
     await fault(p,'');
     // Owned unacknowledged output only: represent a drained partial native write.

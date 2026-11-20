@@ -129,8 +129,8 @@ test('PC Caption work continues after empty tag focus and cancelled file checks,
     const before = await BackupArchive.inspect(new Blob([Uint8Array.from(await readFile(backup)).buffer]), limits);
     const fileState = page.getByLabel('保存ファイルの状態', { exact: true });
     await expect(fileState).toBeVisible();
-    await expect(fileState).toHaveText('ダウンロード開始・保存先で確認');
-    await expect(fileState).toHaveAttribute('title','保存先で完了を確認してください。');
+    await expect(fileState.locator(':scope > span').first()).toHaveText('ダウンロード開始');
+    await expect(fileState).toHaveAttribute('title',`${await fileState.locator('.lv-save-filename').innerText()}\n保存先で完了を確認してください。`);
     const fileBody = page.locator('details.lv-project-files > section');
     const sheet=await fileBody.boundingBox();expect(sheet!.y).toBeGreaterThanOrEqual(0);expect(sheet!.y+sheet!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
     await fileBody.evaluate(n => { n.scrollTop = n.scrollHeight; }); await workspaceFits(page);

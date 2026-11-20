@@ -115,7 +115,12 @@ test('short Caption workspace keeps dense and filtered lists, Scene choices and 
     await detail.getByRole('button', { name: '取り消す', exact: true }).click(); await detail.getByRole('button', { name: '変更を取り消す', exact: true }).click(); await expect(body).toHaveValue('本文を保持');
     await p.setViewportSize({ width: 1280, height: 480 });
     const positionAction = p.getByRole('button', { name: '位置を調整', exact: true });
-    await positionAction.scrollIntoViewIfNeeded(); await expect(positionAction).toBeInViewport({ ratio: 1 });
+    await positionAction.scrollIntoViewIfNeeded();
+    await info.attach('short-position-scroll', { body: JSON.stringify(await positionAction.evaluate(node => {
+      const ancestors=[];for(let parent=node.parentElement;parent;parent=parent.parentElement)if(/auto|hidden|scroll/.test(getComputedStyle(parent).overflowY))ancestors.push({name:parent.className,rect:parent.getBoundingClientRect().toJSON(),scrollTop:parent.scrollTop,client:parent.clientHeight,scroll:parent.scrollHeight});
+      return{control:node.getBoundingClientRect().toJSON(),ancestors};
+    })), contentType:'application/json' });
+    await expect(positionAction).toBeInViewport({ ratio: 1 });
     await expect(sceneChoice).toBeInViewport({ ratio: 1 });
     await layout('wide-short-controls'); await p.screenshot({ path: info.outputPath('wide-short-controls.png') });
     await p.setViewportSize({ width: 1280, height: 720 }); await search.fill(''); await layout('return-dense', true);

@@ -153,11 +153,13 @@ export interface FirstRestoreCaptionPreview extends ProjectCaptionText {
   readonly kind: 'first-restore-caption-preview'; readonly reference: object;
 }
 export type FirstRestorePreviewObserver = (value: FirstRestoreCaptionPreview | null) => void | Promise<void>;
+export type FirstRestoreStage = 'persist' | 'open-staging' | 'initialize' | 'projection' | 'display' | 'select' | 'adopt' | 'restore-existing' | 'inspect-recovery';
+export type FirstRestoreProgress = (stage: FirstRestoreStage) => void | Promise<void>;
 export interface FirstBackupRecovery {
   readonly kind: 'first-backup-recovery'; readonly run: string; readonly readOnly: boolean;
   state(): Readonly<{ phase: 'preview' | 'beforeStart' | 'pending' | 'terminal'; title: string; fileName: string | null; memo: string | null; error: string; replacing: boolean; cancellable: boolean; retryable: boolean }>;
-  confirm(prepare: FirstRestoreDisplay, preview?: FirstRestorePreviewObserver): Promise<ValidationNormalHost>;
-  retry(prepare: FirstRestoreDisplay, preview?: FirstRestorePreviewObserver): Promise<ValidationNormalHost>;
+  confirm(prepare: FirstRestoreDisplay, preview?: FirstRestorePreviewObserver, progress?: FirstRestoreProgress): Promise<ValidationNormalHost>;
+  retry(prepare: FirstRestoreDisplay, preview?: FirstRestorePreviewObserver, progress?: FirstRestoreProgress): Promise<ValidationNormalHost>;
   takePreview(preview: FirstRestoreCaptionPreview, host: ValidationNormalHost): ResumeReading | null;
   edit(): Promise<ValidationNormalHost | FirstBackupRecovery | InterruptedLocalEditRecovery>;
   cancel(): Promise<void>; abandon(): Promise<void>; dispose(): Promise<void>;
@@ -176,7 +178,12 @@ export async function openValidationEntry(options: ValidationHostOptions): Promi
   const lease = options.mode === 'view' ? options.coordinator.openView(options.base, root, `${validationArea}:${run}`) :
     await options.coordinator.tryAcquire(options.base, root, `${validationArea}:${run}`);
   const ordinary = { ...options, firstBackup: undefined }, databases = validationGenerationDatabases(options);
-  const measure = <T>(stage: string, action: () => Promise<T>): Promise<T> => {
+  let progress: FirstRestoreProgress | undefined;
+  const notifyProgress = (stage: FirstRestoreStage) => {
+    try { void Promise.resolve(progress?.(stage)).catch(() => {}); } catch { /* Presentation has no authority. */ }
+  };
+  const measure = <T>(stage: FirstRestoreStage, action: () => Promise<T>): Promise<T> => {
+    notifyProgress(stage);
     try { options.timing?.(`restore.first.${stage}.start`, 0); } catch { /* Diagnostics cannot change restoration. */ }
     return measureValidation(options.timing, `restore.first.${stage}`, action);
   };
@@ -275,7 +282,7 @@ export async function openValidationEntry(options: ValidationHostOptions): Promi
     const work = action(); operation = work;
     try { return await work; } catch (error) { revokePreview(); failure = error instanceof Error ? error.message : '復元を完了できません。';
       try { await reload(); } catch { /* Keep the first failure and retained bytes. */ } throw error;
-    } finally { busy = false; if (operation === work) operation = undefined; }
+    } finally { progress = undefined; busy = false; if (operation === work) operation = undefined; }
   };
   const adopt = async () => {
     if (closed) throw Error('画面を閉じました。復元先は再度開いて確認してください。');
@@ -304,8 +311,9 @@ export async function openValidationEntry(options: ValidationHostOptions): Promi
       title, fileName: inputName, memo, error: failure, replacing: !!existing,
       cancellable: !selectedRecovery && (existing ? existing.backupRestore.cancellable || !existing.backupRestore.pending : !!prepared || !!control?.controls.pending),
       retryable: !!existing?.backupRestore.retryable || selectedRecovery || !!control?.controls.pending?.indexed }),
-    confirm: (prepare, preview) => execute(async () => {
-      if (existing) { await existing.backupRestore.confirm(prepare); handedOff = true; return existing; }
+    confirm: (prepare, preview, observer) => execute(async () => {
+      progress = observer;
+      if (existing) { notifyProgress('restore-existing'); await existing.backupRestore.confirm(prepare); handedOff = true; return existing; }
       if (!prepared) throw Error('復元するファイルを確認してください。');
       activate();
       let seed = previewSeed?.job === prepared.id ? previewSeed : undefined; previewSeed = undefined;
@@ -316,8 +324,10 @@ export async function openValidationEntry(options: ValidationHostOptions): Promi
       publishPreview(seed, preview);
       const job = await measure('persist', () => prepared!.persist(null, databases)); prepared = undefined; return runJob(job, prepare);
     }),
-    retry: (prepare, preview) => execute(async () => {
-      if (existing) { await existing.backupRestore.retry(prepare); handedOff = true; return existing; }
+    retry: (prepare, preview, observer) => execute(async () => {
+      progress = observer;
+      if (existing) { notifyProgress('restore-existing'); await existing.backupRestore.retry(prepare); handedOff = true; return existing; }
+      notifyProgress('inspect-recovery');
       activate(); await reload();
       const controls = await readRestoreControls(lease.workspace, limits);
       if (controls.selection) { await BackupRestoreJob.resumeSelection(lease.workspace, limits, databases, scope => validationGenerationService(scope, options)); return adopt(); }

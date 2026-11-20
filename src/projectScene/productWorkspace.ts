@@ -13,6 +13,7 @@ import { chooseStartupScene } from '../scene/resolve';
 import { value, type Material } from '../scene/types';
 import { validateMaterialIntent } from '../domain/materialIntent';
 import { materialView } from '../ui/projectScene/materialState';
+import { createFailureDetails, failurePresentation } from '../ui/projectScene/storageFeedback';
 
 type Host = ReturnType<typeof createValidationModeHost>;
 type Tools = ReturnType<typeof createValidationReceiveControls>;
@@ -26,6 +27,8 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   mode.type = 'button'; status.setAttribute('role', 'status');
   const fileMenu=tools&&navigation?.compactFiles?document.createElement('details'):undefined;
   const fileClose = document.createElement('button'), fileNotice = document.createElement('p');
+  const fileFailureDetails = createFailureDetails(document);
+  let outputFailure: Readonly<{ text: string; diagnostic?: string }> | undefined;
   let fileSummary: HTMLElement | undefined;
   const filePanel = document.createElement('section'); filePanel.className = 'lv-file-sheet'; filePanel.setAttribute('aria-label', 'ファイル操作');
   const fileHeader = document.createElement('div'); fileHeader.className='lv-file-sheet-header';fileHeader.append(fileClose);
@@ -74,7 +77,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
       }
       fileNotice.dataset.compact='false';
       core?.dismissDisclosures();fileMenu.open=true;if(b.getAttribute('role')!=='tab')filePanel.focus?.({preventScroll:true});})().catch(error=>{
-        if(!disposed&&core===owner){outputNotice=error instanceof Error?error.message:'ファイル処理を完了できません。';fileNotice.dataset.compact='false';changed();}
+        if(!disposed&&core===owner){const failure=failurePresentation(error,'ファイル処理を完了できません。保存済みの内容は保持しています。再試行してください。');outputNotice=failure.message;outputFailure={text:failure.message,diagnostic:failure.diagnostic};fileNotice.dataset.compact='false';changed();}
       });}); return b;
   };
   const saveEntry=fileEntry('ファイルに保存','save',true), shareEntry=fileEntry('共有','share'), receiveEntry=fileEntry('更新を読み込む','receive'), restoreEntry=fileEntry('復元','restore');
@@ -125,8 +128,17 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     if (outputOperation) outputNotice = outputOperation.message;
     else if (wasReadingOutput) outputNotice = tools?.outputFeedback() ?? '';
     wasReadingOutput = !!outputOperation;
-    const notice=outputOperation ? outputOperation.message : needsFiles?['未完了のファイル操作があります。',host.mode!.current==='view'?'編集を開始して「ファイル」から再開してください。':'「ファイル」から再開できます。',host.workspaceOutput.error,host.workspaceFiles.error,host.workspaceFiles.reviewCopyError,host.backupRestore.error].filter(Boolean).join(' '):outputNotice;
+    const fileFailures=[host.workspaceOutput.error,host.workspaceFiles.error,host.workspaceFiles.reviewCopyError,host.backupRestore.error].filter(Boolean)
+      .map(error=>failurePresentation(error,'ファイル処理を完了できません。元のデータは保持しています。「ファイル」から再試行してください。'));
+    const notice=outputOperation ? outputOperation.message : needsFiles?['未完了のファイル操作があります。',host.mode!.current==='view'?'編集を開始して「ファイル」から再開してください。':'「ファイル」から再開できます。',...new Set(fileFailures.map(failure=>failure.message))].join(' '):outputNotice;
     if(fileNotice.textContent!==notice)fileNotice.textContent=notice;
+    let fileDiagnostic: string | undefined;
+    if (!outputOperation) {
+      if (needsFiles) fileDiagnostic = [...new Set(fileFailures.map(failure=>failure.diagnostic).filter(Boolean))].join('\n') || undefined;
+      else if (outputFailure?.text===outputNotice) fileDiagnostic = outputFailure.diagnostic;
+    }
+    fileFailureDetails.render(fileDiagnostic);
+    if (fileMenu?.open) fileFailureDetails.root.hidden = true;
     if(needsFiles&&!outputOperation&&!tools?.busy())fileNotice.dataset.compact='false';
     fileNotice.hidden=!fileNotice.textContent || !!fileMenu?.open; fileNotice.dataset.busy=String(!!outputOperation);
     fileClose.disabled=!!tools?.hasChanges() && !output;
@@ -150,7 +162,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   fileMenu?.addEventListener('toggle', () => { if(fileMenu.open && !tools?.readingOutput())outputNotice=''; changed(); });
   retryStartup.setAttribute('data-lv-edit-only', '');
   retryStartup.addEventListener('click', () => { if (!retryStartup.disabled && !disposed) startup?.retry(); });
-  root.append(mode, status, retryStartup, fileNotice); if (tools) root.append(fileMenu??tools.root);
+  root.append(mode, status, retryStartup, fileNotice, fileFailureDetails.root); if (tools) root.append(fileMenu??tools.root);
   const retireCore = () => {
     const previous = core; core = undefined;
     if (!previous) return retirement ?? Promise.resolve();
@@ -191,9 +203,14 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
       // observed browser handoff is still reportable, never file verification.
       const downloadStarted = jobs.some(job => job.purpose === 'backup' && job.token === provider.token && job.state === 'generated' &&
         (job.stale === false || job.stale === undefined) && tools?.hasHandedOff(job.id));
+      const lastHandoff = tools?.latestHandoff();
+      const namedBackup = lastHandoff && jobs.find(job => job.id === lastHandoff.id && job.purpose === 'backup' && job.token === provider.token &&
+        job.state === 'generated' && job.stale !== true && tools?.hasHandedOff(job.id));
       return { title: candidate?.kind === 'value' && typeof candidate.value === 'string' ? candidate.value : null,
         resumable: current.state === 'ready' && !!current.publication && current.source?.token === provider.token && !host.hasPending(),
         backupOutdated: jobs.some(job => job.purpose === 'backup' && (job.token !== provider.token || job.stale === true) && ['generated', 'file-verified'].includes(job.state)),
+        backupCreated: jobs.some(job => job.purpose === 'backup' && ['generated', 'file-verified'].includes(job.state)),
+        backupFileName: namedBackup ? lastHandoff.name : undefined,
         backup: host.workspaceOutput.error || jobs.some(j => j.state === 'repair-required') ? 'unavailable' :
           matching.some(job => job.state === 'file-verified') ? 'verified' :
             downloadStarted ? 'download-started' : 'unconfirmed' };

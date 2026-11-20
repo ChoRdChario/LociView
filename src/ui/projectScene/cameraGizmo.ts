@@ -51,7 +51,7 @@ export function createCameraGizmo(document: Document, onAxis: (axis: AxisAction)
   };
   const help = (button: HTMLButtonElement, text: string) => {
     const note = contextHelp(document, `${button.getAttribute('aria-label')}：${text}`, [button], { side: 'left', bounds: () => root.closest('.lv-project-stage, .lv-development-viewport')?.getBoundingClientRect() ?? null });
-    (note.children[0] as HTMLElement).hidden = true; root.append(note);
+    (note.children[0] as HTMLElement).hidden = true; root.append(note); return note.children[1] as HTMLElement;
   };
   const lines = axes.map(([, , component]) => {
     const line = document.createElement('i'); line.setAttribute('aria-hidden', 'true'); line.dataset.axis = String(component); compass.append(line); return line;
@@ -65,7 +65,7 @@ export function createCameraGizmo(document: Document, onAxis: (axis: AxisAction)
   const fit = document.createElement('button'); fit.type = 'button'; fit.className = 'lv-camera-fit'; fit.setAttribute('aria-label', '全体表示');
   const icon = document.createElement('span'); icon.setAttribute('aria-hidden', 'true'); fit.append(icon);
   fit.addEventListener('click', () => { if (!disposed && !blocked) onFit(); }); root.append(fit);
-  help(fit, '表示中のモデル全体に視点を合わせます。');
+  const fitHelp = help(fit, '表示中のモデル全体に視点を合わせます。');
   const pan=document.createElement('button'),panIcon=document.createElement('span');pan.type='button';pan.className='lv-camera-pan';pan.setAttribute('aria-label','平行移動');panIcon.setAttribute('aria-hidden','true');pan.append(panIcon);root.append(pan);pan.hidden=!navigate;
   help(pan,'ドラッグで視点を平行移動します。矢印キーでも移動できます。');
   const finish=(cancel=false)=>{
@@ -128,11 +128,15 @@ export function createCameraGizmo(document: Document, onAxis: (axis: AxisAction)
   compass.addEventListener('pointermove', event => hover(event));
   compass.addEventListener('pointerover', event => hover(event));
   compass.addEventListener('pointerleave', () => hover());
-  return { root, render(state: { camera: unknown; axis: string | null; blocked: boolean;navigationBlocked?:boolean;navigating?:boolean;navigationAvailable?:boolean }) {
+  return { root, render(state: { camera: unknown; axis: string | null; blocked: boolean;navigationBlocked?:boolean;navigating?:boolean;navigationAvailable?:boolean;selectedPinOffscreen?:boolean }) {
     if (disposed) return;
     navigationAvailable=!!navigate&&state.navigationAvailable!==false;root.dataset.navigationAvailable=String(navigationAvailable);
     if(!navigationAvailable&&down?.started||(state.navigationBlocked??state.blocked)||down?.started&&state.navigating===false)finish(true);
     blocked = state.blocked; selected = state.axis; tips = projectCameraAxes(state.camera); hover(lastPointer);
+    const offscreen = !!state.selectedPinOffscreen && !blocked;
+    fit.dataset.suggested = String(offscreen);
+    const description = offscreen ? '全体表示：選んだピンは画面外にあります。モデル全体を表示して位置を探せます。' : '全体表示：表示中のモデル全体に視点を合わせます。';
+    if (fitHelp.textContent !== description) fitHelp.textContent = description;
     tips.forEach((tip, index) => {
       const button = buttons[index]!, line = lines[index]!;
       button.disabled = blocked; button.setAttribute('aria-pressed', String(selected === axes[index]![4]));

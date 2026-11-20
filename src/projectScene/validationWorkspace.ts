@@ -2,7 +2,7 @@ import { inspectZipContainerMetadata, isUnrecognizedZip } from '../assets/zipio'
 import type {DesktopOfflinePort} from '../platform/desktopOfflinePorts';
 import {createOfflineControls,createOfflineSettings} from '../ui/projectScene/offlineControls';
 import { mountContextHelp } from '../ui/projectScene/contextHelp';
-import {metadataFailureText,storageFailureText} from '../ui/projectScene/storageFeedback';
+import {createFailureDetails,failurePresentation,metadataFailureText,storageFailureText} from '../ui/projectScene/storageFeedback';
 import { PACKAGE_LIMITS } from '../projectPackage/contract';
 import type {WorkspaceFileInteraction} from '../ui/projectScene/projectWorkspacePorts';
 import type {createProductWorkspace} from './productWorkspace';
@@ -26,7 +26,7 @@ import { PackageArchive } from '../projectPackage/zipArchive';
 import { BackupArchive } from '../projectPackage/backupArchive';
 import type { PngDecoder } from '../projectFiles/png';
 import { isJpeg, type JpegDecoder } from '../projectFiles/jpeg';
-import type { openValidationHost, ValidationHostOptions, ValidationNormalHost, FirstBackupRecovery, InterruptedLocalEditRecovery, FirstRestoreCaptionPreview } from './validationHost';
+import type { openValidationHost, ValidationHostOptions, ValidationNormalHost, FirstBackupRecovery, InterruptedLocalEditRecovery, FirstRestoreCaptionPreview, FirstRestoreStage } from './validationHost';
 import { createValidationModeHost, type ValidationDisplayHost } from './validationModeHost';
 import type { LocalOpenMode } from './hostPorts';
 import type { ResumeReadingRequest, ValidationProjectEntry } from './validationCatalog';
@@ -63,6 +63,7 @@ export interface ValidationWorkspacePorts {
   smoothDisplay?:boolean;
   introduction?:string;
   initialFiles?:readonly File[];
+  sampleFiles?(): readonly File[];
   openLegacy?(file?:File):Promise<void>;
   storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>>;
   localSettings?: { read(): string; save(displayName: string): boolean };
@@ -99,6 +100,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   workspaceLabel.hidden = true; workspaceLabel.textContent = 'ファイルを選択'; workspaceInput.type = 'file'; workspaceInput.multiple = true; workspaceInput.setAttribute('aria-label', 'ファイルを選択'); workspaceLabel.append(workspaceInput);
   const fileHelp = document.createElement('p'); fileHelp.textContent = '3Dモデル・点群から新規作成、保存したファイルから再開できます。';
   openFile.type = 'button'; openFile.textContent = 'ファイルを開く'; workspaceForm.append(openFile, workspaceLabel, fileHelp, fallback);
+  const sample = document.createElement('button'); sample.type = 'button'; sample.textContent = 'サンプルで試す'; sample.hidden = !ports.sampleFiles; workspaceForm.append(sample);
   const importPanel = document.createElement('section'), importNote = document.createElement('p');
   const importConfirm = document.createElement('button'), importCancel = document.createElement('button');
   importPanel.className = 'lv-update-destination'; importPanel.setAttribute('aria-label', '取り込み先'); importPanel.hidden = true;
@@ -126,6 +128,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   coldReportActions.className='lv-file-source-actions';coldReportStatus.className='lv-operation-status';coldReportStatus.setAttribute('role','status');coldReportActions.append(coldReport,coldReportStatus);root.append(coldReportActions);
   const showColdReport=(show:boolean)=>{coldReport.hidden=!show;coldReportActions.hidden=!show;};showColdReport(false);
   const status = document.createElement('p'); status.setAttribute('role', 'status'); status.className = 'lv-operation-status lv-validation-status';
+  const failureDetails = createFailureDetails(document);
   const repairAdvice = document.createElement('p'), repairDetails = document.createElement('details'), repairSummary = document.createElement('summary'), repairDiagnostic = document.createElement('p');
   repairAdvice.className = 'lv-operation-status'; repairAdvice.hidden = repairDetails.hidden = true;
   repairAdvice.textContent = '保存ファイルがある場合は、この作業を開いたことのない別のブラウザで再開を試せます。';
@@ -134,7 +137,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const list = document.createElement('section'), refresh = document.createElement('button'), back = document.createElement('button');
   refresh.type = back.type = 'button'; refresh.textContent = '一覧を更新'; back.textContent = '別のプロジェクトを開く';
   const listHeading = document.createElement('h2'); listHeading.textContent = 'このブラウザから再開'; list.setAttribute('aria-label', 'このブラウザから再開');
-  navigation.append(heading, help, workspaceForm, form, listHeading, refresh, list,legacy); root.append(back, status, repairAdvice, repairDetails, cancelSelection, navigation, content);
+  navigation.append(heading, help, workspaceForm, form, listHeading, refresh, list,legacy); root.append(back, status, failureDetails.root, repairAdvice, repairDetails, cancelSelection, navigation, content);
   function clearRepairPanel(): void {
     repairAdvice.hidden = repairDetails.hidden = true; repairDetails.open = false; repairDiagnostic.textContent = '';
     repairAdvice.textContent = '保存ファイルがある場合は、この作業を開いたことのない別のブラウザで再開を試せます。';
@@ -225,6 +228,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   };
   const controls = () => {
     const inactive = busy || !!retirementFailure;
+    status.dataset.busy = String(busy);
     // Keep progress/errors readable beside the current decision, outside the
     // temporarily inert forms. The existing execute fence still owns actions.
     navigation.inert = false; workspaceForm.inert = form.inert = list.inert = inactive; refresh.disabled = inactive;
@@ -237,7 +241,9 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     }
     else if(navigation.hidden){if(status.parentElement!==root)root.insertBefore(status,navigation);}
     else navigation.insertBefore(status,form.hidden?form:listHeading);
+    if (failureDetails.root.parentElement !== status.parentElement) status.parentElement?.insertBefore(failureDetails.root,status.nextSibling ?? null);
     openFile.disabled = create.disabled = cancelConversion.disabled = inactive || composing;
+    sample.disabled = openFile.disabled || !!creationAttempt;
     if (offline && homeSettings) {
       if (offline.root.parentElement === homeSettings.body) {
         const parent = reviewWorkspace?.header ?? root;
@@ -257,6 +263,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     cancelSelection.disabled = !!retirementFailure || busy && !nativeSelectionChecking || composing || !!creationAttempt;
     cancelSelection.hidden = !selectionPending || !conversionPanel.hidden || !!pendingImport || !!firstRecovery;
     openFile.hidden = !form.hidden || !conversionPanel.hidden || !!pendingImport;
+    sample.hidden = !ports.sampleFiles || openFile.hidden;
     importConfirm.textContent = pendingImport?.kind === 'import' ? 'プロジェクトを取り込む' : '既存に取り込む';
     importPanel.hidden = !pendingImport; importConfirm.disabled = importCancel.disabled = inactive || composing;
     create.textContent = creationAttempt ? '作成を再試行' : 'プロジェクトを作成';
@@ -273,7 +280,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   conversionTitle.addEventListener('compositionstart', () => { composing = true; invalidateLoci(); controls(); });
   conversionTitle.addEventListener('compositionend', () => { composing = false; invalidateLoci(); controls(); });
   const focusIsUnclaimed = () => !document.activeElement || document.activeElement === document.body ||
-    document.activeElement === openFile || document.activeElement === workspaceInput;
+    document.activeElement === openFile || document.activeElement === sample || document.activeElement === workspaceInput;
   let selectedFileError: string | undefined;
   const execute = (action: () => Promise<void>, fileInspection?: {generation?: number}) => {
     if (busy || disposed || retirementFailure) return;
@@ -282,6 +289,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const operationFocus = document.activeElement;
     const confirmFocused = document.activeElement === importConfirm;
     clearRepairPanel();
+    failureDetails.render(undefined);
     busy = true; controls(); workspace?.render();
     const work = action();
     operation = work;
@@ -289,7 +297,9 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       if (disposed) return;
       const storageError = storageFailureText(error);
       const metadataError = showMetadataFailure(error);
-      status.textContent = storageError ?? metadataError ?? (error instanceof Error ? error.message : '処理できません。入力と再開用データは保持しています。');
+      const failure = failurePresentation(error, '処理を完了できません。入力と再開用データは保持しています。元のファイルを確認して再試行してください。');
+      status.textContent = storageError ?? metadataError ?? failure.message;
+      failureDetails.render(metadataError ? undefined : failure.diagnostic);
       if (localRecovery) renderLocalRecovery(status.textContent, error instanceof Error ? error.message : undefined);
       selectedFileError = fileInspection?.generation === selectionGeneration && !storageError && !host && !creationAttempt && !firstRecovery && !localRecovery && !reviewEditAttempt ? status.textContent : undefined;
     }).finally(() => {
@@ -679,7 +689,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const state = target.state(), panel = document.createElement('section'), readerSlot = document.createElement('div'), note = document.createElement('p'), commands = document.createElement('div');
     panel.className = 'lv-first-restore-panel'; panel.setAttribute('aria-label', '保存ファイルから再開'); readerSlot.className = 'lv-first-restore-reading'; commands.className = 'lv-first-restore-actions';
     if (state.phase === 'preview') status.textContent = state.replacing ? 'このバックアップから作業を再開できます。' : '保存ファイルから作業を再開します。';
-    note.textContent = state.error || (state.phase === 'preview' ? state.replacing
+    const recoveryFailure = state.error ? failurePresentation(state.error, '復元を完了できません。元のファイルと復元記録は保持しています。再試行してください。') : undefined;
+    note.textContent = recoveryFailure?.message || (state.phase === 'preview' ? state.replacing
       ? 'バックアップの時点に切り替えます。現在の作業と元ファイルは残ります。' : 'このブラウザで編集できるようにします。元ファイルは変更しません。'
       : state.phase === 'terminal' ? 'プロジェクトはまだありません。復元の記録は保持しています。ファイルを選択して開き直せます。' : state.phase === 'beforeStart'
         ? '復元はまだ始まっていません。「復元を取りやめる」で一覧に戻り、元のバックアップを選び直してください。' : 'バックアップの初回復元が未完了です。記録を使って再開するか、取りやめてください。');
@@ -703,7 +714,20 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       let staged: Awaited<ReturnType<ValidationWorkspacePorts['render']>> | undefined,
         preparation: Parameters<ValidationDisplayHost['setDisplayPreparation']>[0] | undefined, sourceContent: ValidationNormalHost['content'] | undefined,
         reading: ReturnType<typeof createCaptionTextReading> | undefined, fallback: ReturnType<typeof createResumeReading> | undefined, preview: FirstRestoreCaptionPreview | undefined, opened: ValidationNormalHost | undefined;
-      let accepting = true;
+      let accepting = true, progressText = '復元を始めています。';
+      const showProgress = (stage: FirstRestoreStage) => {
+        if (!accepting || disposed || firstRecovery !== target) return;
+        const stages: Record<FirstRestoreStage, string> = {
+          persist: '復元の準備を保存しています。', 'open-staging': '復元先を準備しています。',
+          initialize: '記録・写真・モデルを保存して照合しています。', projection: '保存した記録を確認しています。',
+          display: '3Dの表示を準備しています。', select: '復元先を確定しています。', adopt: '保存した作業を開いています。',
+          'restore-existing': 'バックアップから復元しています。', 'inspect-recovery': '中断した復元を確認しています。',
+        };
+        progressText = stages[stage];
+        const view = reading ?? fallback;
+        if (view) { view.setProgress(progressText); status.textContent = ''; }
+        else status.textContent = progressText;
+      };
       const withdraw = () => { reading?.dispose(); reading = undefined; preview = undefined; };
       try {
         opened = await target[state.phase === 'preview' ? 'confirm' : 'retry'](async (next, preparedContent) => {
@@ -717,7 +741,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
               if (records.length) {
                 fallback?.dispose(); fallback = createResumeReading(document, { token: next.state.token, sceneId: scene.composition.sceneId,
                   title: state.title, records, ...(scene.composition.name.kind === 'value' ? { sceneName: scene.composition.name.value } : {}) }, 'restore');
-                readerSlot.replaceChildren(fallback.root); status.textContent = '';
+                fallback.setProgress(progressText); readerSlot.replaceChildren(fallback.root); status.textContent = '';
               }
             }
           } catch { fallback?.dispose(); fallback = undefined; }
@@ -737,8 +761,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
           if (preview || fallback) return;
           const view = createCaptionTextReading(document, value, 'first-restore');
           status.textContent = ''; summary.textContent = state.title; note.textContent = '元のファイルは変更しません。';
-          preview = value; reading = view; readerSlot.replaceChildren(view.root);
-        } : undefined);
+          view.setProgress(progressText); preview = value; reading = view; readerSlot.replaceChildren(view.root);
+        } : undefined, showProgress);
         accepting = false;
         if (disposed || firstRecovery !== target) return;
         const view = reading ?? fallback; if (view?.composition()) view.setReady();
@@ -759,7 +783,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     });
     if ((!target.readOnly || state.phase === 'preview') && state.cancellable) button(state.phase === 'preview' ? 'キャンセル' : '復元を取りやめる', () => leave(true));
     if (state.phase === 'terminal') button('一覧に戻る', () => leave(false));
-    panel.append(summary, fileSummary, note, commands, readerSlot); content.replaceChildren(panel); controls();
+    const details = createFailureDetails(document); details.render(recoveryFailure?.diagnostic);
+    panel.append(summary, fileSummary, note, details.root, commands, readerSlot); content.replaceChildren(panel); controls();
   };
   const invalidateLoci = () => { lociDraft++; lociEvaluation = null; lociDecision = undefined; conversion = null;materialNotice.render();clearImageOmissions();
     if (lociPreview) conversionNote.textContent = '入力が変わりました。「変換内容を確認」で確認し直してください。'; controls(); };
@@ -1204,6 +1229,11 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   workspaceForm.addEventListener('submit', event => event.preventDefault());
   openFile.addEventListener('click', () => {
     if (!disposed && !openFile.disabled && !workspaceForm.inert && !navigation.hidden) workspaceInput.click();
+  });
+  sample.addEventListener('click', () => {
+    if (disposed || sample.disabled || workspaceForm.inert || navigation.hidden || !ports.sampleFiles) return;
+    const inspection: { generation?: number } = {};
+    void execute(async () => { await openSelection(ports.sampleFiles!(), inspection); }, inspection);
   });
   const leaveForLegacy=(file?:File)=>{if(busy||composing||disposed||changed()||creationAttempt)return;clearSelection();void ports.openLegacy?.(file).catch(error=>{if(!disposed)status.textContent=error instanceof Error?error.message:'ファイルを開けません。';});};
   legacy.addEventListener('click',()=>leaveForLegacy());fallback.addEventListener('click',()=>{const file=legacyFile;if(file)leaveForLegacy(file);});

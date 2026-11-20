@@ -13,7 +13,7 @@ import { createCaptionWindowControls } from './captionWindowControls';
 import { captionWindowPlanIsCurrent, captionWindowView, newCaptionWindowMemory, planCaptionWindow, type CaptionWindowMemory, type CaptionWindowPlan } from './captionWindowState';
 import { createMediaViewer } from './mediaPreview';
 import { createMediaResidencyGate } from './mediaPreviewResources';
-import {metadataFailureText,storageFailureText} from './storageFeedback';
+import {createFailureDetails,failurePresentation} from './storageFeedback';
 import type { SceneUiMemory } from './navigationState';
 import { fieldValue, projectAttachments, projectCaptions, projectCaptionSceneCount, projectCaptionInventory, projectModels, projectIdentity } from './projectRead';
 import { surfaceAnchor, type ProjectWorkspacePorts, type WorkspaceFileInteraction, type WorkspacePinProposal, type WorkspaceSurface, type WorkspaceViewportState, type WorkspaceViewportPresentation, type Point3 } from './projectWorkspacePorts';
@@ -48,6 +48,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const projectTitle = make('h1'), resumeStatus = make('p'), fileStatus = make('p'), help = make('details');
   projectTitle.setAttribute('aria-label', 'プロジェクト名'); resumeStatus.setAttribute('aria-label', '再開データの状態'); fileStatus.setAttribute('aria-label', '保存ファイルの状態');
   fileStatus.tabIndex = -1;
+  const fileStateText = make('span'), fileNameText = make('span');
+  fileNameText.className = 'lv-save-filename'; fileNameText.hidden = true; fileStatus.append(fileStateText, fileNameText);
   help.setAttribute('aria-label', 'ヘルプ'); help.append(make('summary', 'ヘルプ'), introduction);
   for (const [title, text] of [
     ['はじめる', 'プロジェクトを選び、変更するときは「編集する」を選択します。シーンを切り替えても「開始シーン」は変わりません。'],
@@ -56,13 +58,18 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     ['困ったとき', '更新に失敗したら入力を保持したまま「更新を再試行」を選択します。競合は「状態を確認」から残す内容を選択します。3D表示だけに問題がある場合は「3D表示を再試行」を選択してください。'],
   ]) help.append(make('h3', title), make('p', text));
   const storageHelp = make('details'), storageStatus = make('p'); let storageChecking = false, storageEpoch = 0;
-  let storageFailure:{diagnostic:string|undefined;text:string}|undefined;
-  const failureMessage=(state=ports.status())=>storageFailure&&storageFailure.diagnostic===state.error?storageFailure.text:metadataFailureText(state.error)??state.error;
+  let storageFailure:{diagnostic:string|undefined;text:string;details?:string}|undefined;
+  function failureMessage(state=ports.status()): string {
+    if (storageFailure && storageFailure.diagnostic===state.error) return storageFailure.text;
+    if (!state.error) return '';
+    return failurePresentation(state.error,'変更を保存できません。入力を保持しています。再試行してください。').message;
+  }
   storageHelp.setAttribute('aria-label', 'このサイトの保存容量'); storageStatus.setAttribute('role', 'status');
   const storageCheck = button('保存容量を確認', () => { void queryStorage(); });
   storageHelp.append(make('summary', 'このサイトの保存容量'),
     contextHelp(document, 'このサイト全体の推定値です。プロジェクト単独の容量や端末の空き容量を示すものではありません。保存できるかは実際の保存結果で確認してください。', [storageCheck]), storageCheck, storageStatus);
   help.append(storageHelp);
+  const operationFailureDetails = createFailureDetails(document); help.append(operationFailureDetails.root);
   async function queryStorage() {
     if (disposed || storageChecking) return;
     const epoch = ++storageEpoch; storageChecking = true; storageCheck.disabled = true; storageStatus.textContent = '保存容量を確認しています。';
@@ -129,7 +136,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   stageDisplay.append(cameraSurface);
   const markerById = new Map<string, HTMLButtonElement>(), markerNodes = new Set<HTMLButtonElement>();
   const viewportTools = make('section'); viewportTools.className = 'lv-project-viewport-tools'; viewportTools.setAttribute('aria-label', '3D表示の操作');
-  viewportTools.append(viewportStatus, retryViewport);
+  const viewportFailureDetails = createFailureDetails(document);
+  viewportTools.append(viewportStatus, retryViewport, viewportFailureDetails.root);
   const mediaWork = createMediaResidencyGate(document, render, () => viewport.idle?.() ?? Promise.resolve(), () => !disposed);
   const mediaViewer = createMediaViewer(document, ports.rasterResources,ports.imageDimensions, mediaWork.acquire);
   let retirement: Promise<void> | undefined;
@@ -404,6 +412,30 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const panelInput = () => !!organization?.hasChanges() || [...panels.values()].some(p => p.hasChanges());
   const dirty = (includeSearchComposition = true) => draftInput(includeSearchComposition) || !!recovery?.hasChanges() || !!pending || panelInput() || !!mediaManager?.hasChanges() || windowMoving || viewport.read().dragging;
   const readDuringOutput = () => !!ports.readDuringOutput?.() && !busy && !dirty(false);
+  function localSaveText(summary: ReturnType<typeof ports.projectStatus>, hasDraft: boolean, saving: boolean, failed: boolean): string {
+    if (saving) return '保存中…';
+    if (failed) return '保存できませんでした。入力を保持しています。再試行してください。';
+    if (hasDraft) {
+      if (draft?.composing) return '入力中';
+      if (autosave && (hasCaptionDraft(draft) || selectedMedia)) return '保存待ち';
+      if (positionInput()) return pin || numericTarget ? '位置を確認中' : '位置を選択中';
+      if (deletion) return '削除を確認中';
+      if (panels.get('materials')?.hasChanges()) return '描画の変更を確認中';
+      return '変更を確認中';
+    }
+    if (summary.resumable) return autosave ? '保存済み' : '再開できます';
+    return '再開データを確認してください。';
+  }
+  function fileSaveText(summary: ReturnType<typeof ports.projectStatus>, working: boolean): string {
+    if (working) return '作成中…';
+    if (summary.backup === 'verified') return '選択ファイルと一致';
+    if (summary.backup === 'download-started') return 'ダウンロード開始';
+    if (summary.backup === 'unavailable') return 'ファイル操作を確認';
+    if (summary.backupOutdated) return '変更あり';
+    if (summary.backupCreated === false) return '未出力';
+    if (summary.backupCreated) return '作成記録あり・照合前';
+    return '保存未確認';
+  }
   let externalBusy = false, outputReading = false;
   const mutationBlock = () => windowMoving ? 'ウィンドウの操作を完了してください。' : busy ? '変更を適用しています。' : ports.status().kind === 'failed' ? failureMessage() || '更新を再試行してください。' :
     ports.presentation?.()?.reason ?? (ports.readOnly ? '閲覧中です。編集を開始してください。' : ports.otherPending() ? 'ファイルの操作を完了してください。' : pending ? '再試行するか、入力を修正してください。' : null);
@@ -474,6 +506,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       if(needsCaptionFlush())void afterCaptionFlush(invoke);else invoke();
     },
   }});
+  searchRecords.setAttribute('aria-controls', list.searchId);
+  searchRecords.title = 'このシーンの検索欄へ移動';
   function handleListPlan(plan: import('./captionListState').CaptionListPlan): void {
     if (needsCaptionFlush() && canFlushCaption() && (plan.kind === 'change' && plan.intent === 'select' || plan.kind === 'effect' || plan.kind === 'unchanged' && plan.explicitSelection)) {
       const target = plan.kind === 'change' ? plan.memory.selectedCaptionId : plan.kind === 'effect' ? plan.captionId : plan.explicitSelection!.captionId;
@@ -692,7 +726,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   let feedbackTimer: number | undefined, passiveFeedback: string | null = null;
   let mounted = false, observationFrame:number|null=null, observationEpoch=0;
   let installedViewportInput: WorkspaceViewportState | undefined;
-  let overlayBaseline: { input:WorkspaceViewportState; ready:boolean; cameraReady:boolean; gizmo:Parameters<ReturnType<typeof createCameraGizmo>['render']>[0] } | undefined;
+  let overlayBaseline: { input:WorkspaceViewportState; ready:boolean; cameraReady:boolean; selectedPinId?:string; gizmo:Parameters<ReturnType<typeof createCameraGizmo>['render']>[0] } | undefined;
   let lastPresentationGeneration=-1;
   function cancelObservation(){
     const frame=observationFrame;observationFrame=null;observationEpoch++;
@@ -973,7 +1007,10 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       succeeded = true; passiveFeedback = completed;
       feedbackTimer = document.defaultView?.setTimeout(() => { if (!disposed && !busy && !pending && feedback === completed) { feedback = ''; passiveFeedback = null; render(); } }, 6000);
     } }
-    catch (error) { passiveFeedback = null; if (!disposed) {const text=storageFailureText(error),state=ports.status();storageFailure=text?{diagnostic:state.kind==='failed'?state.error:undefined,text}:undefined;feedback=text??(error instanceof Error ? error.message : '変更を適用できません。入力を保持しています。');} }
+    catch (error) { passiveFeedback = null; if (!disposed) {
+      const failure=failurePresentation(error,'変更を保存できません。入力を保持しています。再試行してください。'),state=ports.status();
+      storageFailure={diagnostic:state.kind==='failed'?state.error:undefined,text:failure.message,details:failure.diagnostic};feedback=failure.message;
+    } }
     finally {
       residency?.release(); busy = false;
       // Keep the single user action visibly in progress between its separately
@@ -1277,8 +1314,10 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       frame.generation<=lastPresentationGeneration||![frame.width,frame.height].every(n=>Number.isFinite(n)&&n>0))return false;
     const moves:{node:HTMLButtonElement;x:number;y:number;visible:boolean}[]=[];
     const ids=new Set<string>();
+    let selectedPinVisible: boolean | undefined;
     for(const pin of frame.pins){
       if(!Number.isFinite(pin.x)||!Number.isFinite(pin.y)||ids.has(pin.id))return false;ids.add(pin.id);
+      if (pin.id===baseline.selectedPinId) selectedPinVisible=pin.visible;
       const node=markerById.get(`${sceneId}:${pin.id}`);
       if(!node){if(pin.visible)return false;continue;}
       moves.push({node,x:pin.x,y:pin.y,visible:pin.visible});
@@ -1289,7 +1328,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       move.node.hidden=!move.visible&&!retained;move.node.style.left=`${move.x}px`;move.node.style.top=`${move.y}px`;move.node.style.opacity=move.visible?'':'0';
     }
     windows.project({ready:true,sourceToken:frame.input.token,sceneId:frame.input.sceneId,width:frame.width,height:frame.height,pins:frame.pins});
-    cameraGizmo.render({...baseline.gizmo,camera:frame.camera,axis:frame.axis,navigating:frame.navigating});
+    cameraGizmo.render({...baseline.gizmo,camera:frame.camera,axis:frame.axis,navigating:frame.navigating,selectedPinOffscreen:selectedPinVisible===false});
     lastPresentationGeneration=frame.generation;return true;
   }
   function viewAction(action: () => void) {
@@ -1332,24 +1371,30 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       const hasDraft = draftInput(false) || panelInput() || recovery?.hasChanges() || mediaManager?.hasChanges();
       const saving = busy || ports.status().kind === 'checking';
       const failed = pending || ports.status().kind === 'failed';
-      resumeStatus.textContent = saving ? autosave?.saving ? '保存中…' : '変更を適用中' : failed ? '更新が未完了です。入力を保持しています。再試行してください。' :
-        hasDraft ? autosave && (hasCaptionDraft(draft) || selectedMedia) ? '保存待ち' : '未適用の変更' : summary.resumable ? autosave ? '保存済み' : '再開できます' : '再開データを確認してください。';
+      const localText = localSaveText(summary, !!hasDraft, saving, !!failed);
+      if (resumeStatus.textContent !== localText) resumeStatus.textContent = localText;
       const fileWorking = readDuringOutput();
       resumeStatus.hidden = fileWorking;
       browserState.hidden = resumeStatus.hidden;
       fileStatus.hidden = !fileWorking && !!(hasDraft || saving || failed);
       savedFileState.hidden = fileStatus.hidden;
       resumeStatus.dataset.state = saving ? 'busy' : failed ? 'error' : hasDraft ? 'draft' : summary.resumable ? 'ready' : 'attention';
-      let fileText = summary.backup === 'verified' ? '選択ファイルと一致' : summary.backup === 'download-started' ? 'ダウンロード開始・保存先で確認' :
-        summary.backup === 'unavailable' ? '保存ファイルを確認してください。' : summary.backupOutdated ? '更新が必要' : '保存未確認';
-      if (fileWorking) fileText = '作成中…';
-      if (fileStatus.textContent !== fileText) fileStatus.textContent = fileText;
+      const fileText = fileSaveText(summary, fileWorking);
+      if (fileStateText.textContent !== fileText) fileStateText.textContent = fileText;
+      const fileName = fileWorking ? '' : summary.backupFileName ?? '';
+      if (fileNameText.textContent !== fileName) fileNameText.textContent = fileName;
+      fileNameText.hidden = !fileName; fileNameText.title = fileName;
       fileStatus.dataset.fileBusy = String(fileWorking);
-      fileStatus.title = !fileWorking && summary.backup === 'download-started' ? '保存先で完了を確認してください。' : '';
+      fileStatus.title = !fileWorking && summary.backup === 'download-started' ? [fileName, '保存先で完了を確認してください。'].filter(Boolean).join('\n') :
+        summary.backup === 'unconfirmed' && summary.backupCreated === false ? 'このブラウザからの書き出し前です。元のファイルは変更しません。' : '';
       fileStatus.dataset.state = summary.backup === 'verified' ? 'verified' : summary.backup === 'unavailable' || summary.backupOutdated ? 'attention' : 'unconfirmed';
       const nextGestureContext = JSON.stringify([p.token, sceneId, ports.readOnly, ports.imageScope(), ports.otherPending(), models?.hidden(), memory().pinColors]);
       if (gestureContext !== nextGestureContext) { gestureContext = nextGestureContext; gesture = null; gestureGeneration++; }
       const operationStatus=ports.status();status.dataset.busy = String(busy);
+      let operationDiagnostic: string | undefined;
+      if (storageFailure?.diagnostic===operationStatus.error && (operationStatus.kind==='failed' || feedback===storageFailure?.text)) operationDiagnostic=storageFailure?.details;
+      else if (operationStatus.kind==='failed' && operationStatus.error) operationDiagnostic=failurePresentation(operationStatus.error,'変更を保存できません。入力を保持しています。再試行してください。').diagnostic;
+      operationFailureDetails.render(operationDiagnostic);
       const operationText = autosave && (pending?.owner === 'caption' || pending?.owner === 'media')
         ? '' : operationStatus.kind === 'failed' ? failureMessage(operationStatus) || feedback : feedback;
       if (status.textContent !== operationText) status.textContent = operationText;
@@ -1383,7 +1428,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       const captionList = listContext(captions);
       captionPanel.dataset.empty = String(!captions.length && !ports.readOnly);
       list.render(captionList); refreshPicker(); detail.render({ ...detailContext(captions),
-        autosave: autosave ? { saving: autosave.saving, failed: autosave.failed, inputBlock: captionInputBlock(), error: metadataFailureText(feedback) ?? (feedback || failureMessage() || undefined) } : undefined,
+        autosave: autosave ? { saving: autosave.saving, failed: autosave.failed, inputBlock: captionInputBlock(), error: feedback ? failurePresentation(feedback,'変更を保存できません。入力を保持しています。再試行してください。').message : failureMessage() || undefined } : undefined,
         completionFocusTarget: mobileLayout?.matches ? detailHeading : undefined,
         textOnly: readDuringOutput(),
         cancelBlock: pending?.owner === 'media' && canCancelMedia() ? null :
@@ -1498,12 +1543,16 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       windows.project({ ready: seen.ready, sourceToken: seen.token, sceneId: seen.sceneId, width: extent.width, height: extent.height, pins: seen.pins });
       viewportStatus.dataset.busy = String(!!ports.presentation?.()?.busy || !!seen.loading);
       canvas.setAttribute('aria-busy', viewportStatus.dataset.busy);
-      viewportStatus.textContent = [mediaWork.active ? '画像のため3Dを休止しています。' : ports.presentation?.()?.reason, viewportFeedback, seen.issue, seen.notice, resolved?.kind !== 'ready' && 'シーンを選択し、表示状態を確認してください。'].filter(Boolean).join(' ');
+      const viewportFailure = [viewportFeedback, seen.issue, ports.presentation?.()?.reason].filter(Boolean).map(error => failurePresentation(error, '3Dを表示できません。記録は保持しています。「3D表示を再試行」を選択してください。'));
+      viewportFailureDetails.render([...new Set(viewportFailure.map(error => error.diagnostic).filter(Boolean))].join('\n') || undefined);
+      viewportStatus.textContent = [mediaWork.active ? '画像のため3Dを休止しています。' : '', ...new Set(viewportFailure.map(error => error.message)), seen.notice, resolved?.kind !== 'ready' && 'シーンを選択し、表示状態を確認してください。'].filter(Boolean).join(' ');
       viewportStatus.hidden = !viewportStatus.textContent;
       if (drawingNotice.textContent !== (seen.drawingNotice ?? '')) drawingNotice.textContent = seen.drawingNotice ?? '';
       retryViewport.hidden = !seen.issue && !viewportFeedback&&!seen.retryAvailable; retryViewport.disabled = viewBlocked();
       let camera: unknown=seen.camera; try { camera ??= viewport.capture().camera; } catch { /* Preparation has no camera yet. */ }
-      const cameraState={ camera, axis: seen.view?.kind === 'ready' ? seen.view.axis : null, blocked: !(seen.cameraReady??seen.ready)||viewBlocked(),navigationBlocked:cameraNavigationBlocked()||!(seen.cameraReady??seen.ready),navigating:seen.navigating,navigationAvailable:!!viewport.navigateCamera };
+      const selectedPinId = captions.find(caption => caption.id === selected && caption.pin === 'visible')?.id;
+      const selectedPin = seen.ready && seen.token === p.token && seen.sceneId === sceneId && viewportInput.available && viewportInput.visible !== false && selectedPinId ? seen.pins.find(pin => pin.id === selectedPinId) : undefined;
+      const cameraState={ camera, axis: seen.view?.kind === 'ready' ? seen.view.axis : null, blocked: !(seen.cameraReady??seen.ready)||viewBlocked(),navigationBlocked:cameraNavigationBlocked()||!(seen.cameraReady??seen.ready),navigating:seen.navigating,navigationAvailable:!!viewport.navigateCamera,selectedPinOffscreen:selectedPin?.visible===false };
       cameraGizmo.render(cameraState);
       const focusedMarker = markerNodes.has(document.activeElement as HTMLButtonElement) ? document.activeElement as HTMLButtonElement : null;
       const activeMarkers = new Set<string>(), markerChildren: HTMLElement[] = [];
@@ -1538,7 +1587,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       for (const node of Array.from(markers.children)) if (!wantedMarkerNodes.has(node as HTMLButtonElement)) node.remove();
       markerChildren.forEach((node,index) => { if (markers.children[index] !== node) markers.insertBefore(node,markers.children[index] ?? null); });
       if (focusedMarker && markerNodes.has(focusedMarker) && document.activeElement !== focusedMarker) focusedMarker.focus({ preventScroll: true });
-      overlayBaseline={input:viewportInput,ready:seen.ready&&seen.token===p.token&&seen.sceneId===sceneId,cameraReady:seen.cameraReady??seen.ready,gizmo:cameraState};
+      overlayBaseline={input:viewportInput,ready:seen.ready&&seen.token===p.token&&seen.sceneId===sceneId,cameraReady:seen.cameraReady??seen.ready,selectedPinId,gizmo:cameraState};
       positionRecordSheets();ports.changed();
       // Restore after layout attributes and panel visibility match the new parent.
       if (!disposed && document.activeElement === document.body) movedTaskFocus?.focus({ preventScroll: true });

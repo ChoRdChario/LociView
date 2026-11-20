@@ -28,6 +28,7 @@
 .lv-caption-browser .lv-caption-select { flex: 1 1 100%; display: grid; grid-template-columns: 12px minmax(0, 1fr); column-gap: 8px; text-align: left; border-left-width: 3px; }
 .lv-caption-title { font-weight: 500; overflow-wrap: anywhere; }
 .lv-caption-owner, .lv-caption-note { grid-column: 2; overflow-wrap: anywhere; }
+.lv-caption-excerpt { grid-column: 2; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--lv-muted); font-size: 13px; font-weight: 400; }
 .lv-caption-swatch { width: 10px; height: 10px; border: 1px solid var(--lv-line); border-radius: 50%; align-self: center; }
 .lv-caption-title { grid-column: 2; }
 .lv-caption-select[aria-current="true"] { border-left-color: var(--lv-ink); background: var(--lv-selected); box-shadow: inset 1px 0 var(--lv-ink); }

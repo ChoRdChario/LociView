@@ -11,6 +11,7 @@ import { createMediaResidencyGate } from '../ui/projectScene/mediaPreviewResourc
 import { createCameraGizmo } from '../ui/projectScene/cameraGizmo';
 import { createPinCameraSurface } from '../ui/projectScene/pinCameraSurface';
 import { contextHelp, mountContextHelp } from '../ui/projectScene/contextHelp';
+import { createFailureDetails, failurePresentation } from '../ui/projectScene/storageFeedback';
 import { displayBlobRef } from '../domain/portableMedia';
 import type { JsonObject } from '../domain/values';
 
@@ -70,7 +71,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const overlay = make('div'); overlay.className = 'lv-development-pin-layer';
   const sidebar = make('aside'); sidebar.className = 'lv-development-sidebar'; sidebar.setAttribute('aria-label', '閲覧パネル');
   const emptyCaptions=make('p','このシーンに記録はありません。'),status = make('p'), retry = make('button', '3D表示を再試行'); status.setAttribute('role', 'status'); retry.type = 'button';
-  const renderStatus = make('div'); renderStatus.className = 'lv-review-render-status'; renderStatus.append(status, retry);
+  const renderStatus = make('div'), failureDetails = createFailureDetails(document); renderStatus.className = 'lv-review-render-status'; renderStatus.append(status, retry, failureDetails.root);
   const cameraSurface = createPinCameraSurface(document, canvas, searchRecords, overlay, viewport,
     () => !disposed && !handoffBusy && !composing && !moving && !content.inert, activatePin);
   viewport.append(cameraSurface, renderStatus); stage.append(viewport); content.append(stage, sidebar); root.append(header, content);
@@ -466,12 +467,21 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     const cameraReady=!!(observation?.cameraReady??observation?.ready)&&observation?.display===display;
     const cameraBlocked = !cameraReady || composing || moving || !!observation?.dragging;
     let captured: unknown=observation?.camera; try { captured ??= runtime?.capture?.().camera; } catch { /* Camera preparation remains local. */ }
-    cameraGizmo.render({ camera: captured, axis: observation?.axis ?? null, blocked: cameraBlocked || !display.bounds,navigationBlocked:!cameraReady||composing||moving,navigating:observation?.navigating,navigationAvailable:!!runtime?.navigateCamera });
+    const selectedPin = ready && display.pins.some(pin => pin.id === memory.selectedCaptionId) ? observation!.pins.find(pin => pin.id === memory.selectedCaptionId) : undefined;
+    cameraGizmo.render({ camera: captured, axis: observation?.axis ?? null, blocked: cameraBlocked || !display.bounds,navigationBlocked:!cameraReady||composing||moving,navigating:observation?.navigating,navigationAvailable:!!runtime?.navigateCamera,selectedPinOffscreen:selectedPin?.visible===false });
     projection.disabled = cameraBlocked; projection.value = observation?.projection ?? 'perspective';
     for (const button of cameraButtons) button.disabled = cameraBlocked || !runtime?.recall;
     const drawing = observation?.display === display && !rendererFailure && !observation?.issue ? observation?.drawingNotice ?? '' : '';
     if (drawingNotice.textContent !== drawing) drawingNotice.textContent = drawing;
-    const nextStatus = rendererFailure || failure || observation?.issue || observation?.notice || '';
+    const error = rendererFailure || failure || observation?.issue;
+    let presented: ReturnType<typeof failurePresentation> | undefined;
+    if (error) {
+      let fallback = '処理を完了できません。元のファイルは保持しています。詳細を確認して再試行してください。';
+      if (rendererFailure || !failure && observation?.issue) fallback = '3Dを表示できません。「3D表示を再試行」を選択してください。記録と元ファイルは保持しています。';
+      presented = failurePresentation(error, fallback);
+    }
+    const nextStatus = presented?.message ?? observation?.notice ?? '';
+    failureDetails.render(presented?.diagnostic);
     if (status.textContent !== nextStatus) status.textContent = nextStatus;
     const retryLabel = mediaWork.parked ? '3Dを表示' : '3D表示を再試行';
     if (retry.textContent !== retryLabel) retry.textContent = retryLabel;

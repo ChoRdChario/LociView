@@ -95,7 +95,8 @@ test('PC task navigation retains model, View and material drafts through keyboar
     await revealCameraPositions(b);await expect(views(b).getByRole('button',{name:'開始視点を更新',exact:true})).toBeEnabled();await expect(views(b).getByLabel('記録した視点',{exact:true})).toHaveCount(0);await expect(b.locator('.lv-project-camera').getByLabel('投影方式',{exact:true})).toHaveValue('orthographic');
     const peerFile = await save(b, info, '開き直した作業'), reopened = await inspect(peerFile); expect(reopened.archive.source.originalChanges()).toEqual(saved.archive.source.originalChanges());
     await page.reload(); await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('視点と材質の整理', { timeout: 90_000 }); await expect(page.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false');
-    await page.setViewportSize({ width: 320, height: 740 }); const enlarged = await page.addStyleTag({ content: '.lv-project-workspace [role="tab"] { font-size: 32px; }' });
+    // Force the short Japanese labels to wrap, then verify keyboard revelation.
+    await page.setViewportSize({ width: 320, height: 740 }); const enlarged = await page.addStyleTag({ content: '.lv-project-workspace [role="tab"] { font-size: 48px; }' });
     const captionTab = tab(page, '記録'), last = tab(page, '描画'); await captionTab.focus();
     const firstBox = await captionTab.boundingBox(); expect((await last.boundingBox())!.y).toBeGreaterThan(firstBox!.y); await page.evaluate(y => scrollTo(0, y + scrollY - innerHeight + 44), firstBox!.y);
     await page.keyboard.press('End'); await expect(last).toBeFocused(); const lastBox = await last.boundingBox(); expect(lastBox!.y).toBeGreaterThanOrEqual(0); expect(lastBox!.y + lastBox!.height).toBeLessThanOrEqual(741);

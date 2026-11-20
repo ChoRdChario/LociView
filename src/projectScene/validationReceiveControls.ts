@@ -3,6 +3,14 @@ import type { createValidationModeHost } from './validationModeHost';
 import type { WorkspaceFileInteraction } from '../ui/projectScene/projectWorkspacePorts';
 import { createValidationOutputControls } from './validationOutputControls';
 import { editOnly, displayMode } from '../ui/projectScene/modePresentation';
+import { createFailureDetails, failurePresentation } from '../ui/projectScene/storageFeedback';
+
+type FeedbackFailure = Readonly<{ raw: string; error: unknown }>;
+function feedbackPresentation(message: string, failure: FeedbackFailure | undefined, fallback: string) {
+  const display = failurePresentation(message, fallback);
+  // Preserve the action-specific refusal while retaining typed causes and details.
+  return failure?.raw === message ? failurePresentation(failure.error, display.message) : display;
+}
 
 /** One file/recovery area, available even before a Scene editor can mount. */
 export function createValidationReceiveControls(document: Document, host: ReturnType<typeof createValidationModeHost>,
@@ -17,7 +25,9 @@ export function createValidationReceiveControls(document: Document, host: Return
   const help = document.createElement('p'); help.textContent = '同じプロジェクトの作業一式・変更分を統合します。元ファイルは変更しません。';
   const status = document.createElement('p'), jobs = document.createElement('section'); status.setAttribute('role', 'status');
   status.className = 'lv-operation-status';
-  form.append(label, submit, clear); root.append(heading, help, form, status, jobs);
+  const failureDetails = createFailureDetails(document), restoreDetails = createFailureDetails(document);
+  let failure: FeedbackFailure | undefined, restoreFailure: FeedbackFailure | undefined;
+  form.append(label, submit, clear); root.append(heading, help, form, status, failureDetails.root, jobs);
   let busy = false, disposed = false, feedback = '', selectedJob: string | null = null, selectedCopy: string | null = null,
     cancel: { id: string; stale: boolean; review?: boolean } | null = null;
   let activeOperation: 'receive' | 'restore' | null = null;
@@ -26,7 +36,7 @@ export function createValidationReceiveControls(document: Document, host: Return
     restoreInput = document.createElement('input'), restoreCommands = document.createElement('div'), restoreStatus = document.createElement('p');
   restoreSummary.textContent = 'バックアップから復元'; restoreLabel.textContent = 'バックアップを選択';
   restoreInput.type = 'file'; restoreInput.setAttribute('aria-label', 'バックアップを選択'); restoreLabel.append(restoreInput);
-  restoreStatus.setAttribute('role', 'status'); restoreStatus.className = 'lv-operation-status'; restoreArea.append(restoreSummary, restoreLabel, restoreStatus, restoreCommands);
+  restoreStatus.setAttribute('role', 'status'); restoreStatus.className = 'lv-operation-status'; restoreArea.append(restoreSummary, restoreLabel, restoreStatus, restoreDetails.root, restoreCommands);
   let restorePrepared = false, restoreCancel = false, restoreFeedback = '';
   const restoreChanges = () => !!restoreInput.files?.length || restorePrepared || restoreCancel;
   const output = createValidationOutputControls(document, host, session, changed, () => otherInput() && !session()?.canFlushCaption?.() || busy || !!input.files?.length || !!selectedJob || !!selectedCopy || !!cancel || restoreChanges());
@@ -41,7 +51,7 @@ export function createValidationReceiveControls(document: Document, host: Return
   const perform = (action: () => Promise<unknown>, recovery: boolean, completed: string) => {
     if (busy || output.hasChanges() || restoreChanges() || disposed) return;
     try { guard(recovery); } catch (error) { feedback = (error as Error).message; render(); return; }
-    busy = true; activeOperation = 'receive'; restoreFeedback = ''; feedback = '更新を確認しています。'; render(); changed();
+    busy = true; activeOperation = 'receive'; failure = undefined; restoreFeedback = ''; feedback = '更新を確認しています。'; render(); changed();
     void (async () => {
       try {
         await action(); if (disposed) return;
@@ -50,7 +60,8 @@ export function createValidationReceiveControls(document: Document, host: Return
       } catch (error) { if (!disposed) feedback = error instanceof MetadataSourceError &&
         ['receive-reselected-file', 'contribution-reselected-file'].includes(error.code) ?
         '中断前と異なるファイルです。読み込みを始めた元のファイルを選び直してください。' :
-        error instanceof Error ? error.message : '受信できません。元のデータは保持しています。'; }
+        error instanceof Error ? error.message : '受信できません。元のデータは保持しています。';
+        if (!disposed) failure = { raw: feedback, error }; }
       finally { busy = false; activeOperation = null; if (!disposed) { render(); changed(); } }
     })();
   };
@@ -63,13 +74,13 @@ export function createValidationReceiveControls(document: Document, host: Return
     if (busy || disposed || output.hasChanges() || input.files?.length || selectedJob || selectedCopy || cancel) return;
     feedback = '';
     try { guard(recovery,true); } catch (error) { restoreFeedback = (error as Error).message; render(); return; }
-    busy = true; activeOperation = 'restore'; restoreFeedback = '復元を確認しています。'; render(); changed();
+    busy = true; activeOperation = 'restore'; restoreFailure = undefined; restoreFeedback = '復元を確認しています。'; render(); changed();
     void (async () => {
       try {
         await action(); if (disposed) return;
         if (consume) { restoreInput.value = ''; restorePrepared = false; restoreCancel = false; }
         await recovered(); restoreFeedback = completed;
-      } catch (error) { if (!disposed) restoreFeedback = error instanceof Error ? error.message : '復元を完了できません。元のデータは保持しています。'; }
+      } catch (error) { if (!disposed) { restoreFeedback = error instanceof Error ? error.message : '復元を完了できません。元のデータは保持しています。'; restoreFailure = { raw: restoreFeedback, error }; } }
       finally { busy = false; activeOperation = null; if (!disposed) { render(); changed(); } }
     })();
   };
@@ -91,6 +102,9 @@ export function createValidationReceiveControls(document: Document, host: Return
     submit.textContent = selectedCopy ? 'コピー作成を再開' : selectedJob ? '受信を再開' : host.workspaceFiles.initialImport ? 'ファイルを開く' : '更新を受け取る';
     status.dataset.busy = String(activeOperation === 'receive');
     status.textContent = activeOperation === 'restore' ? '' : feedback || host.workspaceFiles.reviewCopyError || host.workspaceFiles.error || (host.authority.readOnly ? '閲覧中。受信するには編集を開始してください。' : '');
+    const received = status.textContent ? feedbackPresentation(status.textContent, failure, '更新を受け取れません。元のファイルと手元の編集は保持しています。再試行してください。') : undefined;
+    if (received) status.textContent = received.message;
+    failureDetails.render(received?.diagnostic);
     jobs.replaceChildren();
     for (const copy of copies) {
       if (['completed', 'abandoned'].includes(copy.state)) continue;
@@ -136,6 +150,8 @@ export function createValidationReceiveControls(document: Document, host: Return
     restoreStatus.dataset.busy = String(activeOperation === 'restore');
     restoreStatus.textContent = restoreFeedback || host.backupRestore.error || (host.backupRestore.pending ? '復元が未完了です。' :
       host.backupRestore.needsDisplay ? '復元先の表示を再開してください。' : '統合ではなく、バックアップの状態に切り替えます。元の作業とファイルは残ります。');
+    const restored = feedbackPresentation(restoreStatus.textContent, restoreFailure, '復元を完了できません。元のファイルと復元記録は保持しています。再試行してください。');
+    restoreStatus.textContent = restored.message; restoreDetails.render(restored.diagnostic);
     restoreCommands.replaceChildren();
     if (host.backupRestore.retryable) button(restoreCommands, '復元を再開', () => performRestore(async () => {
       if (!restoreDisplay) throw Error('復元先の表示に接続できません。'); await restoreDisplay(true);
@@ -177,7 +193,7 @@ export function createValidationReceiveControls(document: Document, host: Return
   });
   render();
   const hasChanges = () => busy || output.hasChanges() || restoreChanges() || !!input.files?.length || !!selectedJob || !!selectedCopy || !!cancel;
-  return { root, render, busy: () => busy || output.busy(), hasChanges, hasHandedOff: output.hasHandedOff,
+  return { root, render, busy: () => busy || output.busy(), hasChanges, latestHandoff: output.latestHandoff, hasHandedOff: output.hasHandedOff,
     requestSave: () => hasChanges() ? Promise.resolve('blocked' as const) : output.requestSave(),
     readingOutput: () => busy || restoreChanges() || input.files?.length || selectedJob || selectedCopy || cancel ? null : output.readingOutput(),
     outputFeedback: output.outputFeedback,

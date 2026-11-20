@@ -72,7 +72,7 @@ test('image details, Scene keyboard focus and dismissible header sheets retain P
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down(); await page.mouse.move(box.x + box.width / 2 - 123, box.y + box.height / 2 - 57, { steps: 5 }); await page.mouse.up();
     const nextScroll = await viewport.evaluate(n => ({ x: n.scrollLeft, y: n.scrollTop })); expect(nextScroll.x).toBeCloseTo(previousScroll.x + 123, 0); expect(nextScroll.y).toBeCloseTo(previousScroll.y + 57, 0);
     expect(createHash('sha256').update(await viewport.screenshot()).digest('hex')).not.toBe(createHash('sha256').update(originalPixels).digest('hex'));
-    await page.setViewportSize({ width: 1280, height: 800 }); await expect(dialog.getByLabel('画像の表示倍率', { exact: true })).toHaveText('100%'); await expect.poll(() => image.evaluate(n => n.getBoundingClientRect().width)).toBe(2048);
+    await page.setViewportSize({ width: 1280, height: 800 }); await expect(dialog.getByLabel('画像の表示倍率', { exact: true })).toHaveText('倍率 100%'); await expect.poll(() => image.evaluate(n => n.getBoundingClientRect().width)).toBe(2048);
     await viewport.focus(); await page.keyboard.press('Shift+ArrowLeft'); await expect.poll(() => viewport.evaluate(n => n.scrollLeft)).toBeCloseTo(nextScroll.x - 40, 0);
     await dialog.getByRole('button', { name: '全体', exact: true }).click(); const fitted = await image.boundingBox(), area = await viewport.boundingBox(); expect(fitted!.width).toBeLessThanOrEqual(area!.width + 1); expect(fitted!.height).toBeLessThanOrEqual(area!.height + 1);
     await page.screenshot({ path: info.outputPath('inspected-image.png'), fullPage: false }); await dialog.getByRole('button', { name: '閉じる', exact: true }).click(); await expect(show).toBeFocused();
@@ -121,7 +121,7 @@ test('image details, Scene keyboard focus and dismissible header sheets retain P
     await expect(phoneDialog.locator('img')).toHaveCount(0); await expect(phoneDialog).toBeVisible();
     await phone.evaluate(() => { Object.defineProperty(document,'hidden',{configurable:true,get:()=>false}); document.dispatchEvent(new Event('visibilitychange')); });
     await expect.poll(() => phoneDialog.locator('img').evaluate(n => (n as HTMLImageElement).naturalWidth)).toBe(2048);
-    await expect(phoneDialog.getByLabel('画像の表示倍率', { exact: true })).toHaveText('100%');
+    await expect(phoneDialog.getByLabel('画像の表示倍率', { exact: true })).toHaveText('倍率 100%');
     expect(await photoArea.evaluate(n => ({x:n.scrollLeft,y:n.scrollTop}))).toEqual({x:120,y:50});
     await phoneDialog.getByRole('button', { name: '次のメディア', exact: true }).tap();
     await expect.poll(() => phoneDialog.locator('img').evaluate(n => [(n as HTMLImageElement).naturalWidth,(n as HTMLImageElement).naturalHeight])).toEqual([4,8]);

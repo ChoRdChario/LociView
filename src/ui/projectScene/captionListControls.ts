@@ -13,7 +13,8 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
   const root = make('section'); root.className = 'lv-caption-browser'; root.setAttribute('aria-label', '記録');
   const filters = make('div'); filters.className = 'lv-caption-search';
   const searchLabel = make('label', '検索'), search = make('input');
-  search.type = 'search'; search.placeholder = 'シーン内を検索'; search.title = 'タイトル・本文を検索'; search.setAttribute('aria-label', '検索');
+  search.type = 'search'; search.placeholder = '記録を検索'; search.title = 'このシーンのタイトル・本文・タグを検索'; search.setAttribute('aria-label', '検索');
+  search.id = `lv-caption-search-${crypto.randomUUID()}`;
   searchLabel.append(search);
   filters.append(searchLabel);
   const status = make('p'); status.className = 'lv-caption-status'; status.setAttribute('role', 'status');
@@ -62,7 +63,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
   });
   const colors = new Map<string, { node: HTMLButtonElement; mark: HTMLSpanElement; cleanup: () => void }>();
   const rows = new Map<string, { node: HTMLLIElement; select: HTMLButtonElement; title: HTMLSpanElement;
-    owner: HTMLSpanElement; note: HTMLSpanElement; swatch: HTMLSpanElement; action: HTMLButtonElement;edit:HTMLButtonElement;remove:HTMLButtonElement;
+    owner: HTMLSpanElement; note: HTMLSpanElement; excerpt: HTMLSpanElement; swatch: HTMLSpanElement; action: HTMLButtonElement;edit:HTMLButtonElement;remove:HTMLButtonElement;
     cleanup: () => void; effect: 'review' | 'showModel' }>();
   const Observer = document.defaultView?.ResizeObserver;
   const observer = Observer ? new Observer(() => {
@@ -91,13 +92,16 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     let entry = rows.get(item.id);
     if (!entry) {
       const node = make('li'), select = button(''), title = make('span'), ownerText = make('span');
-      const note = make('span'), swatch = make('span'), action = button(''), edit=button('編集'),remove=button('削除');edit.setAttribute('data-lv-edit-only','');remove.setAttribute('data-lv-edit-only','');
+      const note = make('span'), excerpt = make('span'), swatch = make('span'), action = button(''), edit=button('編集'),remove=button('削除');edit.setAttribute('data-lv-edit-only','');remove.setAttribute('data-lv-edit-only','');
       node.className = 'lv-caption-row'; select.className = 'lv-caption-select';
       title.className = 'lv-caption-title'; title.id = `lv-caption-title-${crypto.randomUUID()}`;
+      excerpt.className = 'lv-caption-excerpt'; excerpt.id = `lv-caption-excerpt-${crypto.randomUUID()}`;
+      excerpt.setAttribute('aria-hidden', 'true'); select.setAttribute('aria-describedby', excerpt.id);
+      edit.className = 'lv-caption-row-edit'; remove.className = 'lv-caption-row-remove';
       edit.setAttribute('aria-describedby', title.id); remove.setAttribute('aria-describedby', title.id);
       ownerText.className = 'lv-caption-owner'; note.className = 'lv-caption-note';
       swatch.className = 'lv-caption-swatch'; swatch.setAttribute('aria-hidden', 'true');
-      select.append(swatch, title, ownerText, note); node.append(select, action,edit,remove);
+      select.append(swatch, title, ownerText, note, excerpt); node.append(select, action,edit,remove);
       const selectClick = () => request({ kind: 'select', captionId: item.id });
       const actionClick = () => { const current = rows.get(item.id); if (current) request({ kind: current.effect, captionId: item.id }); };
       const invoke=(kind:'edit'|'delete')=>{if(!context||composing||context.pending||context.mutationBlock||!presentation?.recordActions?.available())return;const token=context.source.token,sceneId=context.source.sceneId;
@@ -105,7 +109,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
         const selected=request({kind:'select',captionId:item.id});if(!selected||selected.kind==='blocked')return;if(context.source.token===token&&context.source.sceneId===sceneId&&context.memory.selectedCaptionId===item.id)presentation.recordActions.invoke(kind,item.id,token,sceneId);};
       const editClick=()=>invoke('edit'),deleteClick=()=>invoke('delete');
       select.addEventListener('click', selectClick); action.addEventListener('click', actionClick);edit.addEventListener('click',editClick);remove.addEventListener('click',deleteClick);
-      entry = { node, select, title, owner: ownerText, note, swatch, action, edit, remove, effect: 'review', cleanup: () => {
+      entry = { node, select, title, owner: ownerText, note, excerpt, swatch, action, edit, remove, effect: 'review', cleanup: () => {
         select.removeEventListener('click', selectClick); action.removeEventListener('click', actionClick);edit.removeEventListener('click',editClick);remove.removeEventListener('click',deleteClick);
       } };
       rows.set(item.id, entry);
@@ -119,6 +123,12 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     const preview = context!.preview;
     const title = preview?.token === context!.source.token && preview.sceneId === context!.source.sceneId && preview.captionId === item.id
       ? preview.title : undefined;
+    const body = preview?.token === context!.source.token && preview.sceneId === context!.source.sceneId && preview.captionId === item.id
+      ? preview.body : undefined;
+    const text = body ?? (item.body.kind === 'value' ? item.body.value : '');
+    label(entry.excerpt, text.slice(0, 160).replace(/\s+/g, ' ').trim().replace(/[\uD800-\uDBFF]$/, ''));
+    entry.excerpt.hidden = !entry.excerpt.textContent;
+    entry.node.dataset.selected = String(item.id === context!.memory.selectedCaptionId);
     label(entry.title, title === undefined ? captionTitle(item) : title.trim() ? title : '無題'); label(entry.owner, captionOwnerLabel(item));
     entry.owner.hidden = item.pin === 'visible' && item.owner.kind === 'value';
     entry.select.setAttribute('aria-current', String(item.id === context!.memory.selectedCaptionId));
@@ -313,5 +323,5 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     const index = captionId === null ? undefined : layout.index(captionId);
     return { previous: index !== undefined && index > 0, next: index !== undefined && index + 1 < (currentView?.rows.length ?? 0) };
   }
-  return { root, tools, render, acceptScroll, neighbors, revealSelected, focusSelection, focusSearch: () => search.focus?.({ preventScroll: true }), dispose, isComposing: () => composing };
+  return { root, tools, searchId: search.id, render, acceptScroll, neighbors, revealSelected, focusSelection, focusSearch: () => search.focus?.({ preventScroll: true }), dispose, isComposing: () => composing };
 }

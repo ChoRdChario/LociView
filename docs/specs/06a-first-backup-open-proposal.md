@@ -1,5 +1,17 @@
 # First backup opening into an absent Project
 
+## Authorized progress presentation — 2026-11-21
+
+The grouped UI polish authorized by the PO permits an optional, read-only
+first-restore stage observer. Notifications occur when existing persistence,
+staging, initialization, projection, display, selection or adoption work starts.
+They carry only a fixed stage name, never a token, storage handle or permission.
+Observers are not awaited; synchronous throws and rejected observer promises
+cannot change ordering, verification, publication, retry or recovery outcomes.
+Replacement restoration may report only its truthful coarse stage. Completion
+is shown only after the existing successful adoption path, never from `finally`.
+
+
 Status: **APPROVED — exact companion ratified by PO 2026-10-16; Implemented in nondefault validation with Node/injected/recorded-DOM evidence, not adopted.**
 This additive companion to [06](06-project-package-wire.md) addresses the missing
 first-open path, separately from the existing ready-Project replacement restore.

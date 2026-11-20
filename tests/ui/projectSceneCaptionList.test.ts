@@ -72,6 +72,33 @@ function largeFixture() {
 }
 
 describe('disconnected Caption list contracts (not browser/render/storage evidence)', () => {
+  it('finds assigned tag names and retains uncertain relations without adding another search', () => {
+    const initial = fixture(); if (initial.source.kind !== 'ready') throw Error('fixture');
+    const context: CaptionListContext = { ...initial, source: { ...initial.source, captions: [
+      { ...item(a, '同じ題名', red), searchTags: { labels: ['現地 Site'], uncertain: true } },
+      { ...item(b, '同じ題名', blue), searchTags: { labels: [], uncertain: false } },
+      { ...item(c, '同じ題名', red), searchTags: { labels: [], uncertain: true } },
+    ] }, memory: { ...initial.memory, search: 'SITE' } };
+    const view = captionListView(context.source, context.memory);
+    expect(view.rows.map(row => [row.item.id, row.uncertainMatch])).toEqual([[a, false], [c, true]]);
+    const removed = { ...context.source, captions: context.source.kind === 'ready' ? context.source.captions.map(row => ({ ...row, searchTags: { labels: [], uncertain: false } })) : [] };
+    expect(captionListView(removed, context.memory).rows).toHaveLength(0);
+  });
+  it('distinguishes identical titles with bounded live body excerpts while retaining the same row', () => {
+    const initial = fixture(); if (initial.source.kind !== 'ready') throw Error('fixture');
+    const h = host({ ...initial, source: { ...initial.source, captions: [
+      { ...item(a, '接合部', red), body: value('左側のボルト\n塗装に傷') },
+      { ...item(b, '接合部', blue), body: value('右側のボルト') },
+    ] } });
+    const row = h.list.children[0]!, select = row.children[0]!, excerpt = select.children[4]!;
+    expect(excerpt.textContent).toBe('左側のボルト 塗装に傷');
+    expect(h.list.children[1]!.children[0]!.children[4]!.textContent).toBe('右側のボルト');
+    select.focus();
+    h.render({ ...h.context, preview: { token: h.context.source.token, sceneId: scene, captionId: a, body: '追記中'.repeat(1000) } });
+    expect(h.list.children[0]).toBe(row); expect(h.document.activeElement).toBe(select);
+    expect(excerpt.textContent).toContain('追記中'); expect(excerpt.textContent.length).toBeLessThanOrEqual(160);
+    expect(select.getAttribute('aria-describedby')).toBe(excerpt.id);
+  });
   it('steps through the full filtered order without wrapping, changing filters or accepting stale/IME selections', () => {
     const initial = fixture(); if (initial.source.kind !== 'ready') throw Error('fixture');
     const source = { ...initial.source, captions: [item(a, '対象A', red), item(b, '除外', blue), item(c, '対象C', red)] };

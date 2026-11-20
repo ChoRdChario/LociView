@@ -12,6 +12,16 @@ function fixture(navigate?:Parameters<typeof createCameraGizmo>[3]) {
   return { controls, root, compass, buttons, axis, fit, pointer };
 }
 describe('compact camera orientation', () => {
+  it('suggests the existing fit action for a selected offscreen pin without moving the camera',()=>{
+    const f=fixture(),fit=f.root.children.find(n=>n.className==='lv-camera-fit')!;
+    f.controls.render({camera:front,axis:null,blocked:false,selectedPinOffscreen:true});
+    expect(fit.dataset.suggested).toBe('true');expect(f.fit).not.toHaveBeenCalled();expect(f.axis).not.toHaveBeenCalled();
+    const note=f.root.children.flatMap(n=>n.children).find(n=>n.className==='lv-context-help-note'&&n.textContent.includes('選んだピン'))!;
+    expect(note.hidden).toBe(true);expect(fit.getAttribute('aria-describedby')).toContain(note.id);
+    fit.fire('click');expect(f.fit).toHaveBeenCalledOnce();
+    f.controls.render({camera:front,axis:null,blocked:true,selectedPinOffscreen:true});expect(fit.dataset.suggested).toBe('false');
+    f.controls.render({camera:front,axis:null,blocked:false});expect(note.textContent).not.toContain('画面外');
+  });
   it('projects signed axes faithfully in front, top and orbit views, retaining depth', () => {
     const tips = projectCameraAxes(front);
     expect(tips).toEqual([{ x: 90, y: 56, depth: 0 }, { x: 22, y: 56, depth: -0 }, { x: 56, y: 22, depth: 0 },

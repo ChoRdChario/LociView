@@ -113,13 +113,20 @@ export async function prepareReviewView(file: Blob | PackageArchive | ReviewArch
     }
     savedMaterials[model.assetId] = effects;
   }
+  const searchTags = new Map<string, Set<string>>(), tags = table(snapshot, 'captionTagsById');
+  for (const membership of Object.values(table(snapshot, 'captionTagMembershipsById'))) {
+    const captionId = string(membership.captionId), tag = object(tags[string(membership.tagId)]);
+    let labels = searchTags.get(captionId);
+    if (!labels) { labels = new Set(); searchTags.set(captionId, labels); }
+    labels.add(string(tag.label));
+  }
   const items: CaptionListItem[] = edges.map(edge => {
     const caption = captions[string(edge.captionId)]!, anchor = object(caption.anchor);
     const ownerId = anchor.kind === 'asset' ? anchor.assetId : anchor.kind === 'unplaced' ? anchor.ownerAssetId : undefined;
     const owner = ownerId === undefined ? null : assets[string(ownerId)]!;
     const missing = !!owner && owner.kind !== 'visual', needsReview = anchor.kind === 'asset' && !!owner && owner.kind === 'visual' && !list(owner.compatibleAnchorClassIds).includes(anchor.authoredAnchorCompatibilityId!);
     return { id: string(caption.id), title: value(string(caption.title)), body: value(string(caption.body)),
-      color: value(captionColor(caption)),
+      color: value(captionColor(caption)), searchTags: { labels: [...(searchTags.get(string(caption.id)) ?? [])], uncertain: false },
       owner: value(owner ? { kind: 'asset' as const, assetId: string(owner.id), name: value(missing ? '対応モデルなし' : string(owner.label)) }
         : { kind: anchor.kind === 'unplaced' ? 'none' as const : 'project' as const }),
       mediaCount: value(attachments.filter(a => a.captionId === caption.id).length), needsReview,

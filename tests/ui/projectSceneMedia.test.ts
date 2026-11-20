@@ -28,11 +28,12 @@ describe('same-host known PNG media connection; not decoder adoption, raster, IM
     viewer.open(()=>group,'photo',document.createElement('button') as unknown as HTMLElement);show();button(root,'原寸').click();content.scrollLeft=123;content.scrollTop=57;
     // Releasing the original can synchronously repaint the owning workspace.
     const revoke=vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{if((document as unknown as Document).hidden)viewer.render();});
-    Object.assign(document,{hidden:true});viewer.render();expect(nodes(root).filter(n=>n.tag==='img')).toHaveLength(0);expect(root.open).toBe(true);
-    Object.assign(document,{hidden:false});show();expect(named(root,'画像の表示倍率').textContent).toBe('100%');expect(content.scrollLeft).toBe(123);
-    group={...group,items:[{...group.items[0]!,image:{blob:new Blob(['b'],{type:'image/png'})}}]};
-    Object.assign(document,{hidden:true});viewer.render();Object.assign(document,{hidden:false});show();expect(named(root,'画像の表示倍率').textContent).toBe('50%');expect(content.scrollLeft).toBe(0);
-    viewer.dispose();revoke.mockRestore();
+    try {
+      Object.assign(document,{hidden:true});viewer.render();expect(nodes(root).filter(n=>n.tag==='img')).toHaveLength(0);expect(root.open).toBe(true);
+      Object.assign(document,{hidden:false});show();expect(named(root,'画像の表示倍率').textContent).toBe('倍率 100%');expect(content.scrollLeft).toBe(123);
+      group={...group,items:[{...group.items[0]!,image:{blob:new Blob(['b'],{type:'image/png'})}}]};
+      Object.assign(document,{hidden:true});viewer.render();Object.assign(document,{hidden:false});show();expect(named(root,'画像の表示倍率').textContent).toBe('倍率 50%');expect(content.scrollLeft).toBe(0);
+    } finally { viewer.dispose(); revoke.mockRestore(); }
   });
   it('mounts only one selected native player, preserving pause/source/URL and stale-event cleanup',()=>{
     const document=new RecordedDocument(),dom=document.asDocument(),createElement=dom.createElement.bind(dom),players:RecordedNode[]=[],pause=vi.fn(),load=vi.fn();

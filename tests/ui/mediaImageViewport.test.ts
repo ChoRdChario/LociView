@@ -15,27 +15,27 @@ describe('existing media dialog image inspection', () => {
   it('restores only the explicitly captured view after native image resources are released', () => {
     const f = fixture(); f.zoom.setImage(f.image(800,400)); f.button('原寸').click();
     f.viewport.scrollLeft = 123; f.viewport.scrollTop = 57; const saved = f.zoom.capture();
-    f.zoom.setImage(null); f.zoom.setImage(f.image(800,400)); expect(f.percent()).toBe('50%');
-    f.zoom.restore(saved); expect(f.percent()).toBe('100%'); expect(f.viewport.scrollLeft).toBe(123); expect(f.viewport.scrollTop).toBe(57);
-    f.zoom.setImage(f.image(800,400)); expect(f.percent()).toBe('50%'); expect(f.viewport.scrollLeft).toBe(0); f.zoom.dispose();
+    f.zoom.setImage(null); f.zoom.setImage(f.image(800,400)); expect(f.percent()).toBe('倍率 50%');
+    f.zoom.restore(saved); expect(f.percent()).toBe('倍率 100%'); expect(f.viewport.scrollLeft).toBe(123); expect(f.viewport.scrollTop).toBe(57);
+    f.zoom.setImage(f.image(800,400)); expect(f.percent()).toBe('倍率 50%'); expect(f.viewport.scrollLeft).toBe(0); f.zoom.dispose();
   });
   it('fits original pixels, zooms around the centre and preserves inspection through host renders', () => {
     const f = fixture(), image = f.image(800, 400); f.zoom.setImage(image);
-    expect(f.percent()).toBe('50%'); expect(image.style.width).toBe('400px'); expect(f.button('縮小').disabled).toBe(true);
-    f.button('原寸').click(); expect(f.percent()).toBe('100%'); expect(image.style.width).toBe('800px');
+    expect(f.percent()).toBe('倍率 50%'); expect(image.style.width).toBe('400px'); expect(f.button('縮小').disabled).toBe(true);
+    f.button('原寸').click(); expect(f.percent()).toBe('倍率 100%'); expect(image.style.width).toBe('800px');
     expect(f.viewport.scrollLeft).toBe(200); expect(f.viewport.scrollTop).toBe(100);
-    f.button('拡大').click(); expect(f.percent()).toBe('125%'); expect(f.viewport.scrollLeft).toBe(300);
-    f.zoom.render(); f.zoom.setImage(image); expect(f.percent()).toBe('125%'); expect(f.viewport.scrollLeft).toBe(300);
-    f.zoom.setImage(f.image(2000, 1000)); expect(f.percent()).toBe('20%'); expect(f.viewport.scrollLeft).toBe(0);
+    f.button('拡大').click(); expect(f.percent()).toBe('倍率 125%'); expect(f.viewport.scrollLeft).toBe(300);
+    f.zoom.render(); f.zoom.setImage(image); expect(f.percent()).toBe('倍率 125%'); expect(f.viewport.scrollLeft).toBe(300);
+    f.zoom.setImage(f.image(2000, 1000)); expect(f.percent()).toBe('倍率 20%'); expect(f.viewport.scrollLeft).toBe(0);
     f.zoom.dispose();
   });
   it('provides keyboard pan without stealing media navigation, browser zoom or composition', () => {
     const f = fixture(), preventDefault = vi.fn(), stopPropagation = vi.fn(); f.zoom.setImage(f.image(800, 400)); f.button('原寸').click();
     f.viewport.fire('keydown', { key: 'ArrowRight', preventDefault, stopPropagation }); expect(preventDefault).not.toHaveBeenCalled();
     f.viewport.fire('keydown', { key: '+', ctrlKey: true, preventDefault, stopPropagation });
-    f.viewport.fire('keydown', { key: '+', isComposing: true, preventDefault, stopPropagation }); expect(f.percent()).toBe('100%');
+    f.viewport.fire('keydown', { key: '+', isComposing: true, preventDefault, stopPropagation }); expect(f.percent()).toBe('倍率 100%');
     f.viewport.fire('keydown', { key: 'ArrowRight', shiftKey: true, preventDefault, stopPropagation }); expect(f.viewport.scrollLeft).toBe(240); expect(stopPropagation).toHaveBeenCalledOnce();
-    f.viewport.fire('keydown', { key: '0', preventDefault, stopPropagation }); expect(f.percent()).toBe('50%'); expect(f.viewport.scrollLeft).toBe(0);
+    f.viewport.fire('keydown', { key: '0', preventDefault, stopPropagation }); expect(f.percent()).toBe('倍率 50%'); expect(f.viewport.scrollLeft).toBe(0);
     f.zoom.dispose();
   });
   it('clears image dimensions for native media and disposes its event lifetime', () => {
@@ -57,14 +57,14 @@ describe('existing media dialog image inspection', () => {
     send('pointerdown', 1, 100);
     send('pointerdown', 2, 300);
     send('pointermove', 2, 400);
-    expect(f.percent()).toBe('75%');
+    expect(f.percent()).toBe('倍率 75%');
     send('pointercancel', 2, 400);
     const left = f.viewport.scrollLeft;
     send('pointermove', 1, 80);
     expect(f.viewport.scrollLeft).toBe(left + 20);
     f.zoom.setImage(f.image(400, 200));
     expect(release).toHaveBeenCalledWith(1);
-    expect(f.percent()).toBe('100%');
+    expect(f.percent()).toBe('倍率 100%');
     expect(f.viewport.scrollLeft).toBe(0);
     f.zoom.dispose();
   });

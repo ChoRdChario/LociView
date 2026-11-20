@@ -23,7 +23,7 @@ import { chooseStartupScene } from '../scene/resolve';
 // Conservative execution budgets for this development lane, not measured product capacity.
 export const validationBrowserLimits: FileValidationLimits = { maxFileBytes: 64 * 1024 * 1024,
   maxJsonBytes: 4 * 1024 * 1024, maxItems: 100_000, maxValues: 8_000_000, maxPixels: 16_777_216 };
-export interface BrowserWorkspaceComposition { readonly offline?:DesktopOfflinePort;readonly mountEditor:MountedEditorFactory;readonly smoothDisplay?:SmoothPresentation;readonly progressivePresentation?:boolean;readonly filePolicy?:ProjectFilePolicy;readonly residency?:GsResidency;readonly introduction?:string;readonly initialFiles?:readonly File[];openLegacy?(file?:File):Promise<void> }
+export interface BrowserWorkspaceComposition { readonly offline?:DesktopOfflinePort;readonly mountEditor:MountedEditorFactory;readonly smoothDisplay?:SmoothPresentation;readonly progressivePresentation?:boolean;readonly filePolicy?:ProjectFilePolicy;readonly residency?:GsResidency;readonly introduction?:string;readonly initialFiles?:readonly File[];sampleFiles?():readonly File[];openLegacy?(file?:File):Promise<void> }
 /** Own only this browser composition; preserve all teardown errors and ordering. */
 export function createValidationBrowserDisposal(owners:{detach():void;workspace():Promise<void>;raster():void|Promise<void>}) {
   let pending:Promise<void>|undefined;
@@ -89,7 +89,7 @@ export async function createValidationBrowserWorkspace(document: Document, compo
     store: new OriginBlobStore(base, { maxBlobBytes: Math.max(policy.nonGs.maxFileBytes,policy.gs.maxFileBytes),
       maxChunkBytes: 16 * 1024 * 1024, maxChunks: 100_000, metadata: validationMetadataLimits }, locks) };
   const storage = (id: string, create: boolean) => openStorage(`${validationArea}-${id}`, create);
-  const workspace = createValidationWorkspace(document, { ...options,offline:composition.offline,smoothDisplay:!!composition.smoothDisplay,progressivePresentation:composition.progressivePresentation,initialFiles:composition.initialFiles,openLegacy:composition.openLegacy,mountEditor:composition.mountEditor,introduction:composition.introduction,lastProject: uiState.lastProject,
+  const workspace = createValidationWorkspace(document, { ...options,offline:composition.offline,smoothDisplay:!!composition.smoothDisplay,progressivePresentation:composition.progressivePresentation,initialFiles:composition.initialFiles,sampleFiles:composition.sampleFiles,openLegacy:composition.openLegacy,mountEditor:composition.mountEditor,introduction:composition.introduction,lastProject: uiState.lastProject,
     reviewTextureJpeg: rasterDecoders?.reviewTextureJpeg,
     storageEstimate: typeof navigator.storage?.estimate === 'function' ? () => navigator.storage.estimate() : undefined, localSettings: uiState.localSettings,
     list: (reading,onlyRun) => measureValidation(timing, 'catalog.total', () => listValidationProjects(options, storage, composition.progressivePresentation ? reading : undefined,onlyRun)),

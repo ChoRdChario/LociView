@@ -91,11 +91,38 @@ export function projectCaptionSceneCount(provider: WorkspaceProvider, captionId:
   }
   return value(scenes.size);
 }
+/** UI-only search labels, collected once without inferring unresolved relations. */
+function captionSearchTags(provider: WorkspaceProvider) {
+  const labels = new Map<string, Set<string>>(), uncertain = new Set<string>();
+  const deleteEdits = new Set(provider.issues.filter(issue => issue.code === 'concurrent-delete-edit')
+    .map(issue => `${issue.path[0]}/${issue.path[1]}`));
+  let unknownOwner = false;
+  for (const [id, fields] of Object.entries(provider.details.mutable.captionTagMembershipsById)) {
+    const lifecycle = fieldValue(fields.lifecycle) as JsonObject | undefined;
+    const membershipConflict = deleteEdits.has(`captionTagMembershipsById/${id}`);
+    if (lifecycle?.state === 'deleted' && !membershipConflict) continue;
+    const target = fieldValue(provider.details.tagMemberships[id]);
+    const tag = target && fieldValue(provider.details.tags[target.tagId]);
+    if (target && tag && typeof tag.label === 'string' && !membershipConflict && !deleteEdits.has(`captionTagsById/${target.tagId}`)) {
+      let names = labels.get(target.captionId);
+      if (!names) { names = new Set(); labels.set(target.captionId, names); }
+      names.add(tag.label);
+    } else {
+      const owner = target?.captionId ?? fieldValue(fields.captionId);
+      if (typeof owner === 'string') uncertain.add(owner);
+      else unknownOwner = true;
+    }
+  }
+  return (captionId: string): NonNullable<CaptionListItem['searchTags']> => ({
+    labels: [...(labels.get(captionId) ?? [])], uncertain: unknownOwner || uncertain.has(captionId),
+  });
+}
 export function projectCaptions(provider: WorkspaceProvider, sceneId: string, hiddenAssetIds: readonly string[] = []): readonly CaptionListItem[] {
   const scene = resolveScene(provider.state, provider.resources, sceneId);
   if (scene.kind !== 'ready') return [];
   const models = projectModels(provider, sceneId, projectIdentity(provider), hiddenAssetIds, { ready: false, issue: null });
   const mediaCount = captionMediaCounts(provider);
+  const searchTags = captionSearchTags(provider);
   return scene.composition.captions.map(c => { const anchor = fieldValue(c.anchor), item = anchor?.kind === 'asset' && models.kind === 'ready' ? models.items.find(a => a.id === anchor.assetId) : undefined;
     const projection = anchor?.kind === 'asset' ? fieldValue(provider.resources.assets[anchor.assetId]?.projection) : undefined;
     const ownerHidden = anchor?.kind === 'asset' && item?.lifecycle.kind === 'value' && item.lifecycle.value === 'active' && item.membership.kind === 'value' &&
@@ -103,6 +130,7 @@ export function projectCaptions(provider: WorkspaceProvider, sceneId: string, hi
       !provider.issues.some(i => i.code === 'concurrent-delete-edit' && i.path[0] === 'assetsById' && i.path[1] === anchor.assetId) &&
       (item.membership.value.kind === 'absent' || hiddenAssetIds.includes(anchor.assetId) && scene.composition.assets.some(a => a.assetId === anchor.assetId));
     return { ...projectCaptionItem(provider, { ...c, id: c.captionId }, c.marker === 'unplaced' ? 'unplaced' : ownerHidden ? 'ownerHidden' : c.marker === 'visible' ? 'visible' : c.marker === 'needsReview' ? 'needsReview' : 'unavailable', mediaCount(c.captionId)),
+      searchTags: searchTags(c.captionId),
       needsReview: c.marker === 'needsReview' || anchor?.kind === 'asset' && !!projection && !projection.anchorCompatibilityIds.includes(anchor.authoredAnchorCompatibilityId) }; });
 }
 function projectCaptionItem(provider: WorkspaceProvider, c: Pick<Caption, 'id' | 'title' | 'body' | 'anchor'>, pin: CaptionListItem['pin'], mediaCount: Field<number>): CaptionListItem {

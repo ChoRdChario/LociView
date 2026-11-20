@@ -85,7 +85,9 @@ export function createCaptionTextReading(document: Document, reading: Omit<Resum
     focusedRowId: rows.find(item => item.button === document.activeElement)?.record.id, scrollTop: scrolled, picked
   }), composition: () => composition, selection: () => ({ query: search.value, captionId: selected, focus: document.activeElement === search ? 'search' as const :
       root.contains(document.activeElement) ? mobile() && root.dataset.surface === 'list' ? 'row' as const : 'detail' as const : null,
-    surface: root.dataset.surface === 'detail' ? 'detail' as const : 'list' as const }), setReady() { status.textContent = '復元が完了しました。入力を終えると編集画面に移ります。'; status.dataset.busy = 'false'; }, dispose() { finish?.(); root.remove(); } };
+    surface: root.dataset.surface === 'detail' ? 'detail' as const : 'list' as const }),
+    setProgress(message: string) { if (status.dataset.busy === 'true') status.textContent = `${message} 記録は閲覧・検索できます。編集・保存は完了後に使えます。`; },
+    setReady() { status.textContent = '復元が完了しました。入力を終えると編集画面に移ります。'; status.dataset.busy = 'false'; }, dispose() { finish?.(); root.remove(); } };
 }
 
 /** Ordinary saved/staged-source reading retains its actual token. */

@@ -1,7 +1,7 @@
 /** Reviewed composition/import boundary. Entries are exact files, never a directory exemption. */
 export const projectSceneApplicationImports:Readonly<Record<string,readonly string[]>> = {
   "src/projectScene/offlineEntry.ts": [
-    "./styles.css", "./validationBrowser", "./productWorkspace", "../projectFiles/validation",
+    "./styles.css", "./validationBrowser", "./productWorkspace", "./homeSample", "../projectFiles/validation",
     "../viewer/gsDecodeQueue", "../viewer/targetBudget", "../viewer/smoothComposite", "../platform/desktopOffline", "../ui/projectScene/offlineControls"
   ],
   "src/harness/projectScene/acknowledgment.ts": [
@@ -131,6 +131,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "../projectMetadata/source"
   ],
   "src/projectScene/desktopEntry.ts": [
+    "./homeSample",
     "../nativeGs/app",
     "../projectFiles/validation",
     "../ui/app",
@@ -293,6 +294,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "../projectMetadata/captionUndo"
   ],
   "src/projectScene/productWorkspace.ts": [
+    "../ui/projectScene/storageFeedback",
     "../scene/types",
     "../domain/materialIntent",
     "../ui/projectScene/materialState",
@@ -349,6 +351,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "three"
   ],
   "src/projectScene/reviewWorkspace.ts": [
+    "../ui/projectScene/storageFeedback",
     "../domain/values",
     "../domain/portableMedia",
     "../ui/projectScene/cameraGizmo",
@@ -535,12 +538,14 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./modelTypes"
   ],
   "src/projectScene/validationReceiveControls.ts": [
+    "../ui/projectScene/storageFeedback",
     "../ui/projectScene/modePresentation",
     "../projectMetadata/format",
     "../ui/projectScene/projectWorkspacePorts",
     "./validationModeHost",
     "./validationOutputControls"
   ],
+  "src/projectScene/homeSample.ts": [],
   "src/projectScene/validationRender.ts": [
     "../viewer/rasterLoadScope",
     "../viewer/rasterResources",

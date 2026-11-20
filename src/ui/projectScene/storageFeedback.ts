@@ -18,3 +18,24 @@ export function metadataFailureText(message: string | undefined): string | undef
     return '保存情報を確認できないため、処理を停止しました。このブラウザのデータは削除しないでください。';
   return undefined;
 }
+
+/** Copy only: neither retry eligibility nor the underlying failure is changed. */
+export function failurePresentation(error: unknown, fallback: string): Readonly<{ message: string; diagnostic?: string }> {
+  const raw = typeof error === 'string' ? error : error instanceof Error ? error.message : '';
+  const known = storageFailureText(error) ?? metadataFailureText(raw);
+  const technical = /THREE\.|WebGLRenderer|Error creating WebGL|(?:TypeError|RangeError|ReferenceError|DOMException):|Metadata source invalid|Failed to (?:fetch|execute)/u.test(raw);
+  const message = known ?? (!technical && /[\u3040-\u30ff\u3400-\u9fff]/u.test(raw) ? raw : fallback);
+  const causes = error instanceof AggregateError ? error.errors.map(value => value instanceof Error ? value.message : String(value)).join('\n') : '';
+  const diagnostic = [raw !== message ? raw : '', causes].filter(Boolean).join('\n');
+  return diagnostic ? { message, diagnostic } : { message };
+}
+
+/** Closed by default; updating a message does not move focus or discard its details. */
+export function createFailureDetails(document: Document) {
+  const root = document.createElement('details'), summary = document.createElement('summary'), text = document.createElement('pre');
+  summary.textContent = '詳細'; root.className = 'lv-failure-details'; root.hidden = true; root.append(summary, text);
+  return { root, render(diagnostic: string | undefined) {
+    root.hidden = !diagnostic;
+    if (text.textContent !== (diagnostic ?? '')) text.textContent = diagnostic ?? '';
+  } };
+}

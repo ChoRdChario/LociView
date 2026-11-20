@@ -1,7 +1,7 @@
 import type { createValidationModeHost } from './validationModeHost';
 import { editOnly, displayMode } from '../ui/projectScene/modePresentation';
 import type { WorkspaceFileInteraction } from '../ui/projectScene/projectWorkspacePorts';
-import {storageFailureText} from '../ui/projectScene/storageFeedback';
+import {createFailureDetails,failurePresentation} from '../ui/projectScene/storageFeedback';
 import type { BackupFileHandoff, BackupFileObserver } from '../projectPackage/backupOutputJob';
 
 /** Same editor, deliberate file handoff. No receipt follows a browser download click. */
@@ -29,12 +29,13 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   historyTitle.textContent = '作成したファイル'; history.append(historyTitle, completedFiles);
   const maintenance = document.createElement('details'), maintenanceTitle = document.createElement('summary'), maintenanceActions = document.createElement('div');
   maintenanceTitle.textContent = 'メンテナンス'; maintenance.append(maintenanceTitle, maintenanceActions);
-  root.append(heading, shareOptions, actions, nameField, commands, status, list, history, maintenance, select);
+  const failureDetails = createFailureDetails(document);
+  root.append(heading, shareOptions, actions, nameField, commands, status, failureDetails.root, list, history, maintenance, select);
   editOnly(shareOptions, actions, nameField, commands, select, maintenance);
   let busy = false, disposed = false, feedback = '', selected: string | null = null, cancellation: string | null = null;
   let completedFeedback = false;
-  let handoffFileName = '';
-  let storageFailure:{diagnostic:string|null|undefined;text:string}|undefined;
+  let lastHandoff: Readonly<{ id: string; name: string }> | undefined;
+  let storageFailure:{diagnostic:string|null|undefined;text:string;details?:string}|undefined;
   let readingToken: string | null = null;
   type OutputExecution = 'completed' | 'attention';
   let primaryAction: (focus?: 'origin') => Promise<OutputExecution> | undefined = () => undefined;
@@ -116,7 +117,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     try { a.click(); } finally { a.remove(); }
     return a.download;
   };
-  const handoffMessage = () => `${handoffFileName} のダウンロードを開始しました。保存先で完了を確認してください。`;
+  const handoffMessage = () => `${lastHandoff?.name ?? ''} のダウンロードを開始しました。保存先で完了を確認してください。`;
   type PerformOptions = {
     writes?: boolean;
     completed?: () => void;
@@ -141,7 +142,10 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     completedFeedback = false; storageFailure=undefined; busy = true; readingToken = allowReading ? host.read().source?.token ?? null : null; feedback = workingMessage; render(); changed();
     return (async (): Promise<OutputExecution> => {
       try { await action(); if (!disposed) { feedback = typeof message === 'function' ? message() : message; completedFeedback = true; completed?.(); succeeded = completedFeedback; } }
-      catch (error) { completedFeedback = false; if (!disposed) {const text=storageFailureText(error);storageFailure=text?{diagnostic:host.workspaceOutput.error,text}:undefined;feedback=text??(error instanceof Error ? error.message : 'ファイル処理を完了できません。');} }
+      catch (error) { completedFeedback = false; if (!disposed) {
+        const failure=failurePresentation(error,'ファイルを作成できません。保存済みの内容は保持しています。再試行してください。');
+        storageFailure={diagnostic:host.workspaceOutput.error,text:failure.message,details:failure.diagnostic};feedback=failure.message;
+      } }
       finally { busy = false; readingToken = null; if (!disposed) { render(); changed(); }
         document.removeEventListener?.('focusin', moved);
         const primaryTarget = root.querySelector?.<HTMLButtonElement>('.lv-file-primary');
@@ -198,7 +202,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
       const name = await download(id, offered);
       if (!disposed) {
         if (name === undefined) throw Error('ダウンロードの結果を確認できません。');
-        handoffFileName = name; handedOff.add(id);
+        lastHandoff = { id, name }; handedOff.add(id);
       }
     }
     catch (error) { history.open = true; throw Error(`${error instanceof Error ? error.message : 'ダウンロードを開始できません。'} 作成したファイルから再試行してください。`); }
@@ -351,8 +355,11 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     });
     status.dataset.busy = String(busy);
     const diagnostic=host.workspaceOutput.error;
-    const nextStatusText = busy ? feedback : storageFailure&&storageFailure.diagnostic===diagnostic ? storageFailure.text : diagnostic || feedback;
+    const ownedFailure = !busy && storageFailure && storageFailure.diagnostic===diagnostic && (diagnostic || feedback===storageFailure.text) ? storageFailure : undefined;
+    const externalFailure = !busy && !ownedFailure && diagnostic ? failurePresentation(diagnostic,'ファイルを作成できません。保存済みの内容は保持しています。再試行してください。') : undefined;
+    const nextStatusText = ownedFailure?.text ?? externalFailure?.message ?? feedback;
     if (status.textContent !== nextStatusText) status.textContent = nextStatusText;
+    failureDetails.render(ownedFailure?.details ?? externalFailure?.diagnostic);
     const currentToken = host.read().source?.token;
     for (const [i, job] of host.workspaceOutput.jobs.entries()) {
       if (['cancelled', 'abandoned'].includes(job.state)) continue;
@@ -431,7 +438,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   nameInput.addEventListener('input', () => { if (!nameInput.disabled) { checkpointName = nameInput.value; choicePending = true; changed(); } });
   nameInput.addEventListener('compositionstart', () => { composing = true; choicePending = true; changed(); });
   nameInput.addEventListener('compositionend', () => { checkpointName = nameInput.value; composing = false; choicePending = true; changed(); });
-  render(); return { root, render, choosePurpose, requestSave: () => activatePrimary(true), hasHandedOff: (jobId: string) => handedOff.has(jobId), setPresentation(value: typeof presentation) {
+  render(); return { root, render, choosePurpose, requestSave: () => activatePrimary(true), latestHandoff: () => lastHandoff, hasHandedOff: (jobId: string) => handedOff.has(jobId), setPresentation(value: typeof presentation) {
       if (value !== presentation) {
         choices.set(presentation, { purpose, baseId, checkpointName, choicePending, sceneIds, omitted, autoBase });
         presentation = value;

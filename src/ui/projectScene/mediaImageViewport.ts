@@ -23,7 +23,7 @@ export function createMediaImageViewport(document: Document, viewport: HTMLEleme
     if(image){viewport.setAttribute('role','region');viewport.setAttribute('aria-label','画像の表示領域');viewport.setAttribute('aria-description','2本指で拡大・縮小できます。拡大後はドラッグ、スクロールバー、Shiftと矢印キーで移動できます。');}
     else{viewport.removeAttribute('role');viewport.removeAttribute('aria-label');viewport.removeAttribute('aria-description');}
     for (const button of [fit, original, smaller, larger]) button.disabled = !data;
-    percentage.textContent = data ? `${Math.round(scale * 1000) / 10}%` : '';
+    percentage.textContent = data ? `倍率 ${Math.round(scale * 1000) / 10}%` : '';
     viewport.className = viewport.className.replace(/\s*lv-media-zoom-viewport\b/g, '') + (image ? ' lv-media-zoom-viewport' : '');
     if (!data || !image) { imageHost.style.width = imageHost.style.height = ''; viewport.dataset.zoomed = 'false'; return; }
     if (fitting) scale = fitScale();
@@ -32,7 +32,7 @@ export function createMediaImageViewport(document: Document, viewport: HTMLEleme
     image.style.width = `${width}px`; image.style.height = `${height}px`;
     image.style.left = `${Math.max(0, (box.width - width) / 2)}px`; image.style.top = `${Math.max(0, (box.height - height) / 2)}px`;
     smaller.disabled = scale <= fitScale() + 1e-10; larger.disabled = scale >= 8;
-    percentage.textContent = `${Math.round(scale * 1000) / 10}%`; viewport.dataset.zoomed = String(movable());
+    percentage.textContent = `倍率 ${Math.round(scale * 1000) / 10}%`; viewport.dataset.zoomed = String(movable());
   };
   const zoom = (next: number, point?: { x: number; y: number }) => {
     const data = dimensions(); if (!data || !image) return;
