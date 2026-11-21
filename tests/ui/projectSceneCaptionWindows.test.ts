@@ -123,6 +123,10 @@ describe('window DOM ownership, not rendered GPU acceptance', () => {
     memory = run(memory, b, { kind: 'open', captionId: b });
     controls.render({ source, memory, selectedId: b, moveBlock: null });
     const second = controls.placement(b)!;
+    const cards = record(controls.root).children.filter(n => n.className === 'lv-caption-window');
+    expect(cards.map(card => [card.dataset.selected, card.dataset.active])).toEqual([['false', 'false'], ['true', 'true']]);
+    controls.render({ source, memory, selectedId: a, moveBlock: null });
+    expect(cards.map(card => [card.dataset.selected, card.dataset.active])).toEqual([['true', 'false'], ['false', 'true']]);
     expect(controls.placement(a)).toEqual(first);
     expect(first.left + first.width <= second.left || first.top + first.height <= second.top).toBe(true);
     const pin = { x: first.left - 100, y: first.top + 70 };

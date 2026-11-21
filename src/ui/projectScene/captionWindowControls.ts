@@ -187,7 +187,10 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
     const view = captionWindowView(context.source, context.memory, context.selectedId);
     root.hidden = context.visible === false || projection.width <= 0 || projection.height <= 0;
     for (const [id, card] of cards) {
-      const index = view.visibleIds.indexOf(id);card.root.dataset.active=String(index===view.visibleIds.length-1);
+      const index = view.visibleIds.indexOf(id);
+      card.root.dataset.active = String(index === view.visibleIds.length - 1);
+      card.root.dataset.selected = String(id === context.selectedId);
+      card.line.dataset.selected = card.root.dataset.selected;
       const preferred = context.memory.placements.find(p => p.captionId === id)?.rect ?? card.initial;
       card.rect = displayedWindowRect(drag?.id === id ? drag.rect : preferred, projection.width, projection.height);
       Object.assign(card.root.style, { left: `${card.rect.left}px`, top: `${card.rect.top}px`,
