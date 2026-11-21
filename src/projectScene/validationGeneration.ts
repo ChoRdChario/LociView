@@ -26,7 +26,8 @@ export function validationGenerationService(scope: Pick<Awaited<ReturnType<typeo
 /** A generation-bound recovery action, without exposing its storage or Session. */
 export function openValidationLocalEditRecovery(root: ProjectWorkspaceFS, options: Options) {
   return BackupRestoreJob.openUnwrittenLocalEdit(root, limits, validationGenerationDatabases(options),
-    scope => validationGenerationService(scope, options));
+    scope => validationGenerationService(scope, options),
+    options.timing && ((stage, ms) => options.timing!(`recovery.local.${stage}`, ms)));
 }
 
 /** Inspect first-only controls before an original DB opener can be reached. No Session is fabricated. */

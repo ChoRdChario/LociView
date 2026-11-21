@@ -36,6 +36,11 @@ export interface RestoreDatabasePorts {
   open: GenerationStorageOpener;
 }
 type DestinationTiming = (stage: string, milliseconds: number) => void;
+function measureRestore<T>(timing: DestinationTiming | undefined, stage: string, action: () => Promise<T>): Promise<T> {
+  if (!timing) return action();
+  const started = performance.now();
+  return action().finally(() => { try { timing(stage, performance.now() - started); } catch { /* Diagnostics have no authority. */ } });
+}
 interface SelectedOpenDiagnostics {
   observeCatalogRead?: (read: MetadataSessionRead) => void;
   observeMetadataRead?: (read: MetadataSessionRead) => void;
@@ -294,12 +299,7 @@ export class BackupRestoreJob {
   private static async verifyDestination(root: ProjectWorkspaceFS, ports: RestoreSourcePorts, factory: MetadataStorageFactory, job: RestoreControlJob,
     limits: MetadataLimits, selected?: GenerationSelection, timing?: DestinationTiming, reopenSelected = false,
     metadataReading?: (read: MetadataSessionRead) => Promise<void>, localRecovery?: LocalRecoveryAdmission) {
-    const measure = async <T>(stage: string, action: () => Promise<T>): Promise<T> => {
-      if (!timing) return action();
-      const started = performance.now();
-      try { return await action(); }
-      finally { try { timing(stage, performance.now() - started); } catch { /* Diagnostics have no authority. */ } }
-    };
+    const measure = <T>(stage: string, action: () => Promise<T>) => measureRestore(timing, stage, action);
     if (!job.prepared) return fail('restore-destination-job');
     // Selection must not acknowledge a destination whose retained recovery archive is already corrupt.
     const inspection = await measure('archive', () => this.inspectInput(root, job.id, job.prepared!, limits));
@@ -375,10 +375,14 @@ export class BackupRestoreJob {
 
   /** Recovery-only scope: it never returns a Session, provider, filesystem or factory. */
   static async openUnwrittenLocalEdit(root: ProjectWorkspaceFS, limits: MetadataLimits, databases: RestoreDatabasePorts,
-    createPorts: (scope: Awaited<ReturnType<typeof openWorkspaceGeneration>>) => LocalEditRecoveryPorts): Promise<LocalEditRecoveryHandle | null> {
+    createPorts: (scope: Awaited<ReturnType<typeof openWorkspaceGeneration>>) => LocalEditRecoveryPorts,
+    timing?: DestinationTiming): Promise<LocalEditRecoveryHandle | null> {
     let ports: LocalEditRecoveryPorts | undefined;
     const admission: LocalRecoveryAdmission = { inspect: () => ports!.session.inspectUnwrittenLocalEdit() };
-    const scope = await this.openSelectedOwned(root, limits, databases, selected => ports = createPorts(selected), undefined, admission);
+    const destinationTiming = (phase: string) => timing && ((stage: string, milliseconds: number) => timing(`${phase}.destination.${stage}`, milliseconds));
+    const measure = <T>(stage: string, action: () => Promise<T>) => measureRestore(timing, stage, action);
+    const scope = await measure('admission.open', () => this.openSelectedOwned(root, limits, databases, selected => ports = createPorts(selected),
+      { timing: destinationTiming('admission') }, admission));
     let closed = false;
     const check = async () => {
       if (closed) return fail('closed-local-scope');
@@ -390,8 +394,8 @@ export class BackupRestoreJob {
       return controls;
     };
     try {
-      const controls = await check();
-      if (!scope.generationId) admission.ticket = await admission.inspect() ?? undefined;
+      const controls = await measure('admission.check', check);
+      if (!scope.generationId) admission.ticket = await measure('admission.inspect', admission.inspect) ?? undefined;
       const ticket = admission.ticket;
       if (!ticket) { await scope.dispose(); closed = true; return null; }
       const journal = new TransactionJournal(scope.fs, limits), pending = observeJournal(await journal.entries()).pending;
@@ -400,22 +404,22 @@ export class BackupRestoreJob {
       const controlBinding = (value: typeof controls) => ({ ...value, jobs: value.jobs.map(job => job.id === scope.generationId
         ? { ...job, destinationFiles: job.destinationFiles.filter(path => path !== closurePath) } : job) });
       const expectedControls = controlBinding(controls);
-      const read = await ports!.session.read(true), projectId = read.source?.proof.identity.projectId;
+      const read = await measure('admission.read', () => ports!.session.read(true)), projectId = read.source?.proof.identity.projectId;
       if (typeof projectId !== 'string' || read.state !== 'pending' || read.provider?.kind !== 'scene-provider' || read.provider.token !== read.source?.token)
         return fail('closed-local-project');
       const field = read.provider.inspection.candidates.fields.find(field => field.path.length === 2 && field.path[0] === 'project' && field.path[1] === 'title');
       const value = field?.valid && field.candidates.length === 1 ? field.candidates[0]?.value : undefined;
       const title = value?.kind === 'value' && typeof value.value === 'string' ? value.value : undefined;
       return { projectId, ...(title === undefined ? {} : { title }), resolve: async () => {
-        const fresh = await check();
+        const fresh = await measure('resolve.before', check);
         if (!restoreEqual(controlBinding(fresh), expectedControls)) return fail('closed-local-selection');
         if (scope.generationId) {
           const job = fresh.jobs.find(job => job.id === scope.generationId);
           if (!job || !fresh.tail) return fail('closed-local-selection');
-          await this.verifyDestination(root, ports!, scope.factory, job, limits, fresh.tail, undefined, true, undefined, admission);
+          await this.verifyDestination(root, ports!, scope.factory, job, limits, fresh.tail, destinationTiming('resolve'), true, undefined, admission);
         }
-        await ports!.session.resolveUnwrittenLocalEdit(ticket);
-        const after = await check();
+        await measure('resolve.session', () => ports!.session.resolveUnwrittenLocalEdit(ticket));
+        const after = await measure('resolve.after', check);
         if (!restoreEqual(controlBinding(after), expectedControls)) return fail('closed-local-selection');
       }, dispose: async () => { if (!closed) { closed = true; await scope.dispose(); } } };
     } catch (error) { closed = true; await scope.dispose().catch(() => {}); throw error; }

@@ -13,7 +13,7 @@ import { readProjectScene, type ProjectProviderRead } from '../scene/projectProv
 import { checkLimits, fail, MetadataSourceError, type MetadataLimits } from './format';
 import { ProjectMetadataSource } from './source';
 import { MetadataRepository, type MetadataStorageFactory } from './repository';
-import { TransactionJournal, observeJournal, journalCommandBase, type JournalCommandBase, type JournalStart, type PreparedJournal, type JournalEntry } from './journal';
+import { TransactionJournal, observeJournal, journalCommandBase, type JournalCommandBase, type JournalStart, type PreparedJournal, type JournalEntry, type PublishedJournalEntry } from './journal';
 import { assertClosedLocalOriginals, closedLocalBase, readUnpreparedLocalPart } from './closedLocal';
 import { digest, equalBytes, json, newId, underWriteLease, withMetadataRead, metadataPath, selectedTextCommit, type MetadataReadPorts, type TextCommitPorts } from './persistence';
 import { canonicalMetadataEdit, planMetadataEdit, type MetadataEdit } from './commands';
@@ -222,7 +222,7 @@ export class MetadataProjectSession {
       } finally { active = false; await Promise.allSettled([...pending]); }
     });
   }
-  private async readCandidate(integrity?: OutputIntegrityRead, ports?: MetadataReadPorts, editingText = false, requireReadyPublished = false, preparation?: MetadataReadPorts, observedJournal?: readonly JournalEntry[]): Promise<{
+  private async readCandidate(integrity?: OutputIntegrityRead, ports?: MetadataReadPorts, editingText = false, requireReadyPublished = false, preparation?: MetadataReadPorts, observedJournal?: readonly JournalEntry[], mode: 'ordinary' | 'localEditRecovery.inspect' = 'ordinary'): Promise<{
     read: MetadataSessionRead; acknowledged?: Set<string>; localChanges?: Set<string>; commandBase?: JournalCommandBase; priorPublications?: JournalEntry[]; witnessWork?: number
   }> {
     try {
@@ -243,7 +243,7 @@ export class MetadataProjectSession {
       if (!source) fail('published-source-missing');
       if (checkAllHeads && json(source!.heads) !== json(heads)) fail('command-base-changed');
       const originals = new Map(source!.originalChanges().map(b => [A.decodeChange(b).hash, b]));
-      await this.validateClosedSources(entries, repository);
+      await this.validateClosedSources(entries, repository, { published: published!, source: source! });
       const acknowledged = new Set<string>(), localChanges = new Set<string>();
       let witnessWork = 0;
       const witness = () => { if (++witnessWork > this.limits.maxWork) fail('retained-media-limit'); };
@@ -280,13 +280,13 @@ export class MetadataProjectSession {
       checkRequiredCapabilities(published.start.requiredCapabilities, capabilityUnion(inheritedCapabilities, source!.requiredCapabilities));
       const provider = await readProjectScene(source!.read(), this.limits, this.verifier(false, preparation), { verifyRetainedMedia: this.retainedSelection(source!, acknowledged, localChanges, preparation) });
       const ready = this.providerReady(provider);
-      if (pending || !ready) this.verifiedPublications = undefined;
+      if (mode === 'ordinary' && (pending || !ready)) this.verifiedPublications = undefined;
       if (pending && requireReadyPublished && !ready) fail('provider-not-ready');
       return { read: Object.freeze({ state: pending ? 'pending' : ready ? 'ready' : 'repair-required',
         source: source!, provider, publication: published.start.transactionId }), acknowledged, localChanges, commandBase: journalCommandBase(observation),
         priorPublications: !pending ? [...entries] : undefined, witnessWork };
     } catch (error) {
-      this.verifiedPublications = undefined;
+      if (mode === 'ordinary') this.verifiedPublications = undefined;
       if (editingText && error instanceof MetadataSourceError && error.code === 'command-base-changed') throw error;
       return { read: Object.freeze({ ...this.last, state: 'repair-required' }) };
     }
@@ -306,7 +306,8 @@ export class MetadataProjectSession {
       commandBase: journalCommandBase(observeJournal(entries)), priorPublications: entries, witnessWork: this.verifiedWitnessWork };
   }
 
-  private async validateClosedSources(entries: readonly JournalEntry[], repository: MetadataRepository) {
+  private async validateClosedSources(entries: readonly JournalEntry[], repository: MetadataRepository,
+    current: { published: PublishedJournalEntry; source: ProjectMetadataSource }) {
     const bases = new Map<string, Promise<Awaited<ReturnType<typeof closedLocalBase>>>>();
     for (const entry of entries) {
       if (!entry.closedLocal) continue;
@@ -314,7 +315,11 @@ export class MetadataProjectSession {
       let base = bases.get(id);
       if (!base) {
         base = (async () => {
-          const source = await repository.read(entry.start.repositoryId, entry.start.proof, receipt.effectivePublication.heads);
+          // Reuse only this read's fresh exact publication; historical closures still load their own heads.
+          const samePublication = id === current.published.start.transactionId && entry.start.repositoryId === current.published.start.repositoryId &&
+            json(entry.start.proof) === json(current.published.start.proof) && json(entry.start.proof) === json(current.source.proof) &&
+            json(current.source.heads) === json(current.published.publication.heads) && json(current.source.heads) === json(receipt.effectivePublication.heads);
+          const source = samePublication ? current.source : await repository.read(entry.start.repositoryId, entry.start.proof, receipt.effectivePublication.heads);
           if (!source) return fail('closed-local-source');
           return closedLocalBase(source.originalChanges(), this.limits);
         })();
@@ -325,47 +330,66 @@ export class MetadataProjectSession {
   }
 
   private async inspectUnwrittenLocal(expectedTransaction?: string) {
+    const assertCurrentLease = () => { if (this.fs.mutationAuthority.accessState === 'lock-lost') fail('closed-local-lease'); };
+    assertCurrentLease();
+    try {
+      // Returning a private failure lets this consumer finish its strict closing
+      // audit. A closing refusal wins; no Session state or ticket changes inside.
+      const outcome = await withMetadataRead(this.fs, this.storage, async ports => {
+        try { return { ok: true as const, value: await this.inspectUnwrittenLocalCandidate(ports, expectedTransaction) }; }
+        catch (error) { return { ok: false as const, error }; }
+      }, 'localEditRecovery.inspect');
+      assertCurrentLease();
+      if (!outcome.ok) throw outcome.error;
+      if (!outcome.value) return null;
+      const { adoption, ...candidate } = outcome.value;
+      const read = this.adoptRead(adoption);
+      return { ...candidate, read };
+    } catch (error) { this.verifiedPublications = undefined; throw error; }
+  }
+
+  private async inspectUnwrittenLocalCandidate(ports: MetadataReadPorts, expectedTransaction?: string) {
+    if (!ports.factory) return fail('generation-storage-binding');
+    const { fs, factory } = ports, journal = new TransactionJournal(fs, this.limits), repository = new MetadataRepository(fs, factory, this.limits);
     if (this.retained) return fail('closed-local-hot-command');
-    const entries = await this.journal.entries(), observation = observeJournal(entries), entry = entries.at(-1), effective = observation.effectivePublication;
+    const entries = await journal.entries(), observation = observeJournal(entries), entry = entries.at(-1), effective = observation.effectivePublication;
     if (!entry || !effective || entry.start.purpose !== 'localCommand' || entry.prepared || entry.durable || entry.publication ||
       (expectedTransaction ? entry.start.transactionId !== expectedTransaction : !!entry.closedLocal)) return null;
     if (entry.closedLocal ? observation.terminal !== entry || observation.pending : observation.pending !== entry) return null;
-    const allowed = new Set([this.journal.path(entry.start.transactionId, 'staging.json'),
-      ...(entry.closedLocal ? [this.journal.path(entry.start.transactionId, 'closedLocal.json')] : [])]);
-    const paths = await this.fs.list(this.journal.path(entry.start.transactionId, ''));
-    const partPath = this.journal.path(entry.start.transactionId, 'changes/00000000.amchange');
-    const part = paths.includes(partPath) ? await readUnpreparedLocalPart(this.fs, partPath, this.limits) : null;
+    const allowed = new Set([journal.path(entry.start.transactionId, 'staging.json'),
+      ...(entry.closedLocal ? [journal.path(entry.start.transactionId, 'closedLocal.json')] : [])]);
+    const paths = await fs.list(journal.path(entry.start.transactionId, ''));
+    const partPath = journal.path(entry.start.transactionId, 'changes/00000000.amchange');
+    const part = paths.includes(partPath) ? await readUnpreparedLocalPart(fs, partPath, this.limits) : null;
     if (part) allowed.add(partPath);
     if (paths.length !== allowed.size || paths.some(path => !allowed.has(path))) return null;
     if (json(entry.start.baseHeads) !== json(effective.publication.heads) || entry.start.repositoryId !== effective.start.repositoryId ||
       json(entry.start.proof) !== json(effective.start.proof)) return fail('closed-local-binding');
-    await this.assertReceiveSlot();
-    await this.assertOutputSlot();
-    const read = await this.read(true);
+    await this.assertReceiveSlot(undefined, fs);
+    await this.assertOutputSlot(undefined, fs);
+    const adoption = await this.readCandidate(undefined, ports, false, true, undefined, undefined, 'localEditRecovery.inspect'), read = adoption.read;
     if (read.state !== (entry.closedLocal ? 'ready' : 'pending') || !read.source || read.provider?.kind !== 'scene-provider' ||
       !this.providerReady(read.provider) || read.publication !== effective.start.transactionId ||
       json(read.source.heads) !== json(entry.start.baseHeads)) return fail('closed-local-source');
     const published = await closedLocalBase(read.source.originalChanges(), this.limits);
-    const whole = await this.repository.readForUnwrittenResolution(entry.start.repositoryId, entry.start.proof);
+    const whole = await repository.readForUnwrittenResolution(entry.start.repositoryId, entry.start.proof);
     if (!whole || json(whole.heads) !== json(read.source.heads)) return fail('closed-local-repository-changed');
     assertClosedLocalOriginals((await closedLocalBase(whole.originalChanges(), this.limits)).originals, published.originals);
     if (entry.closedLocal && json(entry.closedLocal.baseChangeSet) !== json(published.seal)) return fail('closed-local-base');
     const fingerprint = json({ start: entry.start, effectivePublication: effective.start.transactionId,
       publication: effective.publication, baseChangeSet: published.seal, unpreparedParts: part ? [part] : [] });
-    return { start: entry.start, baseChangeSet: published.seal, unpreparedParts: part ? [part] : [], fingerprint, closed: !!entry.closedLocal, read };
+    return { start: entry.start, baseChangeSet: published.seal, unpreparedParts: part ? [part] : [], fingerprint, closed: !!entry.closedLocal, adoption };
   }
 
   /** Cold unprepared-edit admission; never ignore a pending transaction. */
   async inspectUnwrittenLocalEdit(): Promise<UnwrittenLocalEditRecovery | null> {
-    return withMetadataRead(this.fs, this.storage, async () => {
-      if (this.retained) return fail('closed-local-hot-command');
-      if (this.last.state === 'ready') return null;
-      const candidate = await this.inspectUnwrittenLocal();
-      if (!candidate) return null;
-      const ticket = Object.freeze({ kind: 'unwritten-local-edit-recovery' as const });
-      this.unwrittenLocalTickets.set(ticket, { transactionId: candidate.start.transactionId, fingerprint: candidate.fingerprint, observedClosure: false });
-      return ticket;
-    });
+    if (this.retained) return fail('closed-local-hot-command');
+    if (this.last.state === 'ready') return null;
+    const candidate = await this.inspectUnwrittenLocal();
+    if (!candidate) return null;
+    const ticket = Object.freeze({ kind: 'unwritten-local-edit-recovery' as const });
+    this.unwrittenLocalTickets.set(ticket, { transactionId: candidate.start.transactionId, fingerprint: candidate.fingerprint, observedClosure: false });
+    return ticket;
   }
 
   /** One append-only closure, with fresh complete DB proof and normal readback. */
@@ -373,13 +397,13 @@ export class MetadataProjectSession {
     return underWriteLease(this.fs, async () => {
       const binding = this.unwrittenLocalTickets.get(ticket);
       if (!binding) return fail('closed-local-ticket');
-      const candidate = await this.inspectUnwrittenLocal(binding.transactionId);
+      const candidate = await this.measure('recovery.inspect-before', () => this.inspectUnwrittenLocal(binding.transactionId));
       if (!candidate || candidate.fingerprint !== binding.fingerprint) return fail('closed-local-stale');
       if (binding.observedClosure && !candidate.closed) return fail('closed-local-missing');
       if (candidate.closed) binding.observedClosure = true;
-      await this.journal.closeLocal(candidate.start, candidate.baseChangeSet, candidate.unpreparedParts);
+      await this.measure('recovery.close-readback', () => this.journal.closeLocal(candidate.start, candidate.baseChangeSet, candidate.unpreparedParts));
       binding.observedClosure = true;
-      const confirmed = await this.inspectUnwrittenLocal(binding.transactionId);
+      const confirmed = await this.measure('recovery.inspect-after', () => this.inspectUnwrittenLocal(binding.transactionId));
       if (!confirmed?.closed || confirmed.fingerprint !== binding.fingerprint) return fail('closed-local-readback');
       const ready = confirmed.read;
       if (ready.state !== 'ready' || !ready.source || !ready.provider || !this.providerReady(ready.provider)) return fail('closed-local-not-ready');
@@ -802,9 +826,9 @@ export class MetadataProjectSession {
       else await WorkspaceOutputJob.abandon(this.fs, id, this.limits);
     });
   }
-  private async assertOutputSlot(ownId?: string) {
+  private async assertOutputSlot(ownId?: string, owner = this.fs) {
     const excluded = ownId, limits = { ...this.limits };
-    return withMetadataRead(this.fs, undefined, ({ fs }) => withOutputJobDiscovery(fs, limits, async rows => {
+    return withMetadataRead(owner, undefined, ({ fs }) => withOutputJobDiscovery(fs, limits, async rows => {
       for (const row of rows) {
         if (row.key.id === excluded) continue;
         const observation = await row.read(), state = observation.state;
@@ -884,7 +908,7 @@ export class MetadataProjectSession {
       await measureBackupOutput(timing, 'protection-before', () => validateOutputProtection(this.fs, job, store, this.limits));
       const current = await measureBackupOutput(timing, 'ready-final', () => this.outputReady(signal));
       if (current.source!.token !== expectedToken || current.publication !== capture.publication || json(await bases.snapshot()) !== json(job.frozenBases())) return fail('output-stale');
-      await measureBackupOutput(timing, 'persist', () => job.persist()); return measureBackupOutput(timing, 'finish', () => this.finishBackupOutput(job, store, signal, timing, !!observeFile));
+      await measureBackupOutput(timing, 'persist', () => job.persist(timing)); return measureBackupOutput(timing, 'finish', () => this.finishBackupOutput(job, store, signal, timing, !!observeFile));
     });
     // The actual final ready read is observed only after the outer write fence
     // succeeds. A failed/closing command cannot seed its display successor.
@@ -1229,10 +1253,10 @@ export class MetadataProjectSession {
       if (!this.media?.inventory) return fail('media-unconnected'); await this.media.inventory([{ ...ref }]); return 'verified-present' as const;
     } };
   }
-  private async assertReceiveSlot(ownId?: string) {
-    await assertReviewEditSlot(this.fs, this.limits, ownId);
-    if ((await this.sceneAppendStates()).some(state => state.id !== ownId)) return fail('scene-append-recovery-required');
-    await withReceiveJobDiscovery(this.fs, this.receiveStore(), this.limits, async rows => { for (const row of rows) {
+  private async assertReceiveSlot(ownId?: string, fs = this.fs) {
+    await assertReviewEditSlot(fs, this.limits, ownId);
+    if ((await this.readSceneAppendStates(fs, new TransactionJournal(fs, this.limits))).some(state => state.id !== ownId)) return fail('scene-append-recovery-required');
+    await withReceiveJobDiscovery(fs, this.receiveStore(), this.limits, async rows => { for (const row of rows) {
       if (row.key.id === ownId) continue;
       const observed = await row.read();
       if (observed.state === 'abandoned') continue;

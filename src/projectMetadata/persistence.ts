@@ -130,7 +130,8 @@ export function selectedTextCommit(fs: ProjectWorkspaceFS, factory: MetadataStor
 }
 type ReadOperation = <T>(action: (ports: MetadataReadPorts) => Promise<T>) => Promise<T>;
 export type StagingReadConsumer = 'journal.entries' | 'journal.validateParts' | 'journal.readRestoredBases' | 'repository.read' | 'content.readonlyInspection';
-const stagingConsumers: ReadonlySet<StagingReadConsumer> = new Set(['journal.entries', 'journal.validateParts', 'journal.readRestoredBases', 'repository.read', 'content.readonlyInspection']);
+type MetadataReadConsumer = StagingReadConsumer | 'localEditRecovery.inspect';
+const stagingConsumers: ReadonlySet<MetadataReadConsumer> = new Set(['journal.entries', 'journal.validateParts', 'journal.readRestoredBases', 'repository.read', 'content.readonlyInspection']);
 const readOperations = new WeakMap<ProjectWorkspaceFS, { factory: MetadataStorageFactory; run: ReadOperation; staging?: true }>();
 /** Internal generation binding; does not grant writes or replace a root lease. */
 export function registerReadOperation(fs: ProjectWorkspaceFS, factory: MetadataStorageFactory, run: ReadOperation): void {
@@ -143,8 +144,9 @@ export function registerStagingReadOperation(fs: ProjectWorkspaceFS, factory: Me
   readOperations.set(fs, { factory, run, staging: true });
 }
 export function withMetadataRead<T>(fs: ProjectWorkspaceFS, factory: MetadataStorageFactory | undefined,
-  action: (ports: MetadataReadPorts) => Promise<T>, consumer?: StagingReadConsumer): Promise<T> {
+  action: (ports: MetadataReadPorts) => Promise<T>, consumer?: MetadataReadConsumer): Promise<T> {
   const operation = readOperations.get(fs);
+  if (operation?.staging && consumer === 'localEditRecovery.inspect') return Promise.reject(Error('local-recovery-staging'));
   if (!operation || operation.staging && (!consumer || !stagingConsumers.has(consumer))) return action({ fs, factory });
   if (factory && operation.factory !== factory) return Promise.reject(Error('generation-storage-binding'));
   return operation.run(action);

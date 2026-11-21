@@ -9,6 +9,28 @@ import { chooseHomeFiles, finishCaptionEditing, revealCaptionList,revealCoordina
 import {BackupArchive} from '../../src/projectPackage/backupArchive';
 import {inspectProjectCandidates} from '../../src/domain/projectCandidates';
 import {validationMetadataLimits} from '../../src/projectFiles/validation';
+import {closeFileSurface} from './workspaceUi';
+
+const readLocalTimings = (page: Page, start = 0) => page.evaluate(start => performance.getEntriesByType('measure')
+  .filter(entry => entry.name.startsWith('lociview.') && entry.startTime >= start)
+  .map(entry => ({ ...entry.toJSON(), detail: (entry as PerformanceMeasure).detail })), start);
+
+const projectFiles = (page: Page, run: string) => page.evaluate(async run => {
+  let root = await navigator.storage.getDirectory();
+  for (const name of ['lociview-development-validation-1', run]) root = await root.getDirectoryHandle(name);
+  const files: { path: string; size: number; sha256: string }[] = [];
+  const visit = async (directory: FileSystemDirectoryHandle, prefix: string) => {
+    for await (const [name, handle] of (directory as any).entries()) {
+      const path = prefix + name;
+      if (handle.kind === 'directory') await visit(handle, path + '/');
+      else {
+        const file = await handle.getFile(), hash = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+        files.push({ path, size: file.size, sha256: [...new Uint8Array(hash)].map(byte => byte.toString(16).padStart(2, '0')).join('') });
+      }
+    }
+  };
+  await visit(root, ''); return files.sort((a, b) => a.path.localeCompare(b.path));
+}, run);
 
 // Inject only the native failure. Everything after it uses the ordinary command,
 // OPFS, archive inspection and download boundaries; no product test hook exists.
@@ -115,6 +137,88 @@ for(const touch of [false,true])test(`native capacity recovery retains drafts an
   }finally{await context?.close();await server.stop();}
 });
 
+// Isolate06l from the earlier prepared-photo/output fault sequence below.
+// A fixed existing backup can be supplied for matched artifact comparisons.
+for (const touch of [false, true]) test(`06l restored unprepared edit resolves, exports and independently reopens (${touch ? 'touch' : 'desktop'})`, async ({}, info) => {
+  A.getHeads(A.init()); const server = await ownedServer(process.env.LOCIVIEW_E2E_ARTIFACT ?? 'desktop-dist');
+  let context: BrowserContext | undefined;
+  const errors: string[] = [];
+  const open = async (profile: string, run?: string) => {
+    context = await chromium.launchPersistentContext(profile, { channel: 'chromium', serviceWorkers: 'block', acceptDownloads: true,
+      viewport: touch ? { width: 390, height: 844 } : { width: 1280, height: 720 }, isMobile: touch, hasTouch: touch });
+    context.setDefaultTimeout(15_000);
+    const page = context.pages()[0]!, url = new URL(server.url);
+    if (run) url.searchParams.set('run', run);
+    if (process.env.LOCIVIEW_E2E_TIMINGS === '1') url.searchParams.set('timings', '1');
+    await page.route('**/*', route => { const u = new URL(route.request().url()); return u.origin === url.origin || ['blob:', 'data:'].includes(u.protocol) ? route.continue() : route.abort('blockedbyclient'); });
+    page.on('pageerror', e => errors.push(e.message)); await page.goto(url.href); return page;
+  };
+  const close = async () => { await context?.close(); context = undefined; };
+  const record = async (page: Page) => { await revealCaptionList(page); await page.locator('.lv-caption-select').filter({ hasText: '既存のピン' }).click(); return page.getByRole('region', { name: '記録の詳細', exact: true }).getByLabel('本文', { exact: true }); };
+  const backup = async (page: Page, name: string) => {
+    await revealFileSurface(page, '保存'); const primary = page.getByRole('region', { name: 'ファイル', exact: true }).locator('.lv-file-primary');
+    await expect(primary).toBeEnabled(); const since = await page.evaluate(() => performance.now()), started = Date.now();
+    try {
+      const [file] = await Promise.all([page.waitForEvent('download'), primary.click()]);
+      const milliseconds = Date.now() - started, path = info.outputPath(name + '.zip'); await file.saveAs(path); expect(await file.failure()).toBeNull();
+      await info.attach(name + '-output', { body: JSON.stringify({ milliseconds, stages: await readLocalTimings(page, since) }), contentType: 'application/json' });
+      await closeFileSurface(page); return path;
+    } catch (error) {
+      await info.attach(name + '-output-failure', { body: JSON.stringify({ stages: await readLocalTimings(page, since) }), contentType: 'application/json' }); throw error;
+    }
+  };
+  try {
+    let input = process.env.LOCIVIEW_E2E_LOCAL_RECOVERY_BACKUP;
+    if (!input) {
+      const author = await open(await createBrowserProfile('local-recovery-author'));
+      await chooseHomeFiles(author, { name: '記録.zip', mimeType: 'application/zip', buffer: await nativeConversionBackup(triangleGlb(), smallPng()) });
+      await author.getByRole('button', { name: '新しいプロジェクトに変換', exact: true }).click(); await expect(author.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled();
+      input = await backup(author, 'input'); await close();
+    }
+    const bytes = Uint8Array.from(await readFile(input)), original = await BackupArchive.inspect(new Blob([bytes.buffer]), validationMetadataLimits);
+    await info.attach('fixed-input', { body: JSON.stringify({ sha256: createHash('sha256').update(bytes).digest('hex'), bytes: bytes.length }), contentType: 'application/json' });
+    const profile = await createBrowserProfile('local-recovery'), page = await open(profile);
+    await chooseHomeFiles(page, input); await page.getByRole('button', { name: 'このファイルから再開', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('Nativeから引き継ぐ記録', { timeout: 120_000 });
+    await expect(page.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled();
+    const confirmed = '06l：中断前に確定した本文', field = await record(page); await field.fill(confirmed); await finishCaptionEditing(page, { body: confirmed });
+    await page.evaluate(() => {
+      const openFile = FileSystemDirectoryHandle.prototype.getFileHandle;
+      FileSystemDirectoryHandle.prototype.getFileHandle = async function(name, options) {
+        if (options?.create && name === '00000000.amchange') { await openFile.call(this, name, options); console.info('06l part created'); await new Promise<void>(() => {}); }
+        return openFile.call(this, name, options);
+      };
+    });
+    const paused = page.waitForEvent('console', msg => msg.text() === '06l part created'); await field.fill('反映されない未確定入力'); await paused;
+    const protocol = await context!.newCDPSession(page), crashed = page.waitForEvent('crash'); void protocol.send('Page.crash').catch(() => {}); await crashed; await close();
+    const run = (original.source.proof.identity.projectId as string).slice(4), blocked = await open(profile, run);
+    const proceed = blocked.getByRole('button', { name: '最後に保存された内容で続ける', exact: true }); await expect(proceed).toBeEnabled();
+    const before = await projectFiles(blocked, run); expect(before.some(f => f.path.endsWith('/changes/00000000.amchange') && f.size === 0)).toBe(true);
+    const since = await blocked.evaluate(() => performance.now()), started = Date.now();
+    await proceed.focus(); await proceed.press('Enter'); await expect(await record(blocked)).toHaveValue(confirmed);
+    await info.attach('06l-recovery', { body: JSON.stringify({ milliseconds: Date.now() - started, touch, physicalDevice: false, stages: await readLocalTimings(blocked, since) }), contentType: 'application/json' });
+    const after = await projectFiles(blocked, run), paths = new Set(before.map(f => f.path));
+    expect(after.filter(f => paths.has(f.path))).toEqual(before); expect(after.filter(f => !paths.has(f.path)).map(f => f.path)).toEqual([expect.stringMatching(/\/closedLocal\.json$/)]);
+    const saved = await backup(blocked, 'recovered'), restored = await BackupArchive.inspect(new Blob([Uint8Array.from(await readFile(saved)).buffer]), validationMetadataLimits);
+    expect(restored.source.proof).toEqual(original.source.proof); expect(restored.source.originalChanges()).toEqual(expect.arrayContaining(original.source.originalChanges()));
+    expect(restored.source.originalChanges()).toHaveLength(original.source.originalChanges().length + 1); expect(restored.archive.control.manifest.blobs).toEqual(original.archive.control.manifest.blobs);
+    for (const entry of original.archive.control.manifest.blobs) expect(await restored.archive.entryBlob(entry.path).arrayBuffer()).toEqual(await original.archive.entryBlob(entry.path).arrayBuffer());
+    await close(); const fresh = await open(await createBrowserProfile('local-recovery-recipient'));
+    await chooseHomeFiles(fresh, saved); await fresh.getByRole('button', { name: 'このファイルから再開', exact: true }).click();
+    await expect(fresh.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('Nativeから引き継ぐ記録', { timeout: 120_000 });
+    await expect(await record(fresh)).toHaveValue(confirmed); const next = '06l：別環境で再編集'; await (await record(fresh)).fill(next); await finishCaptionEditing(fresh, { body: next });
+    await fresh.reload(); await expect(await record(fresh)).toHaveValue(next); expect(errors).toEqual([]); await fresh.screenshot({ path: info.outputPath('06l-reopened.png') });
+  } catch (error) {
+    const active = context?.pages().find(page => !page.isClosed());
+    if (active) {
+      const body = JSON.stringify({ text: await active.locator('body').innerText().catch(() => ''), stages: await readLocalTimings(active).catch(() => []) });
+      await appendFile(info.outputPath('06l-failure.json'), body).catch(() => {});
+      await info.attach('06l-failure', { body, contentType: 'application/json' }).catch(() => {});
+    }
+    throw error;
+  } finally { await close(); await server.stop(); }
+});
+
 for (const restored of [true, false]) for (const touch of [false, true]) test(`renderer crashes before writing, during photo publication and after autosave preserve confirmed records exactly once (${touch ? 'touch' : 'desktop'}, ${restored ? 'restored' : 'original'})`, async ({}, info) => {
   A.getHeads(A.init());
   const testStarted = Date.now(); let launches = 0;
@@ -135,7 +239,7 @@ for (const restored of [true, false]) for (const touch of [false, true]) test(`r
   };
   const backup = async (page: Page, name: string) => {
     await phase(`backup.${name}.start`);
-    const started = Date.now(), measurements: Record<string, number | string> = { name };
+    const started = Date.now(), browserStarted = await page.evaluate(() => performance.now()), measurements: Record<string, number | string> = { name };
     await revealFileSurface(page, '保存');
     const files = page.getByRole('region', { name: 'ファイル', exact: true }), primary = files.locator('.lv-file-primary');
     try {
@@ -156,12 +260,13 @@ for (const restored of [true, false]) for (const touch of [false, true]) test(`r
       await info.attach(name + '-save-failure', { body: JSON.stringify({
         text: await files.innerText().catch(error => String(error)),
         enabled: await primary.isEnabled().catch(error => String(error)),
-        timings: await page.evaluate(() => performance.getEntriesByType('measure').filter(entry => entry.name.startsWith('lociview.')).map(entry => entry.toJSON())).catch(error => String(error)),
+        timings: await readLocalTimings(page).catch(error => String(error)),
       }), contentType: 'application/json' });
       throw error;
     } finally {
       measurements.totalMs = Date.now() - started;
-      await info.attach(name + '-save-timings', { body: JSON.stringify(measurements), contentType: 'application/json' });
+      const stages = await readLocalTimings(page, browserStarted);
+      await info.attach(name + '-save-timings', { body: JSON.stringify({ ...measurements, stages }), contentType: 'application/json' });
     }
   };
   const text = '強制終了しても一度だけ残る本文', detail = (page: Page) => page.getByRole('region', {
@@ -199,22 +304,6 @@ for (const restored of [true, false]) for (const touch of [false, true]) test(`r
     await signal;
     await crash(page);
   };
-  const projectFiles = (page: Page, run: string) => page.evaluate(async run => {
-    let root = await navigator.storage.getDirectory();
-    for (const name of ['lociview-development-validation-1', run]) root = await root.getDirectoryHandle(name);
-    const files: { path: string; size: number; sha256: string }[] = [];
-    const visit = async (directory: FileSystemDirectoryHandle, prefix: string) => {
-      for await (const [name, handle] of (directory as any).entries()) {
-        const path = prefix + name;
-        if (handle.kind === 'directory') await visit(handle, path + '/');
-        else {
-          const file = await handle.getFile(), hash = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
-          files.push({ path, size: file.size, sha256: [...new Uint8Array(hash)].map(byte => byte.toString(16).padStart(2, '0')).join('') });
-        }
-      }
-    };
-    await visit(root, ''); return files.sort((a, b) => a.path.localeCompare(b.path));
-  }, run);
   try {
     const author = await open(restored ? await createBrowserProfile('author') : receiver);
     await phase('conversion.inspect.start');
@@ -301,6 +390,7 @@ for (const restored of [true, false]) for (const touch of [false, true]) test(`r
       const blocked = await open(receiver, '?run=' + run);
       const proceed = blocked.getByRole('button', { name: '最後に保存された内容で続ける', exact: true });
       await expect(proceed).toBeEnabled();
+      await info.attach('local-recovery-admission', { body: JSON.stringify(await readLocalTimings(blocked)), contentType: 'application/json' });
       const preserved = await projectFiles(blocked, run);
       expect(preserved.some(file=>file.path.endsWith('/changes/00000000.amchange')&&file.size===0)).toBe(true);
       await expect(blocked.getByRole('region', { name: '再開の確認', exact: true })).toBeVisible();
@@ -323,17 +413,19 @@ for (const restored of [true, false]) for (const touch of [false, true]) test(`r
       await expect(proceed).toBeEnabled();
       expect(await projectFiles(blocked, run)).toEqual(preserved);
       const resolveStarted = Date.now();
+      const resolveBrowserStarted = await blocked.evaluate(() => performance.now());
       await phase('local-recovery.resolve.start');
       await proceed.focus(); await proceed.press('Enter');
       try { await expect(await record(blocked)).toHaveValue(confirmed); }
       catch (error) {
         await blocked.screenshot({ path: info.outputPath('local-recovery-failure.png') });
         await info.attach('local-recovery-failure', { body: JSON.stringify({ text: await blocked.locator('body').innerText(),
-          timings: await blocked.evaluate(() => performance.getEntriesByType('measure').filter(entry => entry.name.startsWith('lociview.')).map(entry => entry.toJSON())) }), contentType: 'application/json' });
+          timings: await readLocalTimings(blocked) }), contentType: 'application/json' });
         throw error;
       }
       await phase('local-recovery.resolve.ready');
-      await info.attach('explicit-local-recovery', { body: JSON.stringify({ milliseconds: Date.now() - resolveStarted, restored, touch, physicalDevice: false }), contentType: 'application/json' });
+      const stages = await readLocalTimings(blocked, resolveBrowserStarted);
+      await info.attach('explicit-local-recovery', { body: JSON.stringify({ milliseconds: Date.now() - resolveStarted, restored, touch, physicalDevice: false, stages }), contentType: 'application/json' });
       const resolvedFiles = await projectFiles(blocked, run), priorPaths = new Set(preserved.map(file => file.path));
       expect(resolvedFiles.filter(file => priorPaths.has(file.path))).toEqual(preserved);
       expect(resolvedFiles.filter(file => !priorPaths.has(file.path)).map(file => file.path)).toEqual([expect.stringMatching(/\/closedLocal\.json$/)]);

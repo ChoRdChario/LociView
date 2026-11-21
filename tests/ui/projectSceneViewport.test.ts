@@ -334,6 +334,29 @@ describe('synthetic Scene display; GPU mocked, not rendered/browser acceptance',
     expect(v.read().display).toBe(first);expect(v.read().notice).toContain('前の表示');expect(create).toHaveBeenCalledOnce();
     v.update({...first,token:'current-again'});expect(v.read().notice ?? '').not.toContain('前の表示');v.dispose();
   });
+  it('uses the same clipping before the first camera-replacement frame and later display refresh', () => {
+    const display = syntheticDisplay(createSyntheticProject(), f.overview, null, null), canvas = fakeCanvas();
+    const v = createSyntheticViewport(canvas.canvas as unknown as HTMLCanvasElement, () => {});
+    v.update(display); v.setActive(true); canvas.show();
+    const initial = v.capture!();
+    const actions = [
+      () => v.camera({ kind: 'axis', axis: '+z' }),
+      () => v.camera({ kind: 'fit' }),
+      () => v.camera({ kind: 'projection', projection: 'orthographic' }),
+      () => v.camera({ kind: 'projection', projection: 'perspective' }),
+      () => v.recall!(initial),
+    ];
+    try {
+      for (const action of actions) {
+        action();
+        const camera = tracker.controls.at(-1).object, projection = camera.projectionMatrix.clone(), pose = v.capture!();
+        expect(projection.elements.every(Number.isFinite)).toBe(true);
+        v.update(display);
+        expect(camera.projectionMatrix).toEqual(projection);
+        expect(v.capture!()).toEqual(pose);
+      }
+    } finally { v.dispose(); }
+  });
   it('renders a read-only DTO with camera controls but no edit gizmo or placement picking', () => {
     const base = syntheticDisplay(createSyntheticProject(), f.overview, null, null), canvas = fakeCanvas(), propose = vi.fn();
     const models: ReadonlyRenderModel[] = base.models.map(m => ({ shape: 'render-glb', key: m.binding.id,

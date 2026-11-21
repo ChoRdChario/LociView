@@ -167,6 +167,23 @@ resolve an uncertain candidate. Failure stays local and preserves every byte.
 
 ## 6. Required evidence before connection
 
+### Same-read source ownership (2026-11-21 clarification)
+
+Inside one ordinary `readCandidate`, a closure seal may be derived from the
+source freshly loaded for that exact effective publication instead of loading
+the same publication again. Match transaction ID, repository, canonical proof
+and exact heads; an older/different publication still takes the existing
+repository read. Keep the derived-base map local to this invocation, verify each
+closure seal and discard the observations when the read ends. Never use a
+previous Session result, recovery ticket or cross-operation cache for this proof.
+
+This does not combine eligibility inspections, replace physical whole-repository
+comparison, skip closure write/readback or change destination/strict Host reopening.
+06l is approved for bounded evaluation and conditional adoption. Acceptance covers both matching-current and older-closure
+reads, fresh rejection of a canonical but incorrect base seal, retained bytes,
+interference, failed write and cold recovery. Existing timing observers may expose
+admission, destination, pre/post closure and strict reopen without deciding results.
+
 - Original and restored generations; real start-only crash on PC/touch; resolve,
   edit, actual export and independent cold reopen with exact previous history.
 - Before/after byte equality for all existing paths; only the new closure and

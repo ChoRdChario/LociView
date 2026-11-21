@@ -38,7 +38,7 @@ const checkRef = (r: EvidenceRef) => {
     !Number.isSafeInteger(r.byteLength) || r.byteLength <= 0 || r.byteLength > L.archiveBytes) fail('output-reference');
 };
 
-export type BackupOutputTiming = (stage: Parameters<WorkspaceArchiveTiming>[0] | 'ready-before' | 'slot-before' | 'protection-before' | 'ready-final' | 'ready-finish' | 'slot-finish' | 'protection-finish' | 'handoff-protection' | 'capture' | 'persist' | 'finish' | 'job' | 'inputs-before' | 'space' | 'stream-close' | 'artifact-inspect' | 'inputs-after' | 'receipt', milliseconds: number) => void;
+export type BackupOutputTiming = (stage: Parameters<WorkspaceArchiveTiming>[0] | 'ready-before' | 'slot-before' | 'protection-before' | 'ready-final' | 'ready-finish' | 'slot-finish' | 'protection-finish' | 'handoff-protection' | 'capture' | 'persist' | 'persist-slot' | 'persist-space' | 'persist-payload-write' | 'persist-payload-readback' | 'persist-capture' | 'persist-prepared' | 'persist-index' | 'persist-start' | 'finish' | 'job' | 'inputs-before' | 'space' | 'stream-close' | 'artifact-inspect' | 'inputs-after' | 'receipt', milliseconds: number) => void;
 /** Optional local observations have no authority over output or recovery. */
 export function measureBackupOutput<T>(observer: BackupOutputTiming | undefined, stage: Parameters<BackupOutputTiming>[0], action: () => Promise<T>): Promise<T> {
   if (!observer) return action();
@@ -179,19 +179,24 @@ export class BackupOutputJob {
   }
   frozenBases() { return structuredClone(this.inputs.description.table); }
   frozenInventory() { return structuredClone(this.inputs.description.inventory); }
-  async persist() {
+  async persist(timing?: BackupOutputTiming) {
+    const measure = <T>(stage: Parameters<BackupOutputTiming>[0], action: () => Promise<T>) => measureBackupOutput(timing, stage, action);
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
-    if ((await this.fs.list(this.path(''))).length || await this.fs.exists(indexPath(this.fs, this.id))) fail('output-exists');
-    await assertOutputSpace(this.fs, workspacePackageRoot(this.fs), this.inputs.manifest.length + this.inputs.originals.reduce((n, e) => n + e.bytes.length, 0));
+    await measure('persist-slot', async () => {
+      if ((await this.fs.list(this.path(''))).length || await this.fs.exists(indexPath(this.fs, this.id))) fail('output-exists');
+    });
+    await measure('persist-space', () => assertOutputSpace(this.fs, workspacePackageRoot(this.fs), this.inputs.manifest.length + this.inputs.originals.reduce((n, e) => n + e.bytes.length, 0)));
     for (const { path, bytes } of [{ path: 'manifest.json', bytes: this.inputs.manifest }, ...this.inputs.originals]) {
-      await this.fs.writeBytes(this.path(path), bytes);
-      const stored = await this.fs.readBytes(this.path(path)); if (!stored || json(ref(stored)) !== json(ref(bytes))) fail('output-input-readback');
+      await measure('persist-payload-write', () => this.fs.writeBytes(this.path(path), bytes));
+      await measure('persist-payload-readback', async () => {
+        const stored = await this.fs.readBytes(this.path(path)); if (!stored || json(ref(stored)) !== json(ref(bytes))) fail('output-input-readback');
+      });
     }
     const { capture, prepared, start } = this.records();
     for (const [name, value] of [['capture', capture], ['prepared', prepared]] as const)
-      await writeReceipt(this.fs, this.path(`${name}.json`), value, this.limits);
-    await writeReceipt(this.fs, indexPath(this.fs, this.id), this.index(), this.limits);
-    await writeReceipt(this.fs, this.path('start.json'), start, this.limits);
+      await measure(`persist-${name}`, () => writeReceipt(this.fs, this.path(`${name}.json`), value, this.limits));
+    await measure('persist-index', () => writeReceipt(this.fs, indexPath(this.fs, this.id), this.index(), this.limits));
+    await measure('persist-start', () => writeReceipt(this.fs, this.path('start.json'), start, this.limits));
     // No second aggregate original copy; callers reopen independently for cold recovery.
     return this;
   }

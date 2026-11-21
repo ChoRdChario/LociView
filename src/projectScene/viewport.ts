@@ -284,6 +284,8 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       if (pose.projection.kind === 'perspective') camera = new THREE.PerspectiveCamera(THREE.MathUtils.radToDeg(pose.projection.verticalFov), width / height, Math.max(1e-6, far / 1e7), far);
       else { const half = pose.projection.verticalSpan / 2; camera = new THREE.OrthographicCamera(-half * width / height, half * width / height, half, -half, -far, far); }
       camera.position.copy(position); camera.up.set(...pose.up); camera.lookAt(target); camera.updateMatrixWorld(true);
+      // Match camera/model updates before the first Point projection or depth pass.
+      updateClipping();
       if (![...camera.projectionMatrix.elements, ...camera.matrixWorld.elements].every(Number.isFinite)) throw new Error('表示範囲を確認してください。');
       // Register TransformControls before OrbitControls: handle-down disables orbit
       // before its listener sees that same event (including touch).

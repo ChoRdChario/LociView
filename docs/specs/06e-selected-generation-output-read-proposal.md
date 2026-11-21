@@ -94,6 +94,11 @@ write-onceの管理記録、append-onlyのSelection、正規writerの排他条�
 終了検査を跨ぐ証拠の再利用はしない。
 stagingで許可するconsumerの追加ではなく、normal selected generationの上記経路に限る。
 
+2026-11-21承認の[06l](06l-local-edit-recovery-inspection-proposal.md)は、別途限定評価として
+`localEditRecovery.inspect`を追加する。3回の純読取検査をそれぞれ独立させ、strictな開始・
+終了監査、終了前の非採用、全物理データ照合を保つ。書込・閉鎖読戻し・通常Host再開は
+集約せず、stagingには許可しない。06lの安全性・実時間の条件を確認してから採用する。
+
 ### 2026-11-11 Backup履歴行の候補評価（不採用）
 
 同じreadonly観測内のstate／完全open／step-chain検査の重複を、検証coreを

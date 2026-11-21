@@ -3201,6 +3201,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       await original.workspace.dispose(); await original.host.dispose();
       return { options: original.options, base: original.fs, run: original.options.run, captionId: original.captionId, body, changes };
     })();
+    const recoveryStages: string[] = [];
+    Object.assign(f.options, { timing: (stage: string) => { if (stage.startsWith('recovery.local.')) { recoveryStages.push(stage); throw Error('diagnostic observer fault'); } } });
     const storageOpen = 'databases' in f ? vi.mocked(f.databases.open) : vi.spyOn(f.options, 'openStorage');
     const hot = owned(await openTypedValidationHost(f.options)), write = f.base.writeText.bind(f.base);
     const expectedTitle = validatedResumeReading(hot.read(), f.run)!.title;
@@ -3222,6 +3224,10 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await expect(entry.continueSaved()).rejects.toThrow('strict reopen stopped');
     const resolvedPaths = await f.base.list(''), resolvedBytes = await Promise.all(resolvedPaths.map(path => f.base.readBytes(path)));
     let reopened = owned(await entry.continueSaved()); await entry.dispose();
+    expect(recoveryStages).toEqual(expect.arrayContaining(['recovery.local.resolve', 'recovery.local.reopen']));
+    if (lane === 'restored') expect(recoveryStages).toEqual(expect.arrayContaining([
+      'recovery.local.resolve.before', 'recovery.local.resolve.session', 'recovery.local.resolve.after', 'recovery.local.admission.destination.archive',
+    ]));
     expect(await f.base.list('')).toEqual(resolvedPaths); expect(await Promise.all(resolvedPaths.map(path => f.base.readBytes(path)))).toEqual(resolvedBytes);
     expect(reopened.read().state).toBe('ready'); expect(reopened.authority.readOnly).toBe(false);
     expect(reopened.read().source!.originalChanges()).toEqual(f.changes);
@@ -4909,7 +4915,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(selected.archive).toBe(inspected.archive);
     expect(selected.source.originalChanges()).toEqual(inspected.source.originalChanges());
     expect(selected.description.inventory).toEqual(inspected.description.inventory);
-    expect([...new Set(timings.map(t => t.stage))].sort()).toEqual(['ready-before', 'slot-before', 'protection-before', 'ready-final', 'ready-finish', 'slot-finish', 'protection-finish', 'capture', 'persist', 'finish', 'job', 'inputs-before', 'space', 'stream-close', 'artifact-inspect', 'inputs-after', 'receipt',
+    expect([...new Set(timings.map(t => t.stage))].sort()).toEqual(['ready-before', 'slot-before', 'protection-before', 'ready-final', 'ready-finish', 'slot-finish', 'protection-finish', 'capture', 'persist', 'persist-slot', 'persist-space', 'persist-payload-write', 'persist-payload-readback', 'persist-capture', 'persist-prepared', 'persist-index', 'persist-start', 'finish', 'job', 'inputs-before', 'space', 'stream-close', 'artifact-inspect', 'inputs-after', 'receipt',
       'archive-control-add', 'archive-original-add', 'archive-body-open', 'archive-body-add', 'archive-zip-close', 'archive-pipeline-wait'].sort());
     expect(timings.every(t => Number.isFinite(t.milliseconds) && t.milliseconds >= 0)).toBe(true);
     expect(inspected.source.encodeFullSource()).toEqual(before.source!.encodeFullSource());

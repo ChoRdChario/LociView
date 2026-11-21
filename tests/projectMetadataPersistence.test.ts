@@ -170,6 +170,79 @@ describe('local generation capabilities (ports only, not backup restore/selectio
     const state = session as unknown as { last: MetadataSessionRead; acknowledgedMedia: Set<string>; acknowledgedLocalChanges: Set<string>; acknowledgmentsLoaded: boolean };
     return { read: state.last, media: state.acknowledgedMedia, local: state.acknowledgedLocalChanges, loaded: state.acknowledgmentsLoaded };
   };
+  async function interruptedLocal(f: ReturnType<typeof local>) {
+    const writer = f.original.session(), initial = await writer.create(f.original.records);
+    f.fs.reject = path => path.endsWith('/changes/00000000.amchange');
+    try { await expect(writer.editCaption(initial.source!.token, id('cap'), 'body', '未確定')).rejects.toThrow(); }
+    finally { f.fs.reject = () => false; }
+    return initial;
+  }
+  it('06l adopts eligibility and issues its ticket only after a strict closing audit', async () => {
+    const f = local(); await interruptedLocal(f);
+    const entered = deferred(), release = deferred(); let checks = 0, armed = false;
+    const scope = await f.bind(null, false, async () => { if (armed && ++checks === 2) { entered.release(); await release.promise; } }, true);
+    const session = new MetadataProjectSession(scope.fs, scope.factory, limits, f.original.verifier), before = adopted(session), writes = f.fs.writes;
+    armed = true; const reading = session.inspectUnwrittenLocalEdit();
+    try {
+      await entered.promise; expect(adopted(session)).toEqual(before); expect(adopted(session).read).toBe(before.read);
+      release.release(); expect(await reading).not.toBeNull(); expect(checks).toBe(2);
+      expect(adopted(session).read.state).toBe('pending'); expect(f.fs.writes).toBe(writes);
+    } finally { release.release(); await reading; await scope.dispose(); }
+  });
+  it.each([false, true])('06l closes a failed inspection and gives closing refusal precedence (%s)', async refuseClose => {
+    const f = local(); await interruptedLocal(f);
+    const body = Error('physical read failed'), closing = Error('closing selection changed'); let checks = 0, armed = false;
+    const scope = await f.bind(null, false, async () => { if (armed && ++checks === 2 && refuseClose) throw closing; }, true);
+    const session = new MetadataProjectSession(scope.fs, scope.factory, limits, f.original.verifier), before = adopted(session), writes = f.fs.writes;
+    const failure = vi.spyOn(MetadataRepository.prototype, 'readForUnwrittenResolution').mockRejectedValue(body); armed = true;
+    try {
+      await expect(session.inspectUnwrittenLocalEdit()).rejects.toBe(refuseClose ? closing : body);
+      expect(checks).toBe(2); expect(adopted(session)).toEqual(before); expect(f.fs.writes).toBe(writes);
+    } finally { failure.mockRestore(); await scope.dispose(); }
+  });
+  it.each(['read-only', 'lock-lost-at-entry', 'lock-lost-at-close'] as const)('06l retains readonly inquiry and refuses lost authority (%s)', async mode => {
+    const f = local(); await interruptedLocal(f); let lost = mode === 'lock-lost-at-entry', armed = false, checks = 0;
+    const denied = vi.fn(() => { throw Error('readonly write denied'); });
+    Object.defineProperty(f.fs, 'mutationAuthority', { value: {
+      sessionMode: 'view', get accessState() { return lost ? 'lock-lost' as const : 'read-only' as const; }, accessDetail: 'test',
+      assertEditable: denied, assertSourceSnapshotProtected() {}, assertWorkspaceWriteAuthorized: denied,
+      beginWorkspaceWrite: denied, subscribeAccess: () => () => {},
+    } satisfies ProjectMutationAuthority });
+    const scope = await f.bind(null, false, async () => { if (armed && ++checks === 2 && mode === 'lock-lost-at-close') lost = true; }, true);
+    const session = new MetadataProjectSession(scope.fs, scope.factory, limits, f.original.verifier), before = adopted(session), writes = f.fs.writes; armed = true;
+    try {
+      if (mode === 'read-only') expect(await session.inspectUnwrittenLocalEdit()).not.toBeNull();
+      else { await expect(session.inspectUnwrittenLocalEdit()).rejects.toThrow('closed-local-lease'); expect(adopted(session)).toEqual(before); }
+      expect(denied).not.toHaveBeenCalled(); expect(f.fs.writes).toBe(writes);
+    } finally { await scope.dispose(); }
+  });
+  it.each(['before-close', 'after-close'] as const)('06l uses fresh physical repository proof on both sides of closure (%s)', async cut => {
+    const f = local(), initial = await interruptedLocal(f), scope = await f.bind(null, false, async () => {}, true);
+    const session = new MetadataProjectSession(scope.fs, scope.factory, limits, f.original.verifier), ticket = (await session.inspectUnwrittenLocalEdit())!;
+    const key = JSON.stringify(['unexplained']), data = Uint8Array.of(1), write = f.fs.writeText.bind(f.fs);
+    const fault = vi.spyOn(f.fs, 'writeText').mockImplementation(async (path, value) => {
+      await write(path, value); if (cut === 'after-close' && path.endsWith('/closedLocal.json')) f.original.rows.set(key, data);
+    });
+    if (cut === 'before-close') f.original.rows.set(key, data);
+    try {
+      await expect(session.resolveUnwrittenLocalEdit(ticket)).rejects.toThrow('closed-local-storage-key');
+      const closures = (await f.fs.list('')).filter(path => path.endsWith('/closedLocal.json'));
+      expect(closures).toHaveLength(cut === 'before-close' ? 0 : 1);
+      f.original.rows.delete(key); fault.mockRestore();
+      const ready = await session.resolveUnwrittenLocalEdit(ticket);
+      expect(ready.state).toBe('ready'); expect(ready.source!.originalChanges()).toEqual(initial.source!.originalChanges());
+      expect((await f.fs.list('')).filter(path => path.endsWith('/closedLocal.json'))).toHaveLength(1);
+    } finally { fault.mockRestore(); await scope.dispose(); }
+  });
+  it('06l never grants its pure inspection to an unfinished staging owner', async () => {
+    const f = local(), entered = vi.fn();
+    const scope = await openWorkspaceGeneration(f.fs, { generationId: nextId, allowCreate: true, assertSelected: async () => {},
+      stagingReadOwner: { assertOwner() {} } }, async () => ({ factory: f.original.storage, dispose: async () => {} }));
+    try {
+      await expect(withMetadataRead(scope.fs, scope.factory, async () => { entered(); }, 'localEditRecovery.inspect')).rejects.toThrow('local-recovery-staging');
+      expect(entered).not.toHaveBeenCalled();
+    } finally { await scope.dispose(); }
+  });
   it('adopts a public Session read and its acknowledgments only after the closing audit', async () => {
     const f = local(); await f.original.session().create(f.original.records);
     const entered = deferred(), release = deferred(); let checks = 0, armed = false;
@@ -347,7 +420,7 @@ describe('local generation capabilities (ports only, not backup restore/selectio
     expect(stagingOwners).toBe(0); expect(e.inspect).toHaveBeenCalledTimes(2); expect(e.execute).not.toHaveBeenCalled();
   });
 
-  it('audits an explicit read twice, denies mutations and expires retained capabilities', async () => {
+  it.each([undefined, 'localEditRecovery.inspect'] as const)('audits an explicit read twice, denies mutations and expires retained capabilities (%s)', async consumer => {
     const f = local(); let audits = 0;
     const scope = await f.bind(null, false, async () => { audits++; }, true);
     await f.fs.writeBytes('body', new Uint8Array([1]));
@@ -364,7 +437,7 @@ describe('local generation capabilities (ports only, not backup restore/selectio
       expect(f.fs.writes).toBe(writes); expect(f.original.fault.writes).toBe(dbWrites);
       const file = (await fs.readStream('body'))!;
       return { fs, factory: factory!, port, file, blob: await file.blob!() };
-    });
+    }, consumer);
     expect(audits).toBe(2);
     expect(new Uint8Array(await saved.blob.arrayBuffer())).toEqual(new Uint8Array([1]));
     await withMetadataRead(scope.fs, scope.factory, async () => {
@@ -375,7 +448,7 @@ describe('local generation capabilities (ports only, not backup restore/selectio
       await expect(saved.file.stream().getReader().read()).rejects.toThrow('generation-read-expired');
     });
     const before = audits;
-    await expect(withMetadataRead(scope.fs, f.original.storage, async () => 'wrong database')).rejects.toThrow('generation-storage-binding');
+    await expect(withMetadataRead(scope.fs, f.original.storage, async () => 'wrong database', consumer)).rejects.toThrow('generation-storage-binding');
     expect(audits).toBe(before);
   });
 
@@ -1590,6 +1663,29 @@ describe('new-workspace metadata persistence service (memory ports, not device/a
     expect((await h.session().read()).source!.originalChanges()).toEqual(saved.source!.originalChanges());
     expect(textCandidates(saved.source!, 'body')).toEqual([{ kind: 'value', value: '再開して保存' }]);
     expect(saved.source!.requiredCapabilities).toEqual([]);
+  });
+
+  it.each([false, true])('06j verifies closure seals within one fresh read and loads older publications (%s)', async laterEdit => {
+    const h = setup(), writer = h.session(), initial = await writer.create(h.records);
+    h.fs.reject = path => path.endsWith('/changes/00000000.amchange');
+    await expect(writer.editCaption(initial.source!.token, id('cap'), 'body', '未確定')).rejects.toThrow(); h.fs.reject = () => false;
+    const cold = h.session(), ticket = await cold.inspectUnwrittenLocalEdit();
+    const resolved = await cold.resolveUnwrittenLocalEdit(ticket!);
+    const journal = new TransactionJournal(h.fs, limits), closure = (await journal.entries()).at(-1)!;
+    const expected = laterEdit ? await cold.editCaption(resolved.source!.token, id('cap'), 'body', '次の保存') : resolved;
+    const reads = vi.spyOn(MetadataRepository.prototype, 'read');
+    try {
+      const read = await h.session().read();
+      expect(read.state).toBe('ready'); expect(read.source!.originalChanges()).toEqual(expected.source!.originalChanges());
+      expect(reads).toHaveBeenCalledTimes(laterEdit ? 2 : 1);
+      if (laterEdit) expect(reads.mock.calls[1]![2]).toEqual(initial.source!.heads);
+      const path = journal.path(closure.start.transactionId, 'closedLocal.json'), receipt = JSON.parse((await h.fs.readText(path))!);
+      receipt.baseChangeSet.sha256 = receipt.baseChangeSet.sha256 === '0'.repeat(64) ? '1'.repeat(64) : '0'.repeat(64);
+      await h.fs.writeText(path, json(receipt));
+      const writes = h.fs.writes;
+      expect((await h.session().read()).state).toBe('repair-required');
+      expect(h.fs.writes).toBe(writes);
+    } finally { reads.mockRestore(); }
   });
 
   it.each(['empty-part', 'partial-part', 'complete-part'] as const)('06k seals %s without modifying its bytes or the published database', async defect => {

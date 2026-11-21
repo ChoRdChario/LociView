@@ -10,6 +10,8 @@ import {sourceMaterialPanelsGlb,nativeMeshBackup} from './fixtures';
 import {presentedCanvas} from './presentedCanvas';
 import {ownedServer} from '../offline-e2e/server';
 
+const rearPoints=Buffer.from('ply\nformat ascii 1.0\nelement vertex 3\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n2.5 0 -0.1 255 0 0\n3.5 0 -0.1 255 0 0\n5 0 -0.1 255 0 0\n');
+
 test('01g 変換前に近似表示と環境別の非表示が分かる',async({page:p},info)=>{
   await p.route('**/*',r=>{const u=new URL(r.request().url());return u.origin===desktopOrigin||['blob:','data:'].includes(u.protocol)?r.continue():r.abort('blockedbyclient');});
   await p.goto(desktopEntry);const fixture=await nativeMeshBackup(true,true);
@@ -29,13 +31,15 @@ test('01g BLENDと色の透過は実画素と保守的な位置選択が一致�
     await p.goto(target);await info.attach('render-artifact',{body:JSON.stringify({artifact:process.env.LOCIVIEW_E2E_ARTIFACT??'desktop-dist',origin:targetOrigin}),contentType:'application/json'});await chooseHomeFiles(p, {name:'透過の面.glb',mimeType:'model/gltf-binary',buffer:sourceMaterialPanelsGlb(j=>{j.materials[2].alphaMode='BLEND';})});await p.getByRole('textbox',{name:'プロジェクト名',exact:true}).fill('標準材質の画素と選択');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();
     const status=p.locator('.lv-project-viewport-status');await expect(p.locator('.lv-drawing-notice')).toContainText('透過表示（近似）',{timeout:180000});
     await p.getByRole('tab',{name:'モデル',exact:true}).click();const choosing=p.waitForEvent('filechooser');await revealModelManagement(p); await p.getByRole('tabpanel',{name:'モデル',exact:true}).getByRole('button',{name:'3Dモデルを追加',exact:true}).click();
-    const points=Buffer.from('ply\nformat ascii 1.0\nelement vertex 3\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n2.5 0 -0.1 255 0 0\n3.5 0 -0.1 255 0 0\n5 0 -0.1 255 0 0\n');
-    await(await choosing).setFiles({name:'背後の点.ply',mimeType:'application/ply',buffer:points});await expect(p.getByText('モデルを追加しました。',{exact:true})).toBeVisible({timeout:180000});await lookAlongFront(p);
+    await(await choosing).setFiles({name:'背後の点.ply',mimeType:'application/ply',buffer:rearPoints});await expect(p.getByText('モデルを追加しました。',{exact:true})).toBeVisible({timeout:180000});await lookAlongFront(p);
     const canvas=p.getByLabel('3Dモデルの表示',{exact:true}),red=[255,0,0];
     // Adding residents rebuilds smooth composition asynchronously; saved metadata
     // and camera orientation alone do not imply a presented composite frame.
     const compositionState=()=>canvas.evaluate(n=>({busy:n.getAttribute('aria-busy'),bytes:(n as HTMLElement).dataset.compositionBytes,scale:(n as HTMLElement).dataset.renderScale}));
-    const at=async(x:number,z=-.1)=>{const box=await canvas.boundingBox();if(!box)throw Error('canvas');const pose=fittedPose({min:[-4,-1,-.1],max:[5,1,0]},defaultPose(),box.width/box.height,'+z');if(pose.projection.kind!=='perspective')throw Error('camera');const camera=new THREE.PerspectiveCamera(pose.projection.verticalFov*180/Math.PI,box.width/box.height,.000001,1e9);camera.position.set(...pose.position);camera.up.set(...pose.up);camera.lookAt(new THREE.Vector3(...pose.target));camera.updateMatrixWorld(true);const n=new THREE.Vector3(x,0,z).project(camera);return{x:(n.x+1)*box.width/2,y:(1-n.y)*box.height/2,dx:n.x*box.width/2,dy:-n.y*box.height/2};};
+    const fittedBox=await canvas.boundingBox();if(!fittedBox)throw Error('canvas');
+    // Resize preserves the user's pose; only the projection aspect changes.
+    const pose=fittedPose({min:[-4,-1,-.1],max:[5,1,0]},defaultPose(),fittedBox.width/fittedBox.height,'+z');
+    const at=async(x:number,z=-.1)=>{const box=await canvas.boundingBox();if(!box)throw Error('canvas');if(pose.projection.kind!=='perspective')throw Error('camera');const camera=new THREE.PerspectiveCamera(pose.projection.verticalFov*180/Math.PI,box.width/box.height,.000001,1e9);camera.position.set(...pose.position);camera.up.set(...pose.up);camera.lookAt(new THREE.Vector3(...pose.target));camera.updateMatrixWorld(true);const n=new THREE.Vector3(x,0,z).project(camera);return{x:(n.x+1)*box.width/2,y:(1-n.y)*box.height/2,dx:n.x*box.width/2,dy:-n.y*box.height/2};};
     const sample=async(x:number,z=-.1)=>{const q=await at(x,z);return(await presentedCanvas(canvas,q.dx,q.dy)).sample.slice(0,3);};
     const placement=p.getByRole('region',{name:'位置の調整',exact:true});
     const pick=async(x:number,model:'point'|'mesh'|'none',target:'point'|'mesh'=model==='point'?'point':'mesh',smoothRefusal=false,offset=0)=>{await p.getByRole('tab',{name:'モデル',exact:true}).click();await p.getByRole('tabpanel',{name:'モデル',exact:true}).locator('.lv-model-select').filter({hasText:target==='point'?'背後の点.ply':'透過の面.glb'}).click();await p.getByRole('tab',{name:'記録',exact:true}).click();await p.getByRole('button',{name:'記録を追加',exact:true}).click();const q=await at(x);await canvas.click({position:{x:q.x+offset,y:q.y}});
@@ -51,7 +55,7 @@ test('01g BLENDと色の透過は実画素と保守的な位置選択が一致�
     await expect(canvas).toHaveAttribute('data-composition-bytes',/^[1-9]\d*$/);
     await expect(p.locator('.lv-drawing-notice')).toContainText('透過表示（近似）');
     await info.attach('point-composition-readiness',{body:JSON.stringify({before:beforeReady,after:await compositionState()}),contentType:'application/json'});
-    const originalSmooth=await sample(3.5);expect(originalSmooth).not.toEqual(red);await pick(2.5,'none','point',true);await pick(3.5,'none','point',true);await pick(-3,'mesh');await p.setViewportSize({width:3840,height:2160});await expect(p.locator('.lv-drawing-notice')).toContainText('表示の細かさを自動調整');await pick(5,'point','point',false,5);await pick(5,'none','point',false,8);await p.screenshot({path:info.outputPath('scaled-point-css-picking.png'),fullPage:true});await p.setViewportSize({width:1440,height:1000});
+    const originalSmooth=await sample(3.5);expect(originalSmooth).not.toEqual(red);await canvas.screenshot({path:info.outputPath('point-blend-before-picking.png')});await pick(2.5,'none','point',true);await pick(3.5,'none','point',true);await pick(-3,'mesh');await p.setViewportSize({width:3840,height:2160});await expect(p.locator('.lv-drawing-notice')).toContainText('表示の細かさを自動調整');await pick(5,'point','point',false,5);await pick(5,'none','point',false,8);await p.screenshot({path:info.outputPath('scaled-point-css-picking.png'),fullPage:true});await p.setViewportSize({width:1440,height:1000});
     const blue=await sample(0,0);let panel=await select(1);await beginMaterialEditing(panel);await panel.getByText('色の透過と詳細',{exact:true}).click();await panel.getByLabel('指定した色を透過',{exact:true}).selectOption('on');const key='#'+[.3,.6,.9].map(c=>Math.round(255*(1.055*c**(1/2.4)-.055)).toString(16).padStart(2,'0')).join('');await panel.getByLabel('透過する色',{exact:true}).fill(key);await panel.getByLabel('色の許容範囲',{exact:true}).fill('.01');await panel.getByLabel('境界のぼかし',{exact:true}).fill('0');await apply();await expect.poll(()=>sample(0,0)).not.toEqual(blue);await pick(0,'none');
     panel=await select(1);await panel.getByRole('button',{name:'この範囲の設定を解除',exact:true}).click();await panel.getByRole('button',{name:'設定を解除する',exact:true}).click();await expect(p.getByText('材質の設定を解除しました。',{exact:true})).toBeVisible({timeout:180000});await expect.poll(()=>sample(0,0)).toEqual(blue);await pick(0,'mesh');
     // Standard -> unlit still composes source .8 factor × .8 RGBA × texture × appearance .5.
@@ -68,4 +72,27 @@ test('01g BLENDと色の透過は実画素と保守的な位置選択が一致�
     await mask('50','0');await expect.poll(()=>sample(2.5)).not.toEqual(red);await pick(2.5,'none','point');await pick(2.5,'mesh');
     panel=await select(2);await panel.getByRole('button',{name:'この範囲の設定を解除',exact:true}).click();await panel.getByRole('button',{name:'設定を解除する',exact:true}).click();await expect(p.getByText('材質の設定を解除しました。',{exact:true})).toBeVisible({timeout:180000});await expect(p.locator('.lv-drawing-notice')).toContainText('透過表示（近似）');await expect.poll(()=>sample(2.5)).toEqual(red);await expect.poll(()=>sample(3.5)).toEqual(originalSmooth);await pick(3.5,'none','point',true);expect(errors).toEqual([]);await p.screenshot({path:info.outputPath('blend-mask-point-picking.png'),fullPage:true});
   }finally{await p.screenshot({path:info.outputPath('last.png'),fullPage:true}).catch(()=>{});await context.close();await isolated?.stop();await info.attach('browser-errors',{body:JSON.stringify(errors),contentType:'application/json'});}
+});
+
+test('01g touch camera replacement keeps rear Points behind BLEND immediately',async({browser},info)=>{
+  const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true,serviceWorkers:'block'});
+  const p=await context.newPage(),errors:string[]=[];p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+  await p.route('**/*',r=>{const u=new URL(r.request().url());return u.origin===desktopOrigin||['blob:','data:'].includes(u.protocol)?r.continue():r.abort('blockedbyclient');});
+  try{
+    await p.goto(desktopEntry);await chooseHomeFiles(p,[{name:'透過の面.glb',mimeType:'model/gltf-binary',buffer:sourceMaterialPanelsGlb(j=>{j.materials[2].alphaMode='BLEND';})},{name:'背後の点.ply',mimeType:'application/ply',buffer:rearPoints}]);
+    await p.getByLabel('プロジェクト名',{exact:true}).fill('スマホの前後関係');await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();
+    const canvas=p.getByLabel('3Dモデルの表示',{exact:true}),stage=p.getByRole('button',{name:'3D',exact:true});
+    await expect(stage).toBeVisible();if(await stage.getAttribute('aria-pressed')!=='true')await stage.tap();
+    await expect(canvas).toHaveAttribute('aria-busy','false',{timeout:180000});await expect(canvas).toHaveAttribute('data-composition-bytes',/^[1-9]\d*$/);
+    for(let n=0;n<2;n++){
+      await p.locator('.lv-project-camera').getByRole('button',{name:'X',exact:true}).tap();await p.locator('.lv-project-camera').getByRole('button',{name:'Z',exact:true}).tap();
+      const box=(await canvas.boundingBox())!,pose=fittedPose({min:[-4,-1,-.1],max:[5,1,0]},defaultPose(),box.width/box.height,'+z');
+      if(pose.projection.kind!=='perspective')throw Error('camera');
+      const camera=new THREE.PerspectiveCamera(pose.projection.verticalFov*180/Math.PI,box.width/box.height,.000001,1e9);camera.position.set(...pose.position);camera.up.set(...pose.up);camera.lookAt(new THREE.Vector3(...pose.target));camera.updateMatrixWorld(true);
+      const sample=async(x:number)=>{const q=new THREE.Vector3(x,0,-.1).project(camera);return(await presentedCanvas(canvas,q.x*box.width/2,-q.y*box.height/2)).sample.slice(0,3);};
+      await expect.poll(()=>sample(2.5)).toEqual([255,0,0]);expect(await sample(3.5)).not.toEqual([255,0,0]);
+    }
+    expect(errors).toEqual([]);await p.screenshot({path:info.outputPath('touch-point-blend.png')});
+    await info.attach('touch-render',{body:JSON.stringify({physicalDevice:false,dpr:2,errors}),contentType:'application/json'});
+  }finally{await context.close();}
 });
