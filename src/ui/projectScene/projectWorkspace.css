@@ -219,6 +219,11 @@
 .lv-project-workspace[data-mobile-layout="true"] .lv-caption-color-menu { margin-inline-start: auto; }
 .lv-project-workspace[data-mobile-layout="true"] .lv-header-tools button { padding-block: 4px; line-height: 1.25; }
 .lv-project-workspace[data-mobile-layout="true"] .lv-record-tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (min-width: 360px) {
+  .lv-project-workspace[data-mobile-layout="true"] .lv-caption-task[data-mobile-surface="list"] .lv-record-tools { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.lv-project-workspace[data-mobile-layout="true"]:has(.lv-caption-task[data-mobile-surface="list"]:not([hidden])) > .lv-compact-navigation { padding-block: 0; }
+.lv-project-workspace[data-mobile-layout="true"] .lv-project-body > aside:has(.lv-caption-task[data-mobile-surface="list"]:not([hidden])) { gap: 4px; padding-block: 4px; }
 .lv-project-workspace[data-mobile-layout="true"] .lv-record-tools > button,
 .lv-project-workspace[data-mobile-layout="true"] .lv-record-tools > details > summary { padding-inline: 3px; line-height: 1.25; }
 .lv-project-workspace[data-mobile-layout="true"] .lv-caption-select .lv-caption-title {

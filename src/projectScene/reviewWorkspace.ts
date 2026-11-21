@@ -84,6 +84,9 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const phone = document.defaultView?.matchMedia?.('(pointer: coarse) and (max-width: 760px), (pointer: coarse) and (max-width: 950px) and (max-height: 480px)');
   let windowsMemory = position?.windows ?? newCaptionWindowMemory(view.source.sceneId), composing = false, moving = false, disposed = false, rendering = false;
   let runtime: ProjectViewport | undefined, display = view.display(null, null), failure = '', rendererFailure = '';
+  let pinAction: { id: string; label: string } | null = null;
+  let requestedPin: { id: string; fit: boolean } | null = null;
+  let locationNotice = '';
   let retirement: Promise<void> | undefined;
   const copy = make('button', '編集コピーを作る'), confirmation = make('section'); copy.type = 'button'; copy.hidden = !editCopy;
   confirmation.hidden = true; confirmation.tabIndex = -1; confirmation.className = 'lv-review-handoff';
@@ -215,6 +218,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     windowsMemory = plan.memory; render(); return true;
   }
   function selectCaption(captionId: string) {
+    requestedPin = null; locationNotice = '';
     memory = { ...memory, selectedCaptionId: captionId };
     if (phone?.matches) { readingDetail = true; return; }
     const plan = planCaptionWindow(view.source, windowsMemory, captionId, { kind: 'open', captionId });
@@ -285,7 +289,8 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     }
     target.scrollIntoView?.({ block, behavior: 'auto' });
   }
-  const recordHeader = make('header'), returnTo3D = make('button', '3Dに戻る');
+  const recordHeader = make('header'), returnTo3D = make('button', '3Dに戻る'), locate = make('button');
+  locate.type = 'button'; locate.className = 'lv-locate-pin'; locate.hidden = true;
   recordHeader.className = 'lv-review-record-header'; returnTo3D.type = 'button'; returnTo3D.className = 'lv-review-return';
   const previous = make('button', '前の記録'), next = make('button', '次の記録');
   const activeWindow = () => !phone?.matches ? captionWindowView(view.source, windowsMemory, memory.selectedCaptionId).visibleIds.at(-1) : undefined;
@@ -302,6 +307,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     const stepContext = active ? { ...base, memory: { ...memory, selectedCaptionId: active } } : base;
     const plan = planCaptionList(stepContext, { kind: 'step', direction });
     if (plan.kind !== 'change') return;
+    requestedPin = null; locationNotice = '';
     const captionId = plan.memory.selectedCaptionId!;
     const replace = active ? planCaptionWindow(view.source, windowsMemory, captionId,
       { kind: 'replace', captionId, fromCaptionId: active, rect: windows.placement(active) }) : undefined;
@@ -315,12 +321,20 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   previous.addEventListener('click', () => step('previous')); next.addEventListener('click', () => step('next'));
   recordHeader.append(previous, next);
   header.insertBefore(returnTo3D, files);
-  selectedText.append(recordHeader, recordTitle, recordBody, selectedMedia);
+  selectedText.append(recordHeader, recordTitle, locate, recordBody, selectedMedia);
+  locate.addEventListener('click', () => {
+    if (!pinAction || pinAction.id !== memory.selectedCaptionId || searchBlocked() || content.inert) return;
+    requestedPin = { id: pinAction.id, fit: pinAction.label === '全体表示' }; paint();
+    if (locate.hidden) canvas.focus({ preventScroll: true });
+  });
   returnTo3D.addEventListener('click', () => {
     if (searchBlocked() || content.inert) return;
+    const id = memory.selectedCaptionId;
+    if (id && display.pins.some(pin => pin.id === id)) requestedPin = { id, fit: pinAction?.id === id && pinAction.label === '全体表示' };
     requestStage();
     root.scrollIntoView?.({ block: 'start', behavior: 'auto' });
     canvas.focus({ preventScroll: true });
+    paint();
   });
   let panelGallery: ReturnType<typeof gallery> | null = null, panelCaption: string | null = null;
   const sceneHeader = make('div'); sceneHeader.className = 'lv-review-scene-header';
@@ -468,6 +482,21 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     const cameraBlocked = !cameraReady || composing || moving || !!observation?.dragging;
     let captured: unknown=observation?.camera; try { captured ??= runtime?.capture?.().camera; } catch { /* Camera preparation remains local. */ }
     const selectedPin = ready && display.pins.some(pin => pin.id === memory.selectedCaptionId) ? observation!.pins.find(pin => pin.id === memory.selectedCaptionId) : undefined;
+    if (ready) {
+      if (selectedPin?.visible) locationNotice = '';
+      pinAction = selectedPin && !selectedPin.visible && runtime?.revealPin
+        ? { id: selectedPin.id, label: selectedPin.depthVisible === false ? '全体表示' : 'この位置を表示' } : null;
+    } else if (!mediaWork.active || pinAction?.id !== memory.selectedCaptionId) pinAction = null;
+    const actionLabel = pinAction?.label;
+    const returnLabel = actionLabel ?? '3Dに戻る';
+    if (returnTo3D.textContent !== returnLabel) returnTo3D.textContent = returnLabel;
+    locate.hidden = !!phone?.matches || !actionLabel || !ready;
+    locate.disabled = cameraBlocked || handoffBusy || content.inert;
+    if (!locate.hidden && pinAction) {
+      if (locate.textContent !== actionLabel) locate.textContent = pinAction.label;
+      const anchor = windows.windowContent(pinAction.id) ?? recordBody;
+      if (locate.parentElement !== anchor.parentElement) anchor.parentElement?.insertBefore(locate, anchor);
+    }
     cameraGizmo.render({ camera: captured, axis: observation?.axis ?? null, blocked: cameraBlocked || !display.bounds,navigationBlocked:!cameraReady||composing||moving,navigating:observation?.navigating,navigationAvailable:!!runtime?.navigateCamera,selectedPinOffscreen:selectedPin?.visible===false });
     projection.disabled = cameraBlocked; projection.value = observation?.projection ?? 'perspective';
     for (const button of cameraButtons) button.disabled = cameraBlocked || !runtime?.recall;
@@ -480,7 +509,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
       if (rendererFailure || !failure && observation?.issue) fallback = '3Dを表示できません。「3D表示を再試行」を選択してください。記録と元ファイルは保持しています。';
       presented = failurePresentation(error, fallback);
     }
-    const nextStatus = presented?.message ?? observation?.notice ?? '';
+    const nextStatus = presented?.message ?? (observation?.notice || locationNotice);
     failureDetails.render(presented?.diagnostic);
     if (status.textContent !== nextStatus) status.textContent = nextStatus;
     const retryLabel = mediaWork.parked ? '3Dを表示' : '3D表示を再試行';
@@ -510,6 +539,24 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     }
     const bounds = canvas.getBoundingClientRect?.() ?? { width: 0, height: 0 }; windows.project({ ready, width: bounds.width, height: bounds.height,
       sourceToken: display.token, sceneId: display.sceneId, pins: ready ? observation!.pins : [] });
+    if (requestedPin) {
+      if (requestedPin.id !== memory.selectedCaptionId || handoffBusy || content.inert || observation?.issue || observation?.dragging) {
+        requestedPin = null;
+      } else if (ready) {
+        const request = requestedPin; requestedPin = null; locationNotice = '';
+        if (selectedPin && !selectedPin.visible && !cameraBlocked) {
+          if (selectedPin.depthVisible === false) {
+            if (request.fit) cameraAction(() => camera({ kind: 'fit' }));
+            else { locationNotice = '選んだ部位は現在の視点から見えません。「全体表示」で位置を確認できます。'; paint(); }
+          }
+          else {
+            const destination = windows.pinDestination(selectedPin);
+            if (destination) runtime?.revealPin?.(display, selectedPin.id, destination);
+            else { locationNotice = '記録の窓を移動して、部位を表示する場所を空けてください。'; paint(); }
+          }
+        }
+      }
+    }
   }
   function render() {
     if (disposed || rendering) return; rendering = true;

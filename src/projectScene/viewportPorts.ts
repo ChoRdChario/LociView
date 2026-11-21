@@ -20,7 +20,7 @@ export interface ViewportObservation {
   readonly loading?: boolean;
   readonly retryAvailable?: boolean;
   readonly projection: 'perspective' | 'orthographic'; readonly axis: ViewAxis | null;
-  readonly pins: readonly { id: string; x: number; y: number; visible: boolean }[];
+  readonly pins: readonly { id: string; x: number; y: number; visible: boolean; depthVisible?: boolean }[];
   readonly preview?: { readonly x: number; readonly y: number; readonly visible: boolean };
 }
 /** Draw-owned presentation only. Never a pick, capture, readiness or storage receipt. */
@@ -41,6 +41,7 @@ export interface ProjectViewport {
   setPinPointerActive?(active: boolean): void;
   read(): ViewportObservation; camera(intent: ViewCameraIntent): void; retry(): void; dispose(): void;
   navigateCamera?(event:CameraNavigationEvent):boolean;
+  revealPin?(display: RenderDisplay, captionId: string, destination: { x: number; y: number }): boolean;
   capture?(): DisplayCapture; recall?(payload: DisplayCapture): void;
   /** Includes exact readback verification; thrown verification must roll back before publication. */
   setBackground?(background: SolidBackground, verify?: () => void): void;

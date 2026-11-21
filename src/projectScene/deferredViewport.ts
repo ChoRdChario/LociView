@@ -86,6 +86,7 @@ export function createDeferredViewport() {
       observePresentation(listener){if(closed)return()=>{};presentationListeners.add(listener);bindPresentation();return()=>{presentationListeners.delete(listener);if(!presentationListeners.size)detachPresentation();};},
       update(next) { display = next; runtime?.update(next); }, setActive(next) { active = next; runtime?.setActive(next); },
       read,
+      revealPin: (display, captionId, destination) => runtime?.revealPin?.(display, captionId, destination) ?? false,
       camera(intent) { if (!runtime) throw Error('3Dモデルを読み込んでいます。'); runtime.camera(intent); },
       get navigateCamera(){return runtime?.navigateCamera?(event:Parameters<NonNullable<ProjectViewport['navigateCamera']>>[0])=>runtime?.navigateCamera?.(event)??false:undefined;},
       retry() { if(closed)return;if (cleanupFailure) throw cleanupFailure; if (runtime) runtime.retry(); else if(prepared)install(prepared); }, capture() { if (!runtime?.capture) throw Error('3Dモデルを読み込んでいます。'); return runtime.capture(); },

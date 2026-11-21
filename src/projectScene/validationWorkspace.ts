@@ -909,7 +909,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     } finally { if (!transferred) await opened.dispose(); }
   }));
   cancelConversion.addEventListener('click', () => { if (!busy && !composing) cancelPickedFile(); });
-  convert.addEventListener('click', () => execute(async () => {
+  async function confirmConversion() {
     ensureMaySwitch(); if (composing || lociPreview && (!lociCurrent() || lociEvaluation!.blocked) || !lociPreview && !conversion) throw Error('変換する内容を確認してください。');
     const generation = selectionGeneration, context = selectionContext(), draft = lociDraft, tuple = lociTuple();
     const current = () => guardSelection(generation, context) && draft === lociDraft && tuple === lociTuple();
@@ -919,8 +919,9 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const opened = await openNormal(run, initial);
     try { if (!current()) { await opened.dispose(); return; } } catch (error) { await opened.dispose(); throw error; }
     await replaceSelection(run, opened, generation, context);
-  }));
-  const openSelection=async(files:readonly File[], inspection?: {generation?: number})=>{
+  }
+  convert.addEventListener('click', () => execute(confirmConversion));
+  const openSelection=async(files:readonly File[], inspection?: {generation?: number}, bundledSample = false)=>{
     ensureMaySwitch(); if (creationAttempt) throw Error('作成を再試行してください。');
     const generation = ++selectionGeneration, draft = creationDraft, context = selectionContext(); selectionPending = true;
     if (inspection) inspection.generation = generation;
@@ -1015,6 +1016,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     lociPreview = loci;
     if (native || legacy) {
       conversion = native ?? legacy; const n = conversion!.summary;
+      if (bundledSample && native) { await confirmConversion(); return; }
       conversionNote.textContent = `${native ? 'Native' : '旧LociView'}ファイル：モデル ${n.models}・シーン ${n.scenes}・記録 ${n.captions}・メディア ${n.media}`;
       materialNotice.render(n.materialNotices);
       if (native?.summary.nativeSpatial) {
@@ -1233,7 +1235,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   sample.addEventListener('click', () => {
     if (disposed || sample.disabled || workspaceForm.inert || navigation.hidden || !ports.sampleFiles) return;
     const inspection: { generation?: number } = {};
-    void execute(async () => { await openSelection(ports.sampleFiles!(), inspection); }, inspection);
+    void execute(() => openSelection(ports.sampleFiles!(), inspection, true), inspection);
   });
   const leaveForLegacy=(file?:File)=>{if(busy||composing||disposed||changed()||creationAttempt)return;clearSelection();void ports.openLegacy?.(file).catch(error=>{if(!disposed)status.textContent=error instanceof Error?error.message:'ファイルを開けません。';});};
   legacy.addEventListener('click',()=>leaveForLegacy());fallback.addEventListener('click',()=>{const file=legacyFile;if(file)leaveForLegacy(file);});

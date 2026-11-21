@@ -10,7 +10,10 @@ import { editOnly } from './modePresentation';
 interface OrganizationHost {
   ports: ProjectWorkspacePorts; source(): { provider: WorkspaceProvider; sceneId: string; captionId: string | null };
   localBlocked(): boolean;
-  blocked(): string | null; run(command: MetadataEdit, complete: () => void): void;
+  canContinueWrite(): boolean;
+  blocked(): string | null;
+  run(command: MetadataEdit, complete: () => void, after?: () => Promise<void>, purpose?: 'attachCreatedTag'): void | Promise<void>;
+  createdTagAssignment(): 'saving' | 'retry' | undefined;
   scene(id: string): void; caption(id: string): void; changed(): void; message(text: string): void;
   captionPending?(): boolean; canFlushCaption?(): boolean; flushCaption?(): Promise<boolean>;
 }
@@ -23,7 +26,8 @@ export function createProjectOrganization(document: Document, host: Organization
     make('p', '名前・色の変更と削除は、すべての記録に反映されます。'), definitions);
   tagWarning.setAttribute('role', 'status'); tagsRoot.append(tagsSummary, tagWarning);
   let disposed = false, composing = false, form: { kind: 'sceneCopy' | 'sceneDelete' | 'tagEdit' | 'tagDelete'; token: string; id: string } | null = null;
-  let captured: { token: string; tagId: string | null } | null = null;
+  let captured: { token: string; tagId: string | null; attachTo?: string } | null = null;
+  let assigningTo: string | undefined;
   let settingsDraft: { before: string; value: string } | null = null;
   let editorDraft: { before: string; value: { enabled: boolean; name: string } } | null = null;
   const settingsRoot = make('details'), displayNameLabel = make('label', 'このブラウザの表示名'), displayName = make('input'), settingsStatus = make('p');
@@ -67,9 +71,12 @@ export function createProjectOrganization(document: Document, host: Organization
   const actionHistory: { past: CaptionUndoReceipt[]; future: CaptionUndoReceipt[] } = { past: [], future: [] };
   const recorded = new WeakSet<CaptionUndoCapture>();
   let undoWarning = '';
-  const perform = (intent: WorkspaceAuthoringIntent, complete: (command: MetadataEdit) => void) => {
+  const perform = (intent: WorkspaceAuthoringIntent, complete: (command: MetadataEdit) => void, after?: (command: MetadataEdit) => Promise<void>) => {
     if (disposed || host.blocked() || composing || !host.ports.authoring) return;
-    try { const { provider } = host.source(), command = host.ports.authoring.prepare(provider.token, intent); host.run(command, () => complete(command)); }
+    try {
+      const { provider } = host.source(), command = host.ports.authoring.prepare(provider.token, intent);
+      void host.run(command, () => complete(command), after && (() => after(command)));
+    }
     catch (error) { host.message((error as Error).message); }
   };
   const sceneNote = make('p'), sceneNameLabel = make('label', '複製するシーン名'), sceneName = make('input');
@@ -129,28 +136,54 @@ export function createProjectOrganization(document: Document, host: Organization
   const tagList = make('div'), tagForm = make('div'), tagNameLabel = make('label', 'タグ名'), tagName = make('input'), tagColor = make('input');
   tagName.setAttribute('aria-label', 'タグ名'); tagColor.type = 'color'; tagColor.value = '#57758b'; tagColor.setAttribute('aria-label', 'タグの色'); tagNameLabel.append(tagName);
   const startTag = () => { if (!captured) captured = { token: form?.kind === 'tagEdit' ? form.token : host.source().provider.token, tagId: form?.kind === 'tagEdit' ? form.id : null }; };
+  const createForRecord = button('新しいタグを付ける', () => {
+    const { provider, captionId } = host.source();
+    if (!captionId || captured || form || host.blocked()) return;
+    captured = { token: provider.token, tagId: null, attachTo: captionId };
+    host.changed(); tagName.focus();
+  });
   for (const node of [tagName, tagColor]) {
     node.addEventListener('input', () => { startTag(); host.changed(); });
     node.addEventListener('compositionstart', () => { startTag(); composing = true; host.changed(); }); node.addEventListener('compositionend', () => { composing = false; host.changed(); });
   }
   const saveTag = button('タグを追加', () => {
     if (!captured || captured.token !== host.source().provider.token || !tagName.value.trim()) return;
+    const captionId = captured.attachTo;
+    if (captionId && captionId !== host.source().captionId) return;
     const fields = { label: tagName.value, colorSrgb: tagColor.value.slice(1).match(/../g)!.map(v => parseInt(v, 16) / 255) };
     perform(captured.tagId ? { kind: 'editTag', tagId: captured.tagId, ...fields } : { kind: 'createTag', ...fields }, () => {
-      captured = null; form = null; tagName.value = ''; host.message('タグを保存しました。');
-    });
+      captured = null; form = null; tagName.value = '';
+      host.message(captionId ? 'タグを作成しました。記録に付けています。' : 'タグを保存しました。');
+    }, captionId ? async command => {
+      if (command.kind !== 'createTag' || disposed) return;
+      // The second command always targets the record and tag captured by this action.
+      const authoring = host.ports.authoring;
+      if (!authoring || !host.canContinueWrite()) { host.message('タグは作成済みです。元の記録でタグを付けてください。'); return; }
+      let assignment: MetadataEdit;
+      try { assignment = authoring.prepare(host.source().provider.token, { kind: 'setCaptionTag', captionId, tagId: command.tagId, included: true }); }
+      catch { host.message('タグは作成済みです。元の記録でタグを確認してください。'); return; }
+      assigningTo = captionId;
+      await host.run(assignment, () => { assigningTo = undefined; host.message('記録にタグを付けました。'); }, undefined, 'attachCreatedTag');
+    } : undefined);
   });
   const tagCancel = button('タグの入力を取り消す', () => { if (!host.localBlocked() && !composing) { captured = null; form = null; tagName.value = ''; host.changed(); } });
   const tagConfirm = button('タグを削除する', () => { const f = form; if (f?.kind === 'tagDelete' && f.token === host.source().provider.token) perform({ kind: 'deleteTag', tagId: f.id }, () => { form = null; host.message('タグを削除しました。記録は残っています。'); }); });
-  const tagNote = make('p'); tagForm.append(tagNameLabel, tagColor, saveTag, tagCancel, tagNote, tagConfirm); tagSettings.append(tagForm); tagsRoot.append(tagList, tagSettings);
+  const tagNote = make('p'), assignmentStatus = make('p');
+  tagNote.setAttribute('role', 'status'); assignmentStatus.setAttribute('role', 'status');
+  tagForm.append(tagNameLabel, tagColor, saveTag, tagCancel, tagNote, tagConfirm); tagSettings.append(tagForm); tagsRoot.append(tagList, assignmentStatus, createForRecord, tagSettings);
   editOnly(copyScene, up, down, removeScene, sceneForm, copyCaption, undo, redo, undoHelp,
-    tagNameLabel, tagColor, saveTag, tagCancel, tagConfirm);
+    createForRecord, tagNameLabel, tagColor, saveTag, tagCancel, tagConfirm);
   function render() {
     if (disposed) return; const s = host.source(), enabled = !!host.ports.authoring, blocked = !!host.blocked(), owned = !!form || !!captured || !!settingsDraft || !!editorDraft;
     settingsRoot.hidden = !host.ports.localSettings && !host.ports.editorSettings;
     localSettingsArea.hidden = !host.ports.localSettings;
     if (settingsDraft) localSettingsArea.open = true;
-    if (captured || form?.kind.startsWith('tag')) tagSettings.open = true;
+    if (captured?.attachTo) {
+      if (tagForm.parentElement !== tagsRoot) tagsRoot.insertBefore(tagForm, tagSettings);
+    } else {
+      if (tagForm.parentElement !== tagSettings) tagSettings.append(tagForm);
+      if (captured || form?.kind.startsWith('tag')) tagSettings.open = true;
+    }
     const savedName = host.ports.localSettings?.read() ?? ''; displayNameBadge.textContent = savedName; displayNameBadge.hidden = !savedName;
     if (!composing && displayName.value !== (settingsDraft?.value ?? host.ports.localSettings?.read() ?? '')) displayName.value = settingsDraft?.value ?? host.ports.localSettings?.read() ?? '';
     const localBlocked = host.localBlocked() || !!form || !!captured;
@@ -184,10 +217,18 @@ export function createProjectOrganization(document: Document, host: Organization
     if (host.captionPending?.() && host.canFlushCaption?.() && !owned) { undo.hidden = false; undo.disabled = false; redo.disabled = !h?.future.length; }
     undoHelp.hidden = !h?.past.length && !h?.future.length;
     undoNote.textContent = undoWarning; undoNote.hidden = !undoWarning;
-    saveTag.textContent = captured?.tagId ? 'タグを更新' : 'タグを追加'; saveTag.disabled = blocked || composing || !!stale || !captured || !tagName.value.trim();
+    createForRecord.hidden = !s.captionId || !!captured?.attachTo || host.ports.mode === 'view';
+    createForRecord.disabled = blocked || owned;
+    const assignment = assigningTo === s.captionId ? host.createdTagAssignment() : undefined;
+    assignmentStatus.textContent = assignment === 'saving' ? '作成したタグをこの記録に付けています。' :
+      assignment === 'retry' ? 'タグは作成済みです。記録への付与を再試行してください。' : '';
+    assignmentStatus.hidden = !assignment;
+    saveTag.textContent = captured?.attachTo ? '作成してこの記録に付ける' : captured?.tagId ? 'タグを更新' : 'タグを追加';
+    saveTag.disabled = blocked || composing || !!stale || !captured || !tagName.value.trim() || !!captured.attachTo && captured.attachTo !== s.captionId;
     tagCancel.hidden = !captured && !form?.kind.startsWith('tag'); tagCancel.disabled = host.localBlocked() || composing;
     tagConfirm.hidden = form?.kind !== 'tagDelete'; tagConfirm.disabled = blocked || composing || !!stale;
-    tagNote.textContent = stale ? '内容が更新されています。入力は保持しています。取り消して選び直してください。' : form?.kind === 'tagDelete' ? 'すべての記録からこのタグを外します。記録や添付は残ります。' : '';
+    tagNote.textContent = stale ? '内容が更新されています。入力は保持しています。取り消して選び直してください。' : form?.kind === 'tagDelete' ? 'すべての記録からこのタグを外します。記録や添付は残ります。' : captured && !blocked ? 'タグを入力中' : '';
+    tagNote.hidden = !tagNote.textContent;
     tagName.disabled = tagColor.disabled = blocked || !!form && form.kind !== 'tagEdit';
     tagList.replaceChildren(); definitions.replaceChildren();
     const viewing = host.ports.mode === 'view'; tagSettings.hidden = viewing; tagsSummary.textContent = '分類タグ';

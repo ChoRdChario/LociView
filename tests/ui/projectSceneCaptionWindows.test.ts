@@ -113,6 +113,26 @@ describe('disconnected comparison window STATE, not a floating renderer', () => 
 });
 
 describe('window DOM ownership, not rendered GPU acceptance', () => {
+  it('gives two new windows separate reachable positions and ignores parked windows on touch return', () => {
+    const document = new RecordedDocument();
+    const controls = createCaptionWindowControls(document.asDocument(), () => true, () => {});
+    controls.project({ ready: true, width: 960, height: 620, sourceToken: source.token, sceneId: sceneA, pins: [] });
+    let memory = run(newCaptionWindowMemory(sceneA), a, { kind: 'open', captionId: a });
+    controls.render({ source, memory, selectedId: a, moveBlock: null });
+    const first = controls.placement(a)!;
+    memory = run(memory, b, { kind: 'open', captionId: b });
+    controls.render({ source, memory, selectedId: b, moveBlock: null });
+    const second = controls.placement(b)!;
+    expect(controls.placement(a)).toEqual(first);
+    expect(first.left + first.width <= second.left || first.top + first.height <= second.top).toBe(true);
+    const pin = { x: first.left - 100, y: first.top + 70 };
+    const destination = controls.pinDestination(pin)!;
+    expect(destination.x + 22 <= first.left || destination.x - 22 >= first.left + first.width ||
+      destination.y + 22 <= first.top || destination.y - 22 >= first.top + first.height).toBe(true);
+    controls.render({ source, memory, selectedId: b, moveBlock: null, visible: false });
+    expect(controls.pinDestination(pin)).toEqual({ x: 24, y: pin.y });
+    controls.dispose();
+  });
   it('keeps a replaced frame and suspends hidden preview content without losing retained windows', () => {
     const document = new RecordedDocument(), activity: boolean[] = [], disposed: string[] = [];
     const controls = createCaptionWindowControls(document.asDocument(), () => true, () => {}, id => ({

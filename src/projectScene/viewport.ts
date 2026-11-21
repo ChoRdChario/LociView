@@ -71,8 +71,9 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
   function notify() { semanticRevision++; changed(); }
   function projectPosition(position: readonly [number, number, number]) {
     const p = new THREE.Vector3(...position); if (camera) p.project(camera);
-    return { x: (p.x + 1) * width / 2, y: (1 - p.y) * height / 2,
-      visible: Boolean(camera && p.z >= -1 && p.z <= 1 && Math.abs(p.x) <= 1 && Math.abs(p.y) <= 1) };
+    const depthVisible = Boolean(camera && p.z >= -1 && p.z <= 1);
+    return { x: (p.x + 1) * width / 2, y: (1 - p.y) * height / 2, depthVisible,
+      visible: depthVisible && Math.abs(p.x) <= 1 && Math.abs(p.y) <= 1 };
   }
   function presentFrame() {
     if (!presentationListeners.size || !display || !camera) return false;
@@ -591,6 +592,24 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
           ...Object.values(display?.savedMaterials ?? {}).flatMap(rows => Object.values(rows).flatMap(m => 'issue' in m ? [m.issue] : []))].filter(Boolean).join(' ') || null,
         dragging: dragging || !!navigation || !!gizmo?.dragging, navigating:!!navigation, camera:{position:[...pose.position],target:[...pose.target],up:[...pose.up]}, manipulating: !!gizmo?.dragging,
         projection: pose.projection.kind, axis, pins, preview: display?.preview ? projectPosition(display.preview) : undefined };
+    },
+    revealPin(expected, captionId, destination) {
+      if (disposed || !active || !renderer || !camera || !controls || issue || contextLost || dragging || navigation || gizmo?.dragging ||
+        display !== expected || display.selectedId !== captionId || !(width > 0 && height > 0) ||
+        !Number.isFinite(destination.x) || !Number.isFinite(destination.y) || destination.x < 0 || destination.x > width || destination.y < 0 || destination.y > height) return false;
+      const pin = display.pins.find(p => p.id === captionId);
+      if (!pin) return false;
+      camera.updateMatrixWorld(true);
+      const position = new THREE.Vector3(...pin.position), projected = position.clone().project(camera);
+      if (!Number.isFinite(projected.z) || projected.z < -1 || projected.z > 1) return false;
+      if (Math.abs(projected.x) <= 1 && Math.abs(projected.y) <= 1) return true;
+      // Unproject at the pin's depth so a perspective view keeps its magnification.
+      const atDestination = new THREE.Vector3(destination.x / width * 2 - 1, 1 - destination.y / height * 2, projected.z).unproject(camera);
+      const translation = position.sub(atDestination);
+      if (!translation.toArray().every(Number.isFinite)) return false;
+      const previousAxis = axis;
+      camera.position.add(translation); controls.target.add(translation); controls.update();
+      axis = previousAxis; notify(); return true;
     },
     navigateCamera(event){
       if(event.phase==='end')return endNavigation(event.id);

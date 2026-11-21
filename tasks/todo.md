@@ -8,7 +8,16 @@ and [earlier working records](../docs/history/development-through-2026-10-28/tas
 retain qualifications and failures. Their Current/Next headings are not an active
 queue or renewed approval requirements.
 
-## Current — Point/BLEND correctness and recovery/output variability
+## Current — 共有相手が撮影部位へ戻り、二つの記録を見比べる
+
+- 基準は `f4cefc4`。同じ4シーンのKi-84共有ファイルを新しい閲覧環境で開き、天蓋と垂直尾翼の写真を確認。PC 1280×720、タッチ 390×844、専用Chromium。選択と写真閉鎖だけでカメラを動かさず、明示した復帰で元のピンに届くことを終了条件とした。
+- PCは二窓の重なりが80.3%から0%になり、ドラッグなしで両方の原写真を開けた。PC・タッチとも画面外のピンへの移動は1操作。向きと倍率、写真の内容、元の選択を照合し、復帰後のピンを実際に選択した。背面の部位へは全体表示から戻れた。写真閉鎖から実回転までの前後各3回の中央値はPC 0.233→0.309秒、タッチ5.194→4.342秒。速度の短縮は採用条件に含めない。
+- Ki-84編集一覧で選択行に戻った直後、完全に読める行が4→5、一覧高が360→440px。内蔵サンプルの開始と新しいタグの作成・付与はそれぞれ2→1操作。タグ保存中に別記録へ移っても元の記録のみへ付与し、再開後の検索で照合。持込変換の取消、タグ定義だけの作成、写真の解像度と保存・復旧の契約を維持する。
+- 初回の全体回帰で編集画面の端にあるピンを避けた窓が右端に寄り、拡大や結線の既存試験4件が失敗した。最初の窓でピンの直下・右も試すように修正し、該当5試験と実ブラウザ9件（共有、保存、独立環境での再開を含む）が通過。最終ビルドのKi-84ではPCのクリックとタッチのタップで尾翼の記録を選び直し、スマホで尾翼の写真とフォーカス復帰も照合した。
+- 最終版は独立差分レビュー、全体チェック（160ファイル・3,723件成功、既存の想定失敗16件・未実装試験21件）、全ビルドとオフライン・HEIC分離検査を通過。開発ブランチのCIで同じ変更を照合する。
+- 短いタッチ画面（320×365）では保存直後の一時通知と本文欄の一部が重なる。実機iPhoneのメモリ・キーボードと初見の利用者による発見性は未確認。次の候補は短い画面の通知と写真閉鎖後の3D再準備。私的な実資料・写真・検証画像は配布しない。
+
+## Previous — Point/BLEND correctness and recovery/output variability
 
 - Outcome/boundary: from c5bf235 on g0-baseline, correct the reproduced Point/BLEND depth discrepancy and reduce interrupted-local-edit recovery delay on PC/touch. Root is sole writer; independent cause, safety and final-scope reviewers are read-only. Preserve private existing records, original bytes/quality, camera/picking/budgets, saved formats/IDs and all write/readback/publication/recovery fences. Display lightening, dependencies, migration, new audit policies and release remain excluded.
 - Authority/exit: PO explicitly approved06l on2026-11-21 for adoption only after measured benefit and safety. Its three independent pure recovery inspections use the existing named read-operation boundary; no adoption before the strict closing audit. Finish focused fault checks, matched elapsed observations, normal browser controls, independent review, final serial checkpoint/offline/HEIC, exact-source candidate and suitable g0 commit/push/CI. Physical iPhone Safari acceptance stays pending; do not request per-control human tests.

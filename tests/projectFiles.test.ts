@@ -5920,6 +5920,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const file = setup.initialWorkspace ? await host.workspaceOutput.download(await host.workspaceOutput.generate(host.read().source!.token)) : undefined;
     const f = { ...r, run, options, f: { captionId, file } };
     const legacy = vi.spyOn(host.authority, 'write').mockImplementation(() => { throw Error('product UI must dispatch typed commands'); });
+    const dispatchToSession = host.dispatch.bind(host);
     const dispatch = vi.spyOn(host, 'dispatch'), document = new RecordedDocument().asDocument(), create = document.createElement.bind(document), downloads = vi.fn();
     Object.assign(document, { createElement: (tag: string) => {
       const node = create(tag); if (tag === 'a') Object.assign(node, { click: downloads }); if(tag==='img'&&setup.nativeImageDecode)Object.assign(node,{decode:setup.nativeImageDecode,naturalWidth:1,naturalHeight:1});return node;
@@ -6004,7 +6005,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const before = liveHost.read().source!.token; await completed(action);
       expect(liveHost.read().source!.token).not.toBe(before);
     };
-    return { f, host, ui, editor, root, all, named, button, edited, completed, failed, status, downloads, legacy, dispatch, pick, navigateCamera,
+    return { f, host, ui, editor, root, all, named, button, edited, completed, failed, status, downloads, legacy, dispatch, dispatchToSession, pick, navigateCamera,
       runtimeReads:()=>runtimeReads,
       present(generation:number,overrides:Partial<import('../src/projectScene/viewportPorts').ViewportPresentationFrame>={}){
         if(!display||!visualListeners.size)return false;
@@ -7758,6 +7759,34 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(groups.flatMap(g => g.owners).every(o => o.label.includes('内容の競合') || o.label.includes('照明'))).toBe(true);
     const views = ports.viewReview(sceneId); expect(views).toHaveLength(1); expect(views[0]!.choices.map(c => c.label).sort()).toEqual(['視点 inherit', '視点 lit']);
     expect(views[0]!.target).toEqual({ kind: 'view', viewId, field: 'name' }); expect(h.host.read().source!.token).toBe(seed.token); await h.ui.dispose();
+  });
+  it('keeps the original tag target through list selection and IME, and retries only the failed assignment', async () => {
+    const h = await productWorkspaceFixture(true), { editor, host, button, named } = h;
+    const rows = () => h.all(named('記録一覧', editor)).filter(n => n.className === 'lv-caption-select');
+    rows()[0]!.click();
+    await h.edited(() => button('記録を複製', editor).click());
+    const target = Object.keys(host.authority.read().resources.captions).find(id => id !== h.f.f.captionId)!;
+    const tags = named('分類タグ', editor); tags.open = true;
+    button('新しいタグを付ける', tags).click();
+    const name = named('タグ名', tags); name.value = '比較対象'; name.fire('input');
+    let release!: () => void;
+    const held = new Promise<void>(resolve => { release = resolve; });
+    caseDisposals.push(release);
+    h.dispatch.mockClear().mockImplementationOnce(async (token, command) => {
+      await held; return h.dispatchToSession(token, command);
+    }).mockRejectedValueOnce(Error('fixture: failed assignment before write'));
+    const finished = h.completed(() => button('作成してこの記録に付ける', tags).click());
+    const other = rows().find(n => n.parent!.dataset.selected === 'false')!;
+    other.click(); expect(other.parent!.dataset.selected).toBe('true');
+    const search = named('検索', editor); search.fire('compositionstart');
+    release(); await finished;
+    const [create, assign] = h.dispatch.mock.calls.map(([, command]) => command);
+    expect(create?.kind).toBe('createTag'); if (create?.kind !== 'createTag') throw Error('missing tag');
+    expect(assign, h.status.textContent).toMatchObject({ kind: 'setCaptionTag', captionId: target, tagId: create.tagId, included: true });
+    search.fire('compositionend');
+    await h.edited(() => button('タグの付与を再試行', editor).click());
+    expect(h.dispatch.mock.calls.map(([, command]) => command)).toEqual([create, assign, assign]);
+    await h.ui.dispose();
   });
   it('daily authoring organizes independent records and Scenes, guarded undo, tags, backup, Workspace and cold reopen', async () => {
     const h = await productWorkspaceFixture(true, false, true), { host, editor, named, button, all, edited } = h;

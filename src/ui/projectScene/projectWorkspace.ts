@@ -367,7 +367,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const addColors = new Map<string, string>(), addColorValue = () => addColors.get(sceneId) ?? '#a08045';
   let parentKey = '', parentScope = '';
   let deletion: { token: string; sceneId: string; captionId: string; title: string; impact: ReturnType<ProjectWorkspacePorts['captionDeletion']> } | null = null;
-  let rawPosition = ['', '', ''], pending: { action: () => Promise<unknown>; complete: () => void; owner?: 'media' | 'caption'; after?: () => Promise<void> } | null = null;
+  type EditOwner = 'media' | 'caption' | 'tag' | 'attachCreatedTag';
+  let rawPosition = ['', '', ''], pending: { action: () => Promise<unknown>; complete: () => void; owner?: EditOwner; after?: () => Promise<void> } | null = null;
   let applyingCaption: CaptionApplyPlan | null = null;
   let captionToken: string | null = null, captionEpoch = 0, dependentAction = false;
   const autosave = ports.captionAutosave ? createCaptionAutosave({
@@ -437,6 +438,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     return '保存未確認';
   }
   let externalBusy = false, outputReading = false;
+  const readingDuringTagSave = () => busy && (pending?.owner === 'tag' || pending?.owner === 'attachCreatedTag') && !externalBusy && !ports.otherPending();
+  const bodyInert = () => busy && !autosave?.saving && !readingDuringTagSave() || externalBusy && !readDuringOutput();
   const mutationBlock = () => windowMoving ? 'ウィンドウの操作を完了してください。' : busy ? '変更を適用しています。' : ports.status().kind === 'failed' ? failureMessage() || '更新を再試行してください。' :
     ports.presentation?.()?.reason ?? (ports.readOnly ? '閲覧中です。編集を開始してください。' : ports.otherPending() ? 'ファイルの操作を完了してください。' : pending ? '再試行するか、入力を修正してください。' : null);
   function captionInputBlock(): string | null {
@@ -471,7 +474,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       title: draft.edits.title ?? draft.savedRaw?.title, body: draft.edits.body ?? draft.savedRaw?.body };
   }
   const listContext = (captions = projectCaptions(provider(), sceneId, models?.hidden())): CaptionListContext => ({ source: { kind: 'ready', token: provider().token, sceneId,
-    captions }, memory: memory(), preview: textPreview(), pending: canFlushCaption() ? null : dirty() ? 'text' : busy ? 'update' : null,
+    captions }, memory: memory(), preview: textPreview(), pending: canFlushCaption() || readingDuringTagSave() ? null : dirty() ? 'text' : busy ? 'update' : null,
     showModelPending: composingInput() || pressedPointers.size || pin || numericTarget || surfaceOpening || choosing || deletion || pickerScope || sceneEdit || recovery?.hasChanges() || panelInput() || mediaManager?.hasChanges() || windowMoving || viewport.read().dragging ? 'text' : null,
     mutationBlock: !canFlushCaption() && (busy || pending || windowMoving || ports.status().kind !== 'idle' || ports.otherPending()) ? '現在の操作を完了してください。' : null });
   const emptyCaptionReason = () => {
@@ -514,9 +517,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       const intent = plan.kind === 'effect' ? plan.action : 'select';
       void afterCaptionFlush(() => { if (target) handleListPlan(planCaptionList(listContext(), { kind: intent, captionId: target })); }); return;
     }
-    const reading = readDuringOutput();
+    const readingTag = readingDuringTagSave(), reading = readDuringOutput() || readingTag;
     const localFinding = !!autosave?.saving && plan.kind === 'change' && (plan.intent === 'search' || plan.intent === 'scroll');
-    if (disposed || (busy || pending) && !localFinding || windowMoving || ports.otherPending() && !reading) return;
+    if (disposed || (busy || pending) && !localFinding && !readingTag || windowMoving || ports.otherPending() && !reading) return;
     if (reading && !(plan.kind === 'change' && ['search','scroll','select','step','revealSelection'].includes(plan.intent) || plan.kind === 'unchanged')) return;
     if (plan.kind === 'blocked') { feedback = plan.reason; render(); return; }
     const current = listContext();
@@ -771,6 +774,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   };
   organization = createProjectOrganization(document, {
     captionPending: needsCaptionFlush, canFlushCaption, flushCaption,
+    canContinueWrite: () => !externalBusy && !mutationBlock(),
+    createdTagAssignment: () => pending?.owner === 'attachCreatedTag' ? busy ? 'saving' : 'retry' : undefined,
     ports, source: () => ({ provider: provider(), sceneId, captionId: memory().selectedCaptionId }),
     localBlocked: () => busy || !!pending || ports.otherPending() || windowMoving || hasCaptionDraft(draft) || !!selectedMedia || !!draft?.composing ||
       composing || !!sceneEdit || includeMemory().composing || positionInput() || !!deletion || !!pickerScope ||
@@ -778,7 +783,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     blocked: () => mutationBlock() || (hasCaptionDraft(draft) || selectedMedia || draft?.composing || composing || sceneEdit || includeMemory().composing ||
       positionInput() || deletion || pickerScope || recovery?.hasChanges() || mediaManager?.hasChanges() ||
       [...panels.values()].some(p => p.hasChanges()) || viewport.read().dragging ? '現在の入力・操作を完了してください。' : null),
-    run: (command, complete) => { void run(command, complete); },
+    run,
     scene(next) { sceneId = next; resetDraft(); }, caption: selectCaption, changed: render, message(text) { feedback = text; render(); },
   });
   sceneManagement.append(organization.sceneRoot);captionContent.append(organization.captionRoot,organization.tagsRoot,deletionArea);beginDelete.hidden=true;
@@ -996,7 +1001,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     referenceDiagnosticList.replaceChildren(...issues.map(i=>make('li',`${i.code}: ${i.path.join(' / ')}`)));
   }
   function positionValid() { return rawPosition.every(v => /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(v.trim()) && Number.isFinite(Number(v))); }
-  async function perform(action: () => Promise<unknown>, complete: () => void, owner?: 'media' | 'caption', after?: () => Promise<void>) {
+  async function perform(action: () => Promise<unknown>, complete: () => void, owner?: EditOwner, after?: () => Promise<void>) {
     if (disposed) return;
     document.defaultView?.clearTimeout(feedbackTimer); passiveFeedback = null; storageFailure=undefined; busy = true; feedback = '変更を適用しています。'; pending = { action, complete, owner, after };
     let succeeded = false;
@@ -1025,11 +1030,12 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       finally { if (!disposed) render(); }
     }
   }
-  async function run(command: MetadataEdit, complete: () => void, after?: () => Promise<void>) {
+  async function run(command: MetadataEdit, complete: () => void, after?: () => Promise<void>, purpose?: 'attachCreatedTag') {
     if (mutationBlock()) return;
     const token = provider().token;
     const undo = organization?.beginAction(command) ?? null;
-    await perform(() => ports.dispatch(token, command), () => { organization?.recordAction(undo); complete(); }, undefined, after);
+    const owner = purpose ?? (command.kind === 'createTag' || command.kind === 'setCaptionTag' ? 'tag' : undefined);
+    await perform(() => ports.dispatch(token, command), () => { organization?.recordAction(undo); complete(); }, owner, after);
   }
   async function retryPending() {
     if (busy || !pending || ports.readOnly || ports.otherPending()) return;
@@ -1403,7 +1409,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       status.dataset.passive = String(!busy && !pending && ports.status().kind === 'idle' && feedback === passiveFeedback);
       retry.hidden = !pending; retry.disabled = busy || ports.readOnly || ports.otherPending() || ports.status().retryable === false;
       if (autosave?.saving) retry.hidden = true;
-      retry.textContent = autosave && (pending?.owner === 'caption' || pending?.owner === 'media') ? '保存を再試行' : '更新を再試行';
+      retry.textContent = pending?.owner === 'attachCreatedTag' ? 'タグの付与を再試行' :
+        autosave && (pending?.owner === 'caption' || pending?.owner === 'media') ? '保存を再試行' : '更新を再試行';
       if (autosave?.failed && (pending?.owner === 'caption' || pending?.owner === 'media')) retry.hidden = true;
       revise.hidden = !pending || busy || ports.status().kind !== 'idle';
       const activeScenes = new Set<string>(); let sceneIndex = 0;
@@ -1507,7 +1514,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
         (!compactLayout() || compactSurface === 'panel') && document.hidden !== true, !selectedWindowVisible);
       recovery!.render();
       organization!.render();
-      body.setAttribute('aria-busy', String(busy && !autosave?.saving)); body.inert = busy && !autosave?.saving || externalBusy && !readDuringOutput();
+      body.setAttribute('aria-busy', String(busy && !autosave?.saving)); body.inert = bodyInert();
       body.dataset.surface = compactSurface; body.dataset.drawingPreview = String(drawingPreview());
       body.dataset.drawingEditing = String(drawingPreview() && materials.hasChanges());
       const resolved = sceneId ? resolveScene(p.state, p.resources, sceneId) : null;
@@ -1528,15 +1535,18 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       const other = [...panels].find(([key, panel]) => key !== task && !(key==='views'&&cameraPositions.open&&stageVisible()) && panel.hasChanges());
       retainedOwner = settingsInput ? task : hasCaptionInput && task !== 'captions' ? 'captions' : other?.[0] ?? task;
       const hiddenCaptionDraft = compactLayout() && retainedOwner === 'captions' && captionSurface === 'list' && hasCaptionInput;
-      retainedEdit.hidden = retainedOwner === task && !organization!.hasChanges() && !hiddenCaptionDraft;
-      retainedNote.textContent = `${settingsInput?'設定':retainedOwner==='views'?'カメラ位置':tabButtons.get(retainedOwner)?.textContent ?? '記録'}に未適用の変更があります。`;
+      const tagInput = organization!.hasChanges() && organization!.inputOwner() === 'caption';
+      const visibleTagInput = tagInput && task === 'captions' && !detailPane.hidden && organization!.tagsRoot.open &&
+        (!compactLayout() || compactSurface === 'panel');
+      retainedEdit.hidden = retainedOwner === task && (!organization!.hasChanges() || visibleTagInput) && !hiddenCaptionDraft;
+      retainedNote.textContent = `${tagInput?'タグ':settingsInput?'設定':retainedOwner==='views'?'カメラ位置':tabButtons.get(retainedOwner)?.textContent ?? '記録'}に未適用の変更があります。`;
       const previewTitle = textPreview()?.title;
       detailHeading.textContent = previewTitle === undefined ? selected ? fieldValue(p.resources.captions[selected]?.title) || '無題' : '記録' : previewTitle.trim() ? previewTitle : '無題';
       sceneArea.hidden = false;captionBack.hidden = !mobileDetail;
       returnToEdit.disabled = showStage.disabled = viewBlocked();
       captionBack.disabled = viewBlocked() || hasCaptionInput || !!deletion;
       if(canFlushCaption())captionBack.disabled=false;
-      if(readDuringOutput())captionBack.disabled=false;
+      if(readDuringOutput() || readingDuringTagSave())captionBack.disabled=false;
       showStage.setAttribute('aria-pressed', String(compactSurface === 'stage'));
       const seen = viewport.read();
       const extent = canvas.getBoundingClientRect?.() ?? { width: 0, height: 0 };
@@ -1600,7 +1610,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     else if (reading.focus === 'detail' && memory().selectedCaptionId) detailHeading.focus({ preventScroll: true });
     else list.focusSearch();
   });
-  return { root, headerActions, fileStatus, projectNavigation: otherProject, utilityArea: settingsSheet, clearNotice(){if(!pending&&ports.status().kind==='idle')feedback='';}, dismissDisclosures(){help.open=false;organization!.settingsRoot.open=false;}, setExternalBusy: (active:boolean) => { const reading=readDuringOutput(), changed=externalBusy!==active||outputReading!==reading; externalBusy=active;outputReading=reading;if(changed)render();body.inert=busy&&!autosave?.saving||active&&!readDuringOutput(); }, render, session: interaction, activeScene: () => sceneId, inputPending: () => dirty() || busy,
+  return { root, headerActions, fileStatus, projectNavigation: otherProject, utilityArea: settingsSheet, clearNotice(){if(!pending&&ports.status().kind==='idle')feedback='';}, dismissDisclosures(){help.open=false;organization!.settingsRoot.open=false;}, setExternalBusy: (active:boolean) => { const reading=readDuringOutput(), changed=externalBusy!==active||outputReading!==reading; externalBusy=active;outputReading=reading;if(changed)render();body.inert=bodyInert(); }, render, session: interaction, activeScene: () => sceneId, inputPending: () => dirty() || busy,
     canFlushCaption, flushCaption,
     hasChanges: () => dirty() || busy || !!pending,
     unmount() {

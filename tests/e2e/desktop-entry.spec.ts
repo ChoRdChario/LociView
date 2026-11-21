@@ -1,6 +1,7 @@
 import { desktopOrigin, desktopEntry } from './desktopEntry';
 import {test,expect} from '@playwright/test';
 import {triangleGlb} from './fixtures';
+import { homeSampleFiles } from '../../src/projectScene/homeSample';
 import {ownedServer} from '../offline-e2e/server';
 import {revealCaptionList,chooseHomeFiles,revealProjectSelection} from './workspaceUi';
 
@@ -12,9 +13,11 @@ for(const touch of [false,true])test(`Home sample follows normal inspection, sav
  for(const current of [context,recipient])await current.route('**/*',route=>{const url=new URL(route.request().url());if(url.origin===new URL(server.url).origin||['blob:','data:'].includes(url.protocol))return route.continue();remote.push(url.origin);return route.abort();});
  try{
   await page.goto(server.url);const sample=page.getByRole('button',{name:'サンプルで試す',exact:true});
-  await sample.focus();await sample.press('Enter');const convert=page.getByRole('button',{name:'新しいプロジェクトに変換',exact:true});await expect(convert).toBeVisible();await expect(convert).toBeFocused();
+  const sampleFile=homeSampleFiles()[0]!;
+  await chooseHomeFiles(page,{name:sampleFile.name,mimeType:'application/zip',buffer:Buffer.from(await sampleFile.arrayBuffer())});
+  const convert=page.getByRole('button',{name:'新しいプロジェクトに変換',exact:true});await expect(convert).toBeVisible();await expect(convert).toBeFocused();
   await page.getByRole('button',{name:'選択を取り消す',exact:true}).click();await expect(sample).toBeEnabled();
-  await sample.click();await convert.click();await expect(page.getByRole('button',{name:'閲覧する',exact:true})).toBeEnabled({timeout:90000});
+  await sample.focus();await sample.press('Enter');await expect(page.getByRole('button',{name:'閲覧する',exact:true})).toBeEnabled({timeout:90000});
   const firstProject=await page.evaluate(()=>new URL(location.href).searchParams.get('run'));expect(firstProject).toBeTruthy();
   if(touch){const stage=page.getByRole('button',{name:'3D',exact:true});if(await stage.getAttribute('aria-pressed')!=='true')await stage.click();}
   const canvas=page.getByLabel('3Dモデルの表示',{exact:true});await expect(canvas).toHaveAttribute('aria-busy','false',{timeout:90000});
@@ -33,7 +36,7 @@ for(const touch of [false,true])test(`Home sample follows normal inspection, sav
   const restored=await recipient.newPage();restored.on('pageerror',e=>errors.push(e.message));await restored.goto(server.url);await chooseHomeFiles(restored,file);await restored.getByRole('button',{name:'このファイルから再開',exact:true}).click();
   await expect(restored.getByRole('button',{name:'閲覧する',exact:true})).toBeEnabled({timeout:90000});await revealCaptionList(restored);await restored.locator('.lv-caption-select').filter({hasText:'パネルの傷'}).click();await expect(restored.getByRole('region',{name:'記録の詳細',exact:true}).getByLabel('本文',{exact:true})).toHaveValue(body);
   await restored.reload();await expect(restored.getByRole('button',{name:'閲覧する',exact:true})).toBeEnabled({timeout:90000});
-  await revealProjectSelection(page);await page.getByRole('button',{name:'プロジェクトを選ぶ',exact:true}).click();await sample.click();await convert.click();await expect(page.getByRole('button',{name:'閲覧する',exact:true})).toBeEnabled({timeout:90000});
+  await revealProjectSelection(page);await page.getByRole('button',{name:'プロジェクトを選ぶ',exact:true}).click();await sample.click();await expect(page.getByRole('button',{name:'閲覧する',exact:true})).toBeEnabled({timeout:90000});
   expect(await page.evaluate(()=>new URL(location.href).searchParams.get('run'))).not.toBe(firstProject);expect(errors).toEqual([]);expect(remote).toEqual([]);
  }finally{await recipient.close();await context.close();await server.stop();}
 });

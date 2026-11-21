@@ -44,9 +44,14 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await attached.getByText('添付を整理',{exact:true}).click();await attached.getByRole('button',{name:'説明を編集',exact:true}).click();
     const description=attached.getByLabel('メディアの説明',{exact:true});await expect(description).toBeFocused();await description.fill('柱と梁の写真');await description.dispatchEvent('compositionstart');
     await expect(attached.getByRole('button',{name:'説明を適用',exact:true})).toBeDisabled();await description.dispatchEvent('compositionend');await attached.getByRole('button',{name:'説明を適用',exact:true}).click();await ready('メディアの説明を適用しました。');
-    const tags=p.getByLabel('分類タグ',{exact:true});await tags.locator(':scope > summary').click(); await tags.locator('.lv-tag-settings > summary').click();
-    await tags.getByLabel('タグ名',{exact:true}).fill('選択中の記録');await tags.getByLabel('タグの色',{exact:true}).fill('#37a24b');await tags.getByRole('button',{name:'タグを追加',exact:true}).click();await ready('タグを保存しました。');
-    await tags.getByRole('button',{name:'この記録にタグを付ける',exact:true}).click();await ready('記録のタグを変更しました。');
+    const tags=p.getByLabel('分類タグ',{exact:true});await tags.locator(':scope > summary').click();
+    await tags.getByRole('button',{name:'新しいタグを付ける',exact:true}).click();
+    const tagName=tags.getByLabel('タグ名',{exact:true}), attachTag=tags.getByRole('button',{name:'作成してこの記録に付ける',exact:true});
+    await tagName.fill('選択中の記録');await tagName.dispatchEvent('compositionstart');await expect(attachTag).toBeDisabled();
+    await tagName.dispatchEvent('compositionend');await tags.getByLabel('タグの色',{exact:true}).fill('#37a24b');
+    await expect(p.locator('.lv-retained-edit')).toBeHidden();await attachTag.click();await ready('記録にタグを付けました。');
+    await expect(tags.locator('.lv-caption-tag').filter({hasText:'選択中の記録'})).toHaveAttribute('data-included','true');
+    await tags.locator('.lv-tag-settings > summary').click();
     await tags.getByLabel('タグ名',{exact:true}).fill('保持する分類入力');await tab('モデル').click();await expect(p.locator('.lv-retained-edit')).toBeVisible();await p.locator('.lv-retained-edit').getByRole('button',{name:'編集に戻る',exact:true}).click();await expect(tags).toHaveAttribute('open');await expect(tags).toBeFocused();await expect(tags.getByLabel('タグ名',{exact:true})).toHaveValue('保持する分類入力');await expect(tags.getByRole('button',{name:'タグを追加',exact:true})).toBeEnabled();
     await tags.getByLabel('タグ名',{exact:true}).fill('ほかの記録用');await tags.getByRole('button',{name:'タグを追加',exact:true}).click();await ready('タグを保存しました。');
     await expect(comparison.getByRole('group', { name: '比較ウィンドウの本文', exact: true })).toHaveAttribute('tabindex', '0');

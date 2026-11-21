@@ -21,6 +21,11 @@ export function displayedWindowRect(preferred: WindowRect, width: number, height
 }
 // Layout defaults, not persisted project fields or device-size guarantees.
 const sizes = [{ width: 220, height: 180 }, { width: 280, height: 200 }, { width: 360, height: 280 }];
+function overlap(a: WindowRect, b: WindowRect): number {
+  const width = Math.min(a.left + a.width, b.left + b.width) - Math.max(a.left, b.left);
+  const height = Math.min(a.top + a.height, b.top + b.height) - Math.max(a.top, b.top);
+  return Math.max(0, width) * Math.max(0, height);
+}
 function resizedWindowRect(base: WindowRect, dx: number, dy: number, width: number, height: number): WindowRect {
   const availableWidth = Math.max(1, width - base.left), availableHeight = Math.max(1, height - base.top);
   return { ...base, width: Math.min(availableWidth, Math.max(sizes[0]!.width, base.width + dx)),
@@ -68,11 +73,49 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
     paint();
   }
   function removeCard(card: Card) { for (const cleanup of card.cleanups) cleanup(); card.content?.dispose(); card.root.remove(); card.line.remove(); }
-  function createCard(id: string): Card {
+  function controlsOnStage(): WindowRect[] {
+    const stage = root.parentElement;
+    if (!stage?.getBoundingClientRect || !stage.querySelectorAll) return [];
+    const origin = stage.getBoundingClientRect();
+    return [...stage.querySelectorAll('.lv-project-camera, .lv-camera-positions, .lv-stage-search')].flatMap(node => {
+      const box = node.getBoundingClientRect();
+      return box.width && box.height ? [{ left: box.left - origin.left, top: box.top - origin.top, width: box.width, height: box.height }] : [];
+    });
+  }
+  function occupied(): WindowRect[] {
+    const visible = context?.visible === false ? [] : [...cards.values()].map(card => card.rect);
+    return visible.concat(controlsOnStage());
+  }
+  function placeNewWindow(id: string, slot: number, height: number): WindowRect {
+    const width = 280, margin = 16;
+    const cascade = { left: margin + slot * 32, top: margin + slot * 28, width, height };
+    if (!hasExtent()) return cascade;
+    const blocks = occupied();
+    const pin = projection.ready && projection.sceneId === context?.source.sceneId && projection.sourceToken === context.source.token
+      ? projection.pins.find(p => p.id === id && p.visible) : undefined;
+    if (pin) blocks.push({ left: pin.x - 22, top: pin.y - 22, width: 44, height: 44 });
+    // An edge pin needs only a small offset. Keep room to resize the first
+    // window instead of immediately moving it to the far side of the stage.
+    const nearPin = pin && !cards.size ? [
+      { ...cascade, top: pin.y + 24 },
+      { ...cascade, left: pin.x + 24 },
+    ] : [];
+    const candidates = [cascade, ...nearPin, ...[margin, Math.max(margin, projection.height - height - margin)].flatMap(top =>
+      [margin, Math.max(margin, projection.width - width - margin)].map(left => ({ left, top, width, height })))];
+    let best = cascade, least = Infinity;
+    for (const candidate of candidates) {
+      const rect = displayedWindowRect(candidate, projection.width, projection.height);
+      const covered = blocks.reduce((area, block) => area + overlap(rect, block), 0);
+      if (covered < least) { best = candidate; least = covered; }
+      if (!covered) break;
+    }
+    return best;
+  }
+  function createCard(id: string, height: number): Card {
     let positions = initialPositions.get(scope); if (!positions) { positions = new Map(); initialPositions.set(scope, positions); }
     const retained = context?.memory.retained ?? [], slot = retained.includes(id) ? retained.indexOf(id) : retained.length;
     const initial = (retained.includes(id) ? positions.get(id) : undefined) ??
-      { left: 16 + slot * 32, top: 16 + slot * 28, width: 280, height: 200 };
+      placeNewWindow(id, slot, height);
     positions.set(id, initial);
     const node = make('section'), header = make('header'), footer = make('footer'), title = button(''), close = button('×'), resize = button('↘');
     node.className = 'lv-caption-window'; close.setAttribute('aria-label', '閉じる');
@@ -171,7 +214,7 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
     for (const [id, card] of cards) if (!view.visibleIds.includes(id)) { removeCard(card); cards.delete(id); }
     for (const id of view.visibleIds) {
       const item = next.source.kind === 'ready' ? next.source.captions.find(c => c.id === id)! : null; if (!item) continue;
-      let card = cards.get(id); if (!card) { card = createCard(id); cards.set(id, card); }
+      let card = cards.get(id); if (!card) { card = createCard(id, item.mediaCount.kind === 'value' && item.mediaCount.value > 0 ? 300 : 200); cards.set(id, card); }
       if (item.mediaCount.kind === 'value' && item.mediaCount.value > 0 && card.initial.height === 200 && !next.memory.placements.some(p => p.captionId === id)) {
         card.initial = { ...card.initial, width: 280, height: 300 }; initialPositions.get(scope)!.set(id, card.initial);
       }
@@ -206,7 +249,26 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
       rect: displayedWindowRect({ left: (i % columns) * 296, top: Math.floor(i / columns) * 216, width: 280, height: 200 }, projection.width, projection.height) })) });
   };
   front.addEventListener('change', changeFront); arrange.addEventListener('click', arrangeAll);
-  return { root, tools, render, placement(captionId: string): WindowRect | undefined {
+  return { root, tools, render,
+    windowContent(captionId: string) { return cards.get(captionId)?.body.parentElement; },
+    pinDestination(pin: { x: number; y: number }) {
+      if (!hasExtent() || !Number.isFinite(pin.x) || !Number.isFinite(pin.y)) return null;
+      const blocks = occupied(), margin = 24;
+      const candidates = (value: number, span: number, edges: number[]) => {
+        const inset = Math.min(margin, span / 2);
+        return [value, ...edges, span / 2].map(v => Math.min(span - inset, Math.max(inset, v)));
+      };
+      const xs = candidates(pin.x, projection.width, blocks.flatMap(b => [b.left - margin, b.left + b.width + margin]));
+      const ys = candidates(pin.y, projection.height, blocks.flatMap(b => [b.top - margin, b.top + b.height + margin]));
+      let best: { x: number; y: number } | null = null, nearest = Infinity;
+      for (const x of xs) for (const y of ys) {
+        const distance = Math.hypot(x - pin.x, y - pin.y);
+        if (distance < nearest && blocks.every(b => !overlap({ left: x - 22, top: y - 22, width: 44, height: 44 }, b))) {
+          best = { x, y }; nearest = distance;
+        }
+      }
+      return best;
+    }, placement(captionId: string): WindowRect | undefined {
       if (disposed || !context || !captionWindowView(context.source, context.memory, context.selectedId).visibleIds.includes(captionId)) return;
       const rect = context.memory.placements.find(p => p.captionId === captionId)?.rect ?? cards.get(captionId)?.initial;
       return rect && Object.freeze({ ...rect });
