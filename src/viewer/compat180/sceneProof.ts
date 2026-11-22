@@ -145,6 +145,14 @@ export function snapshotTargets(root: unknown, expected?: readonly NeutralTarget
   const rows: NeutralTarget[] = [], lights: unknown[] = [], geometries = new WeakMap<object, string>();
   // Different primitives can share an accessor. Each engine still reads its own complete snapshot.
   const attributes = new WeakMap<object, unknown>();
+  const materials = new WeakMap<object, { keyOrder: string | undefined; value: ReturnType<typeof material> }>();
+  const readMaterial = (source: object, keys?: readonly string[]) => {
+    const keyOrder = JSON.stringify(keys), previous = materials.get(source);
+    if (previous && previous.keyOrder === keyOrder) return previous.value;
+    const value = material(source, keys);
+    materials.set(source, { keyOrder, value });
+    return value;
+  };
   const readAttribute = (value: unknown) => {
     const key = object(value);
     if (!attributes.has(key)) attributes.set(key, attribute(key));
@@ -168,10 +176,10 @@ export function snapshotTargets(root: unknown, expected?: readonly NeutralTarget
         n.skeleton ? array(object(n.skeleton).boneInverses).map(b => numbers(object(b).elements)) : null,
         n.instanceMatrix ? readAttribute(n.instanceMatrix) : null, n.instanceColor ? readAttribute(n.instanceColor) : null, n.count ?? null]);
       mats.forEach((m, slot) => {
-        const md = material(m, expected?.[rows.length]?.materialKeys), f = object(m);
+        const f = object(m), md = readMaterial(f, expected?.[rows.length]?.materialKeys);
         rows.push({ kind, childPath: [...path], namePath: [...names], nativeKey: `m/${path.length ? path.join('.') : 'root'}/${slot}`,
           v1Key: `m/${names.join('|')}/${slot}`, slot, materialName: String(f.name), opacity: Number(f.opacity), side: Number(f.side),
-          transparent: f.transparent === true, depthWrite: f.depthWrite === true, geometry: gd!, material: md.digest, materialKeys: md.keys,
+          transparent: f.transparent === true, depthWrite: f.depthWrite === true, geometry: gd!, material: md.digest, materialKeys: [...md.keys],
           world: numbers(object(n.matrixWorld).elements), pose });
       });
     }

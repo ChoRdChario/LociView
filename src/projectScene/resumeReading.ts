@@ -1,4 +1,5 @@
 import type { ResumeReading } from './validationCatalog';
+import { captionMatchExcerpt } from '../ui/projectScene/captionListState';
 
 /** Transient text reader. It owns no Project or file commands. */
 export function createCaptionTextReading(document: Document, reading: Omit<ResumeReading, 'token'> & { incomplete?: boolean }, context: 'resume' | 'restore' | 'first-restore' | 'first-import' | 'review' = 'resume',
@@ -11,8 +12,8 @@ export function createCaptionTextReading(document: Document, reading: Omit<Resum
   const list = document.createElement('ul'), detail = document.createElement('section');
   const title = document.createElement('h3'), body = document.createElement('p'), empty = document.createElement('p');
   const importing = context === 'first-import';
-  root.className = 'lv-project-workspace lv-resume-reading'; root.setAttribute('aria-label', importing ? '取り込み中の記録' : context === 'review' ? '共有シーンの記録' : context !== 'resume' ? '復元中の記録' : '再開中の記録');
-  if (importing) root.classList.add('lv-import-reading');
+  root.className = 'lv-project-workspace lv-resume-reading' + (importing ? ' lv-import-reading' : '');
+  root.setAttribute('aria-label', importing ? '取り込み中の記録' : context === 'review' ? '共有シーンの記録' : context !== 'resume' ? '復元中の記録' : '再開中の記録');
   identity.className = 'lv-project-identity'; heading.textContent = reading.title;
   status.className = 'lv-operation-status'; status.dataset.busy = 'true';
   status.setAttribute('role', 'status'); status.textContent = importing ? '取り込み中です。記録を閲覧・検索できます。編集・保存は完了後に使えます。' : context === 'first-restore' ? '復元中です。最初のシーンの記録を読めます。編集・保存は完了後に使えます。' : context === 'restore' ? '復元しています。完了後に編集できます。' : '保存データを確認中です。記録は閲覧・検索できます。';
@@ -47,7 +48,21 @@ export function createCaptionTextReading(document: Document, reading: Omit<Resum
       if (mobile()) title.focus?.({ preventScroll: true });
     });
     row.append(button); list.append(row);
-    return { record, row, button, text: `${record.title}\n${record.body}`.toLowerCase() };
+    let excerpt: HTMLSpanElement | undefined;
+    function showMatch(query: string) {
+      const text = captionMatchExcerpt(record.title, record.body, query);
+      if (text && !excerpt) {
+        excerpt = document.createElement('span'); excerpt.className = 'lv-reader-match';
+        excerpt.id = `lv-reader-match-${crypto.randomUUID()}`;
+        excerpt.setAttribute('aria-hidden', 'true'); button.append(excerpt);
+      }
+      if (excerpt) {
+        excerpt.textContent = text; excerpt.hidden = !text;
+        if (text) button.setAttribute('aria-describedby', excerpt.id);
+        else button.removeAttribute('aria-describedby');
+      }
+    }
+    return { record, row, button, showMatch, text: `${record.title}\n${record.body}`.toLowerCase() };
   }
   // A shared archive can contain more records than a bounded restore preview.
   const batch = 100, paged = context === 'review' && reading.records.length > batch;
@@ -64,10 +79,16 @@ export function createCaptionTextReading(document: Document, reading: Omit<Resum
     if (paged) {
       const matches = reading.records.filter(record => !query || `${record.title}\n${record.body}`.toLowerCase().includes(query));
       list.replaceChildren(); rows = matches.slice(0, shown).map(makeRow);
-      for (const item of rows) item.button.setAttribute('aria-pressed', String(item.record.id === selected));
+      for (const item of rows) {
+        item.button.setAttribute('aria-pressed', String(item.record.id === selected));
+        item.showMatch(query);
+      }
       more.hidden = shown >= matches.length; empty.hidden = !!matches.length; return;
     }
-    for (const item of rows) item.row.hidden = !item.text.includes(query);
+    for (const item of rows) {
+      item.row.hidden = !item.text.includes(query);
+      if (!item.row.hidden) item.showMatch(query);
+    }
     empty.hidden = rows.some(item => !item.row.hidden);
   };
   more.addEventListener('click', () => { const at = shown; shown += batch; filter(); rows[at]?.button.focus?.(); });
@@ -85,11 +106,25 @@ export function createCaptionTextReading(document: Document, reading: Omit<Resum
   list.addEventListener('scroll', () => {
     if (list.scrollTop !== observedTop) scrolled = observedTop = list.scrollTop;
   });
+  function selection() {
+    const active = document.activeElement, focused = rows.find(item => item.button === active);
+    // The full list has taller rows. Transfer a record, not the preview's pixel offset.
+    const bounds = (list.scrollTop > 0 || focused) && list.clientHeight > 0 ? list.getBoundingClientRect() : undefined;
+    const firstVisibleId = bounds && rows.find(item =>
+      !item.row.hidden && item.row.getBoundingClientRect().bottom > bounds.top + list.clientTop)?.record.id;
+    const focusedBounds = bounds && focused?.row.getBoundingClientRect();
+    // Wheel scrolling leaves keyboard focus on the old button. Resume navigation
+    // in the visible list without selecting a different record or scrolling back.
+    const focusedRowId = focusedBounds && bounds && (focusedBounds.bottom <= bounds.top || focusedBounds.top >= bounds.bottom)
+      ? firstVisibleId : focused?.record.id;
+    const focus = active === search ? 'search' as const : focused ? 'row' as const :
+      root.contains(active) ? mobile() && root.dataset.surface === 'list' ? 'row' as const : 'detail' as const : null;
+    return { query: search.value, captionId: selected, focus, focusedRowId, firstVisibleId,
+      surface: root.dataset.surface === 'detail' ? 'detail' as const : 'list' as const };
+  }
   return { root, restoreScroll(top: number) { list.scrollTop = top; observedTop = list.scrollTop; }, readingPosition: () => ({
     focusedRowId: rows.find(item => item.button === document.activeElement)?.record.id, scrollTop: scrolled, picked
-  }), composition: () => composition, selection: () => ({ query: search.value, captionId: selected, focus: document.activeElement === search ? 'search' as const :
-      root.contains(document.activeElement) ? mobile() && root.dataset.surface === 'list' ? 'row' as const : 'detail' as const : null,
-    surface: root.dataset.surface === 'detail' ? 'detail' as const : 'list' as const }),
+  }), composition: () => composition, selection,
     setProgress(message: string) { if (status.dataset.busy === 'true') status.textContent = `${message} 記録は閲覧・検索できます。編集・保存は完了後に使えます。`; },
     setReady() { status.textContent = importing ? '取り込みが完了しました。入力を終えると編集画面に移ります。' : '復元が完了しました。入力を終えると編集画面に移ります。'; status.dataset.busy = 'false'; }, dispose() { finish?.(); root.remove(); } };
 }

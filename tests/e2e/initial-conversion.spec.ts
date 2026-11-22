@@ -65,7 +65,7 @@ for (const lane of lanes) test(`${lane.kind}ファイルを内容確認して変
       const row = history.locator('section').filter({ hasText: `バックアップ ${name} —` }); await row.getByText('保存したファイルを確認', { exact: true }).click();
       const chooser = page.waitForEvent('filechooser'); await row.getByRole('button', { name: 'ファイルを選択', exact: true }).click(); await (await chooser).setFiles(path);
       await expect(files.getByText('選択したファイルの内容を確認しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
-      await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toHaveText('選択ファイルと一致');
+      await expect(page.getByLabel('バックアップの状態', { exact: true })).toHaveText('選択ファイルと一致');
     }
     const archive = await BackupArchive.inspect(new Blob([new Uint8Array(await readFile(path)).buffer]), validationMetadataLimits);
     const inspected = await inspectProjectCandidates(archive.source.read(), validationMetadataLimits); if (inspected.kind !== 'project-candidate-inspection') throw Error('converted metadata rejected');

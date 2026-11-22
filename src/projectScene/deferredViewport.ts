@@ -84,7 +84,8 @@ export function createDeferredViewport() {
         }
       },
       observePresentation(listener){if(closed)return()=>{};presentationListeners.add(listener);bindPresentation();return()=>{presentationListeners.delete(listener);if(!presentationListeners.size)detachPresentation();};},
-      update(next) { display = next; runtime?.update(next); }, setActive(next) { active = next; runtime?.setActive(next); },
+      update(next) { display = next; runtime?.update(next); },
+      setActive(next, ...context) { active = next; runtime?.setActive(next, ...context); },
       read,
       revealPin: (display, captionId, destination) => runtime?.revealPin?.(display, captionId, destination) ?? false,
       camera(intent) { if (!runtime) throw Error('3Dモデルを読み込んでいます。'); runtime.camera(intent); },

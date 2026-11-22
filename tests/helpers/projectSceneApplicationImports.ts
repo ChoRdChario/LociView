@@ -626,6 +626,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "../scene/projectProvider"
   ],
   "src/projectScene/resumeReading.ts": [
+    "../ui/projectScene/captionListState",
     "./validationCatalog"
   ],
   "src/projectScene/viewDisplay.ts": [

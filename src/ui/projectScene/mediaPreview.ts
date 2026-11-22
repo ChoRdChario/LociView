@@ -11,7 +11,7 @@ export interface MediaPreviewItem {
 }
 export interface MediaPreviewGroup {
   readonly scope: string; readonly label: string; readonly items: readonly MediaPreviewItem[];
-  readonly showPin?: () => void;
+  readonly showPin?: (displayedPhoto: boolean) => void;
 }
 type MediaOpener = HTMLElement | (() => HTMLElement | null);
 export type MediaPreviewReader = () => MediaPreviewGroup | null;
@@ -121,7 +121,7 @@ export function createMediaViewer(document: Document, raster?: RasterResources,d
   const root = document.createElement('dialog'); root.className = 'lv-media-viewer'; root.setAttribute('aria-label', 'メディアビューア');
   const header = document.createElement('header'), title = document.createElement('h2'), closeButton = document.createElement('button');
   closeButton.type = 'button'; closeButton.textContent = '×'; closeButton.setAttribute('aria-label', '閉じる');
-  const pin = document.createElement('button'); pin.type = 'button'; pin.textContent = 'ピンを表示'; pin.hidden = true; pin.className = 'lv-media-show-pin';
+  const pin = document.createElement('button'); pin.type = 'button'; pin.textContent = '3Dでピンを見る'; pin.hidden = true; pin.className = 'lv-media-show-pin';
   const content = document.createElement('div'), description = document.createElement('p'), status = document.createElement('p');
   content.className = 'lv-media-viewer-content'; status.setAttribute('role', 'status');
   const imageViewport = createMediaImageViewport(document, content);
@@ -131,13 +131,14 @@ export function createMediaViewer(document: Document, raster?: RasterResources,d
   header.append(title, pin, closeButton); footer.append(previous, count, next); root.append(header, imageViewport.toolbar, content, description, status, footer);
   let reader: MediaPreviewReader | null = null, scope = '', id = '', resourceId = '', opener: MediaOpener | null = null, disposed = false;
   let preview: ReturnType<typeof createPngPreview> | null = null, presentedImage: PreviewPng | null = null;
+  let fullImage: HTMLImageElement | null = null;
   let retirement: Promise<void> | undefined;
   let resumeImage: { image: PreviewPng | null; view: ReturnType<typeof imageViewport.capture> } | undefined;
   const selected = () => { const group = reader?.(); return group?.scope === scope ? group.items.find(i => i.id === id && i.resourceId === resourceId) ?? null : null; };
   const pauseThumbnails = () => resources?.setThumbnailsActive(!disposed && !reader && document.hidden !== true);
   function close(restore = true, navigate?: () => void) {
     const from = opener; opener = null;
-    reader = null; resumeImage = undefined; preview?.dispose(); preview = null; presentedImage = null; content.replaceChildren(); root.close();
+    reader = null; resumeImage = undefined; preview?.dispose(); preview = null; presentedImage = null; fullImage = null; content.replaceChildren(); root.close();
     // Let the destination retire its hidden gallery before waking thumbnail readers.
     try { navigate?.(); } finally { pauseThumbnails(); }
     const target = restore && !disposed ? typeof from === 'function' ? from() : from : null;
@@ -163,10 +164,13 @@ export function createMediaViewer(document: Document, raster?: RasterResources,d
     status.textContent = item ? '' : 'この添付は変更されています。閉じて、メディアを選び直してください。';
     count.textContent = item ? `${index + 1} / ${group.items.length}` : '';
     footer.hidden = !item || group.items.length < 2;
+    const focused = document.activeElement;
     previous.disabled = index <= 0; next.disabled = index < 0 || index === group.items.length - 1;
+    if (focused === previous && previous.disabled && !next.disabled) next.focus({ preventScroll: true });
+    if (focused === next && next.disabled && !previous.disabled) previous.focus({ preventScroll: true });
     if (!item) { preview?.dispose(); preview = null; content.replaceChildren(); }
     else { if (!preview) { preview = createPngPreview(document, selected, false, imageViewport.imageHost, image => {
-      presentedImage = image ? selected()?.image ?? null : null; imageViewport.setImage(image);
+      presentedImage = image ? selected()?.image ?? null : null; fullImage = image; imageViewport.setImage(image);
       if (image && resumeImage) { if (sameBody(resumeImage.image, selected()?.image ?? null)) imageViewport.restore(resumeImage.view); resumeImage = undefined; }
     }, resources); content.append(preview.root); } preview.render(); imageViewport.render(); }
   }
@@ -179,8 +183,11 @@ export function createMediaViewer(document: Document, raster?: RasterResources,d
   closeButton.addEventListener('click', () => close()); previous.addEventListener('click', () => step(-1)); next.addEventListener('click', () => step(1));
   pin.addEventListener('click', () => {
     const group = reader?.(), showPin = group?.showPin;
-    if (disposed || !showPin || group?.scope !== scope || !selected()) return;
-    close(false, showPin);
+    const item = selected();
+    if (disposed || !showPin || group?.scope !== scope || !item) return;
+    const displayedPhoto = (!item.kind || item.kind === 'image') && !!item.image && sameBody(presentedImage, item.image) &&
+      !!fullImage?.isConnected && fullImage.complete && fullImage.naturalWidth > 0 && !fullImage.hidden && document.hidden !== true;
+    close(false, () => showPin(displayedPhoto));
   });
   root.addEventListener('cancel', event => { event.preventDefault(); close(); });
   const visibility = () => { if (!disposed) { pauseThumbnails(); render(); } };
@@ -241,19 +248,22 @@ export function createMediaThumbnails(document: Document, read: MediaPreviewRead
             (secondary ? current.show : current.action) ?? null : null;
         };
         const figure = document.createElement('figure'), label = document.createElement('figcaption'), action = document.createElement('button');
+        label.id = `lv-media-caption-${crypto.randomUUID()}`;
         action.type = 'button'; action.className = 'lv-media-thumbnail-action';
         action.textContent = selection ? item.label : item.kind==='video'?'動画を再生':item.kind==='audio'?'音声を再生':'画像を表示';
         action.setAttribute('aria-label', action.textContent);
+        if (!selection) action.setAttribute('aria-describedby', label.id);
         const preview = createPngPreview(document, live, true, action, undefined, viewer.resources);
         action.addEventListener('click', () => { if (disposed || !live()) return; if (selection) { selection.choose(item.id); render(); } else viewer.open(read, item.id, returnTo()); });
         figure.append(preview.root, label);
         let show: HTMLButtonElement | undefined;
         if (selection) { show = document.createElement('button'); show.type = 'button'; show.textContent = item.kind==='video'?'動画を再生':item.kind==='audio'?'音声を再生':'画像を表示';
+          show.setAttribute('aria-describedby', label.id);
           show.addEventListener('click', () => { if (!disposed && live()) viewer.open(read, item.id, returnTo(true)); }); figure.append(show); }
         const tools = cardTools ? document.createElement('div') : undefined; if (tools) figure.append(tools);
         card = { root: figure, label, action, show, preview, resourceId, tools }; cards.set(item.id, card);
       }
-      card.label.textContent = selection ? '' : `${item.label}${item.description ? ` — ${item.description}` : ''}`; card.label.hidden = !!selection;
+      card.label.textContent = `${item.label}${item.description ? ` — ${item.description}` : ''}`; card.label.hidden = !!selection;
       if (selection) card.action.setAttribute('aria-pressed', String(selection.selected() === item.id));
       card.preview.render(showPreviews);
       if (card.tools) { const tools=cardTools!(item.id);if(card.tools.children[0]!==tools){card.tools.replaceChildren();if(tools)card.tools.append(tools);} }

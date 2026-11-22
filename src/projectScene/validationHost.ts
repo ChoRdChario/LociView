@@ -663,8 +663,14 @@ async function openValidationHostOwned(options: ValidationHostOptions, run: stri
         const failed = () => { if (notify && importObserver === notify) endImportPreview(true); };
         try { void Promise.resolve(notify?.(importText)).catch(failed); } catch { failed(); }
       }
-      try { await (last.state === 'ready' && last.source ? workspaceFiles.receive(last.source.token, incoming.archive) :
-        workspaceFiles.importWorkspace(incoming.archive)); }
+      try {
+        if (last.state === 'ready' && last.source) await workspaceFiles.receive(last.source.token, incoming.archive);
+        else if (fresh && options.standaloneWorkspace && incoming instanceof WorkspaceArchive) {
+          // The Host already matched this selection to the new Project. The receiver
+          // reopens it under its operation lock before it can persist anything.
+          await receiveAction(() => receiver.importWorkspace(incoming.archive));
+        } else await workspaceFiles.importWorkspace(incoming.archive);
+      }
       catch { endImportPreview(true); /* File and incomplete originals stay available through the same recovery controls. */ }
     }
     const outputAction = <T>(action: () => Promise<T>, recovery = false, presentation?: () => MetadataSessionRead | undefined,

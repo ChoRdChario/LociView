@@ -28,7 +28,7 @@ export type Point3 = readonly [number, number, number];
 export interface WorkspaceRecoveryGroup {
   readonly key: string; readonly label: string; readonly ready: boolean;
   readonly note?: string; readonly details?: readonly string[];
-  readonly choices: readonly { id: string; label: string; anchor?: Anchor; editorName?: string | null }[];
+  readonly choices: readonly { id: string; label: string; bodyText?: string; anchor?: Anchor; editorName?: string | null }[];
   readonly manual?: 'name' | 'title' | 'body';
   readonly copyReady?: boolean;
   readonly target: { kind: 'name'; sceneId: string } | { kind: 'startup' } |
@@ -70,6 +70,7 @@ export interface WorkspaceViewportState {
   readonly available: boolean;
   /** Presentation lifetime only; metadata and editing remain available while hidden. */
   readonly visible?: boolean;
+  readonly photoContext?: 'record' | 'return';
   readonly hiddenAssetIds?: readonly string[]; readonly model?: WorkspaceModelProposal | null;
   readonly material?: WorkspaceMaterialProposal | null;
   readonly windowMoving?: boolean;
@@ -119,6 +120,8 @@ export interface WorkspaceReadingSelection {
   readonly query: string;
   readonly captionId: string | null;
   readonly focus: 'search' | 'row' | 'detail' | null;
+  readonly focusedRowId?: string;
+  readonly firstVisibleId?: string;
   readonly surface?: 'list' | 'detail';
 }
 export interface ProjectWorkspacePorts {

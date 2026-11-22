@@ -7,7 +7,7 @@ import { newProjectId, panelNodes, sameProjectValue, type ProjectPanelHost, type
 
 /** Attachment commands and local viewing only; binary verification stays in the current host. */
 export function createProjectMedia(document: Document, host: ProjectPanelHost, caption: () => string | null, viewer: MediaViewer,
-  photoPin?: (captionId: string) => (() => void) | undefined) {
+  photoPin?: (captionId: string) => MediaPreviewGroup['showPin']) {
   const { make, button } = panelNodes(document), root = make('section'), galleryHost = make('section'), stored = make('details');
   root.setAttribute('aria-label', 'メディアの整理'); galleryHost.setAttribute('aria-label', '添付メディア');
   stored.setAttribute('aria-label', '既存のメディアを添付'); stored.append(make('summary', '既存のメディアを添付'));

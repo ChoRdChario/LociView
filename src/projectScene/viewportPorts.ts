@@ -31,12 +31,16 @@ export interface ViewportPresentationFrame {
   readonly navigating: boolean;
   readonly pins: readonly { readonly id: string; readonly x: number; readonly y: number; readonly visible: boolean }[];
 }
+export interface PhotoPinTarget {
+  readonly token: string; readonly sceneId: string; readonly captionId: string;
+  readonly assetId: string; readonly assetFrameId: string; readonly returning: boolean;
+}
 export interface ProjectViewport {
   /** Owned display preparation/retirement only; no storage or readiness authority. */
   idle?(): Promise<void>;
   observePresentation?(listener: (frame: ViewportPresentationFrame) => boolean): () => void;
   setPointDiameter?(assetId: string, diameter: number): void; pointDiameter?(assetId: string): number;
-  update(display: RenderDisplay): void; setActive(active: boolean): void;
+  update(display: RenderDisplay): void; setActive(active: boolean, photo?: PhotoPinTarget): void;
   /** Reserve placement input before Orbit receives pointerdown; independent of gizmo activity. */
   setPinPointerActive?(active: boolean): void;
   read(): ViewportObservation; camera(intent: ViewCameraIntent): void; retry(): void; dispose(): void;

@@ -46,6 +46,18 @@ describe('07j private actual180 proof and checked186 display',()=>{
       expect(read).toHaveBeenCalledTimes(2 * position.count);
     } finally { disposeModelResources(root); }
   });
+  it('checks the expected properties at each shared material slot and observes later edits', () => {
+    const { root, geometry, material } = scene();
+    root.add(new THREE.Mesh(geometry, material));
+    try {
+      material.opacity = 0.4;
+      const before = snapshotTargets(root);
+      const expected = before.rows.map((row, i) => i === 0 ? row : { ...row, materialKeys: row.materialKeys.filter(k => k !== 'opacity') });
+      expect(() => snapshotTargets(root, expected)).toThrow('新しい材質');
+      material.opacity = 0.6;
+      expect(() => assertTargetTables(before, snapshotTargets(root))).toThrow('面・材質');
+    } finally { disposeModelResources(root); }
+  });
   it('retains cloned-UV image identity and refuses an absent/swapped image source',()=>{
     const a=scene(),b=scene();
     const first=new THREE.Texture({width:1,height:1}),other=new THREE.Texture({width:1,height:1});

@@ -35,7 +35,7 @@ function measureResident<T>(timing: ResidentTiming | undefined, stage: string, a
 export interface SavedModelResidentPort {
   idle?(): Promise<void>;
   readonly rasterResources?: RasterResources;
-  demand?(models: readonly (ValidationModelClosure | ReadonlyRenderModel)[]): void;
+  demand?(models: readonly (ValidationModelClosure | ReadonlyRenderModel)[], photo?: { representationId: string; signal: AbortSignal }): void;
   retry?(): void;
   state?(model: ValidationModelClosure | ReadonlyRenderModel): { phase:'loading'|'ready'|'failed'; issue?:string };
   label?(model:ValidationModelClosure|ReadonlyRenderModel):string;
@@ -151,25 +151,30 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
   let demandTask: Promise<void> | null = null, demandQueued = false;
   const preparations = new Set<Promise<void>>();
   let demanded = new Map<string, ReadonlyRenderModel>();
+  let pendingPhoto: { representationId: string; signal: AbortSignal } | undefined;
   const keyFor=(c:ValidationModelClosure|ReadonlyRenderModel)=>`${c.representation.id}/${c.proxy?.id??''}`;
   const dispose = () => { if (closed) return; closed = true; lifetime.abort(); for (const release of [...live]) release();
     for (const item of templates.values()) retire(item.model); templates.clear();checked.clear();demanded.clear();listeners.clear(); };
-  const loadSingle = (record: JsonObject, proxy = false) => {
+  const loadSingle = (record: JsonObject, proxy = false, photo?: AbortSignal) => {
     const blob = record.blob as JsonObject | undefined, count = blob?.byteLength;
     if (resources && (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0)) throw Error('保存したモデルの容量を確認してください。');
     return measureResident(timing, 'render.model.load', () => retainRasterModelReadStage<ValidatedModel, DecodedValidationModel>(typeof count === 'number' ? count : 0, record.contentKind === 'gaussianSplat' ? undefined : resources,
       () => measureResident(timing, 'render.model.content', () => content.modelContent ? content.modelContent(record) : content.model!(record)), async source => {
+        photo?.throwIfAborted();
         if (!same(nativeSpatialModelBounds(record, source), record.logicalBoundsAsset)) throw Error('保存したモデルの範囲が一致しません。');
         if (proxy && (isPointModel(source) || isGsModel(source))) throw Error('ピン配置用モデルを確認してください。');
         if (isGsModel(source)) return { gs: source, root: new THREE.Group(), materialLocators: new Map(), dispose() {} } as DecodedValidationModel;
         if (isPointModel(source)) return { point: source, root: new THREE.Group(), materialLocators: new Map(), dispose() {} } as DecodedValidationModel;
+        const photoSignal = photo && typeof AbortSignal.any === 'function' && !isMeshSourceModel(source) && source.jpeg && !source.occurrences &&
+          decode === decodeValidationModel ? AbortSignal.any([lifetime.signal, photo]) : undefined;
         const model = await measureResident<DecodedValidationModel>(timing, 'render.model.decode', () => isMeshSourceModel(source) ? decodeMeshSource(source, lifetime.signal, resources) :
+          photoSignal ? measureResident(timing, 'render.model.photo-return', () => decodeValidationModel(source, photoSignal, resources, true)) :
           decode === decodeValidationModel ? decodeValidationModel(source, lifetime.signal, resources) : decode(source, lifetime.signal));
         return source.raster ? { ...model, raster: source.raster } : model;
       }));
   };
-  const load = async (c: ReadonlyRenderModel): Promise<DecodedValidationModel> => {
-    const model = await loadSingle(c.representation);
+  const load = async (c: ReadonlyRenderModel, photo?: AbortSignal): Promise<DecodedValidationModel> => {
+    const model = await loadSingle(c.representation, false, photo);
     if (model.gs && c.proxy) try {
       model.proxy = await loadSingle(c.proxy, true);
       const original = model.dispose; model.dispose = () => { try { model.proxy?.dispose(); } finally { original(); } };
@@ -188,9 +193,12 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
       demandTask = (async () => {
         for (const [key, model] of demanded) {
           if (closed || !wanted.has(key) || templates.has(key) || failures.has(key) || !checked.has(key)) continue;
-          try { const decoded = await load(model); if (closed || !wanted.has(key)) { retire(decoded); continue; }
+          const photo = pendingPhoto?.representationId === model.representation.id && model.shape === 'render-glb' &&
+            !model.proxy && checked.get(key)?.record === canonical(model.representation) ? pendingPhoto.signal : undefined;
+          if (photo) pendingPhoto = undefined;
+          try { const decoded = await load(model, photo); if (closed || photo?.aborted || !wanted.has(key)) { retire(decoded); continue; }
             remember(model, decoded); templates.set(key, { record: canonical(model.representation), model: decoded }); failures.delete(key); notify();
-          } catch (error) { if (!closed) { failures.set(key, error instanceof Error ? error.message : 'モデルを読み込めません。'); notify(); } }
+          } catch (error) { if (!closed && !photo?.aborted) { failures.set(key, error instanceof Error ? error.message : 'モデルを読み込めません。'); notify(); } }
         }
       })().finally(() => { demandTask = null; if (!closed && [...demanded.keys()].some(key => checked.has(key) && !templates.has(key) && !failures.has(key))) scheduleDemand(); });
     });
@@ -243,8 +251,9 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
       }
     }
   };
-  const demand = (models: readonly (ValidationModelClosure | ReadonlyRenderModel)[]) => {
+  const demand: NonNullable<SavedModelResidentPort['demand']> = (models, photo) => {
     demanded = new Map(models.map(input => { const model = renderModel(input); return [keyFor(model), model]; }));
+    if (photo || !models.length || pendingPhoto?.signal.aborted) pendingPhoto = photo;
     wanted = new Set(demanded.keys()); collect(); scheduleDemand();
   };
   try {

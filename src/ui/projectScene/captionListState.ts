@@ -63,6 +63,29 @@ export const captionOwnerLabel = (item: CaptionListItem): string => {
 export const captionTitle = (item: CaptionListItem): string => item.title.kind === 'value'
   ? item.title.value.trim() ? item.title.value : '無題' : 'タイトルを確認';
 
+/** A short passage explains a body-only search hit without changing the record's title. */
+export function captionMatchExcerpt(title: string, body: string, search: string): string {
+  const query = search.trim().toLowerCase();
+  if (!query || title.toLowerCase().includes(query)) return '';
+  const folded = body.toLowerCase();
+  let offset = folded.indexOf(query);
+  if (offset < 0) return '';
+  // Some letters expand when case-folded. Present the original text and casing.
+  if (folded.length !== body.length) {
+    let remaining = offset;
+    offset = 0;
+    for (const letter of body) {
+      const width = letter.toLowerCase().length;
+      if (remaining < width) break;
+      remaining -= width;
+      offset += letter.length;
+    }
+  }
+  const start = Math.max(0, offset - 8);
+  const passage = body.slice(start, start + 160).replace(/^[\uDC00-\uDFFF]|[\uD800-\uDBFF]$/g, '').replace(/\s+/g, ' ').trim();
+  return (start ? '…' : '') + passage;
+}
+
 export function captionSourceIssue(source: CaptionListSource): string | null {
   if (source.kind === 'unavailable') return source.reason || '記録を読み込めません。状態を確認してください。';
   if (!source.token || !source.sceneId || new Set(source.captions.map(item => item.id)).size !== source.captions.length)

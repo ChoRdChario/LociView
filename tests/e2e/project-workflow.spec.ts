@@ -76,7 +76,7 @@ async function saveBackup(page: Page, path: string, name: string, boundaries?: R
   await row.getByRole('button', { name: 'ファイルを選択', exact: true }).click();
   const chooser = await choosing, verifyStarted = performance.now(); await chooser.setFiles(path);
   await expect(files.getByText('選択したファイルの内容を確認しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
-  await expect(page.getByLabel('保存ファイルの状態', { exact: true }))
+  await expect(page.getByLabel('バックアップの状態', { exact: true }))
     .toHaveText('選択ファイルと一致');
   if (boundaries) boundaries[`${name}.selected-file-to-ack-ms`] = performance.now() - verifyStarted;
 }
@@ -235,7 +235,7 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
     const first = await inspectBackup(backup, glb, png, body);
     await measure('通常の再読込から編集画面の準備', async () => { await page.reload(); await projectReady(page); });
     await selectCaption(page); await checkCaption(page);
-    await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toContainText('一致しています');
+    await expect(page.getByLabel('バックアップの状態', { exact: true })).toContainText('一致しています');
     await close();
 
     page = await measure('完全終了後の起動と再開', async () => {

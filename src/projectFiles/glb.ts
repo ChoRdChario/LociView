@@ -194,7 +194,7 @@ export async function inspectStaticMeshDocument(j:Record<string,unknown>,bin:Uin
   const scenes = fileList(j.scenes, max).map(raw => { const s = fileObject(raw); fileFields(s, ['nodes']); return fileList(s.nodes ?? [], max).map(v => fileInteger(v)); });
   const scene = j.scene === undefined ? scenes.length === 1 ? 0 : fileError('GLB内で開始シーンを指定してください。') : fileInteger(j.scene);
   if (!scenes[scene]) return fileError('開始シーンがありません。');
-  const box = new THREE.Box3(), surfaceRanges: JsonObject[] = [], seen = new Set<number>();
+  const box = new THREE.Box3(), point = new THREE.Vector3(), surfaceRanges: JsonObject[] = [], seen = new Set<number>();
   const visit = (id: number, parentMatrix: THREE.Matrix4, depth: number) => {
     if (depth > 256 || seen.has(id) || !nodes[id]) return fileError('ノードが循環しているか、参照が不正です。');
     seen.add(id); const n = nodes[id]!, world = parentMatrix.clone().multiply(n.matrix);
@@ -202,8 +202,9 @@ export async function inspectStaticMeshDocument(j:Record<string,unknown>,bin:Uin
     for (const [primitiveIndex, p] of (n.mesh === undefined ? [] : meshes[n.mesh]!).entries()) {
       charge(p.positions.count * 3);
       for (let i = 0; i < p.positions.count; i++) {
-        const point = new THREE.Vector3(p.positions.read(i, 0), p.positions.read(i, 1), p.positions.read(i, 2)).applyMatrix4(world);
-        if (point.toArray().some(v => !Number.isFinite(v))) return fileError('モデルの座標が大きすぎます。'); box.expandByPoint(point);
+        point.set(p.positions.read(i, 0), p.positions.read(i, 1), p.positions.read(i, 2)).applyMatrix4(world);
+        if (!Number.isFinite(point.x) || !Number.isFinite(point.y) || !Number.isFinite(point.z)) return fileError('モデルの座標が大きすぎます。');
+        box.expandByPoint(point);
       }
       surfaceRanges.push({ kind: 'meshTriangle', nodeIndex: id, primitiveIndex, count: p.triangleCount });
     }

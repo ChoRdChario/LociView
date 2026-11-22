@@ -6453,8 +6453,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     }
     h.refresh(); h.refresh(); await Promise.resolve(); if (!direct) expect(primary() === origin).toBe(true);
     if (result === 'handoff') {
-      expect(origin.document.activeElement === (direct ? h.named('保存ファイルの状態',h.editor) : status())).toBe(true);
-      const row = h.host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!, fileStatus = () => h.named('保存ファイルの状態', h.editor).children[0]!.textContent;
+      expect(origin.document.activeElement === (direct ? h.named('バックアップの状態',h.editor) : status())).toBe(true);
+      const row = h.host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!, fileStatus = () => h.named('バックアップの状態', h.editor).children[0]!.textContent;
       expect(row.stale).toBeUndefined(); expect(fileStatus()).toBe('ダウンロード開始');
       // Unknown freshness must never be promoted into a verified-file claim.
       row.state = 'file-verified'; h.refresh(); expect(fileStatus()).toBe('作成記録あり・照合前');
@@ -8103,9 +8103,9 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const initialCaptionIds = new Set(Object.keys(host.authority.read().resources.captions));
     expect(named('プロジェクト名', editor).textContent).toBe('統合画面の検証');
     expect(named('再開データの状態', editor).textContent).toBe('再開できます');
-    expect(named('保存ファイルの状態', editor).children[0]!.textContent).toBe('未出力');
-    expect(named('保存ファイルの状態', editor).hidden).toBe(false);
-    expect(all(named('保存状況', editor)).filter(n => n.className === 'lv-save-location').map(n => n.textContent)).toEqual(['ブラウザ内', 'ファイル']);
+    expect(named('バックアップの状態', editor).children[0]!.textContent).toBe('このブラウザでは未作成');
+    expect(named('バックアップの状態', editor).hidden).toBe(false);
+    expect(all(named('保存状況', editor)).filter(n => n.className === 'lv-save-location').map(n => n.textContent)).toEqual(['ブラウザ内', 'バックアップ']);
     const initialSceneCount = Object.keys(host.authority.read().state.scenes).length;
     button('記録を追加', editor).fire('click'); const canvas = named('3Dモデルの表示', editor);
     const down = { pointerId: 7, button: 0, isPrimary: true, clientX: 80, clientY: 90 };
@@ -8163,25 +8163,25 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const backup = host.workspaceOutput.jobs.find(j => j.purpose === 'backup')!;
     expect((await BackupArchive.inspect(await host.workspaceOutput.download(backup.id), metadata)).source.originalChanges()).toEqual(host.read().source!.originalChanges());
     await vi.waitFor(() => expect(output.children.find(n => n.attributes.get('role') === 'status')!.dataset.busy).toBe('false'));
-    expect(named('保存ファイルの状態', editor).children[0]!.textContent).toBe('ダウンロード開始');
-    expect(named('保存ファイルの状態', editor).title).toBe(`${(downloads.mock.contexts[0] as unknown as HTMLAnchorElement).download}\n保存先で完了を確認してください。`);
-    expect(named('保存ファイルの状態', editor).hidden).toBe(false);
+    expect(named('バックアップの状態', editor).children[0]!.textContent).toBe('ダウンロード開始');
+    expect(named('バックアップの状態', editor).title).toBe(`${(downloads.mock.contexts[0] as unknown as HTMLAnchorElement).download}\n保存先で完了を確認してください。`);
+    expect(named('バックアップの状態', editor).hidden).toBe(false);
     button('ファイルを選択', output).fire('click');
     const verify = named('保存したファイルを選択', output); Object.assign(verify, { files: [await host.workspaceOutput.download(backup.id)] }); verify.fire('change');
-    await vi.waitFor(() => expect(named('保存ファイルの状態', editor).children[0]!.textContent).toBe('選択ファイルと一致'), { timeout: 10000 });
+    await vi.waitFor(() => expect(named('バックアップの状態', editor).children[0]!.textContent).toBe('選択ファイルと一致'), { timeout: 10000 });
     body.value = '照合後の未適用入力'; body.fire('input');
     expect(named('再開データの状態', editor).textContent).toBe('変更を確認中');
-    expect(named('保存ファイルの状態', editor).hidden).toBe(true);
+    expect(named('バックアップの状態', editor).hidden).toBe(true);
     const detail = named('記録の詳細', editor);
     button('取り消す', detail).fire('click'); button('変更を取り消す', detail).fire('click');
     expect(body.value).toBe('最初の本文');
-    expect(named('保存ファイルの状態', editor).hidden).toBe(false);
+    expect(named('バックアップの状態', editor).hidden).toBe(false);
     const verifiedToken = host.read().source!.token;
     button('相手に渡す', output).fire('click'); button('ダウンロード', output).fire('click');
     await vi.waitFor(() => expect(downloads).toHaveBeenCalledTimes(2), { timeout: 10000 });
     const workspaceJob = host.workspaceOutput.jobs.find(j => j.purpose === 'teamWorkspace')!;
     expect(host.read().source!.token).toBe(verifiedToken); expect(host.workspaceOutput.jobs.find(j => j.id === backup.id)!.stale).toBe(true);
-    expect(named('保存ファイルの状態', editor).children[0]!.textContent).toBe('変更あり');
+    expect(named('バックアップの状態', editor).children[0]!.textContent).toBe('変更あり');
     const workspaceFile = await host.workspaceOutput.download(workspaceJob.id), peer = firstWorkspaceRecipient();
     const sharedBaseId = (await WorkspaceArchive.inspect(workspaceFile, metadata)).archive.control.manifest.packageId;
     await peer.receiver.importWorkspace(workspaceFile);
@@ -8413,7 +8413,9 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(candidate).toBeDefined();
     const option = h.all(area).find(n => n.tag === 'input' && n.value === candidate.operationId)!; expect(option).toBeDefined();
     const row = h.all(option.parent!);
-    expect(row.some(n => n.tag === 'span' && n.textContent.endsWith('：相手からの内容'))).toBe(true);
+    const visibleChoice = row.filter(n => n.tag === 'span' || n.tag === 'mark').map(n => n.textContent).join('');
+    expect(visibleChoice).toMatch(/^候補 \d+：相手からの内容$/);
+    expect(row.find(n => n.tag === 'mark')?.textContent).toBe('相手からの');
     expect(row.some(n => n.tag === 'bdi' && n.textContent === '編集者情報なし')).toBe(true);
     option.checked = true; option.fire('change');
     expect(button('ファイルに保存', named('ファイル')).disabled).toBe(true);
@@ -8863,6 +8865,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
   });
   it('hands off only an actual scroll and the focused row from a paged shared text reader', () => {
     const document = new RecordedDocument(), records = Array.from({ length: 130 }, (_, i) => ({ id: String(i), title: String(i), body: '本文' }));
+    records[129]!.body = '記録'.repeat(100) + '風防枠内側は同色';
     const view = resumeReadingModule.createCaptionTextReading(document.asDocument(), { title: '資料', sceneId: 's', sceneName: '記録', records }, 'review');
     const all = (node: RecordedNode): RecordedNode[] => [node, ...node.children.flatMap(all)];
     const nodes = () => all(record(view.root)), list = nodes().find(node => node.tag === 'ul')!;
@@ -8876,6 +8879,30 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       expect(view.readingPosition().focusedRowId).toBe('100');
       expect(view.selection().captionId).toBeNull();
       expect(list.children).toHaveLength(130);
+      const search = nodes().find(n => n.type === 'search')!;
+      search.value = '風防'; search.fire('input');
+      expect(list.children).toHaveLength(1);
+      const excerpt = nodes().find(n => n.className === 'lv-reader-match')!;
+      expect(excerpt.textContent).toContain('風防枠内側は同色');
+      expect(excerpt.parent!.getAttribute('aria-describedby')).toBe(excerpt.id);
+      search.value = ''; search.fire('input');
+      expect(nodes().some(n => n.className === 'lv-reader-match')).toBe(false);
+    } finally { view.dispose(); }
+  });
+  it('continues from the visible records when a wheel scroll leaves keyboard focus on a different record', () => {
+    const doc = new RecordedDocument();
+    const records = ['最初', '次', '最後'].map(id => ({ id, title: id, body: '' }));
+    const view = resumeReadingModule.createCaptionTextReading(doc.asDocument(), { title: '資料', sceneId: 's', records }, 'first-import');
+    const nodes = (node: RecordedNode): RecordedNode[] => [node, ...node.children.flatMap(nodes)];
+    const list = nodes(record(view.root)).find(node => node.tag === 'ul')!;
+    try {
+      Object.assign(list, { clientHeight: 45, clientTop: 0, getBoundingClientRect: () => ({ top: 0, bottom: 45 }) });
+      list.children.forEach((row, i) => Object.assign(row, { getBoundingClientRect: () =>
+        ({ top: i * 45 - list.scrollTop, bottom: (i + 1) * 45 - list.scrollTop }) }));
+      const first = list.children[0]!.children[0]!;
+      first.click(); first.focus();
+      list.scrollTop = 90;
+      expect(view.selection()).toMatchObject({ captionId: '最初', firstVisibleId: '最後', focusedRowId: '最後', focus: 'row' });
     } finally { view.dispose(); }
   });
   it('opens a review read-only, then explicitly creates an editable independent copy and cold reopens it (recorded DOM)', async () => {
@@ -12363,6 +12390,36 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const held=new Promise<void>(resolve=>{finish=resolve;}),startRead=vi.fn(async()=>source),single=await prepareReadonlyResidents([models[0]!],{modelContent:startRead},async()=>{await held;return decoder();},true,one);
     single.demand!([models[0]!]);finish();await single.ready;single.create(models[0]!).dispose!();
     expect(startRead).toHaveBeenCalledOnce();single.dispose();await one.dispose();expect(one.snapshot().cpuBytes).toBe(0);
+  });
+  it.each(['success', 'failure', 'reading'] as const)('retires an interrupted photo return before the same model is demanded again: %s', async outcome => {
+    const bytes = glb(), source = await inspectValidationGlb(bytes, budget, decode);
+    const placement = { translation: [0,0,0], rotationXYZW: [0,0,0,1], uniformScale: 1 };
+    const model = { shape: 'render-glb', key: 'shown', assetId: 'asset', assetToProject: placement,
+      representation: { id: 'frame', contentKind: 'mesh', role: 'meshPrimary', blob: { byteLength: bytes.length },
+        representationToAsset: { ...placement, reflection: 'none' }, logicalBoundsAsset: source.bounds } } as unknown as ReadonlyRenderModel;
+    const resources = createRasterResources({ cpuBytes: 5 * bytes.length, gpuBytes: 0 });
+    const staleDisposed = vi.fn(), freshDisposed = vi.fn(), reads = vi.fn(async () => source);
+    const decoded = (dispose: () => void) => ({ root: new THREE.Group(), materialLocators: new Map(), dispose });
+    const decodeModel = vi.fn(async () => decoded(freshDisposed));
+    const cache = await prepareReadonlyResidents([model], { modelContent: reads }, decodeModel, false, resources);
+    try {
+      cache.demand!([]); await cache.idle();
+      let complete!: () => void;
+      if (outcome === 'reading') reads.mockImplementationOnce(() => new Promise(resolve => { complete = () => resolve(source); }));
+      else decodeModel.mockImplementationOnce(() => new Promise((resolve, reject) => {
+        complete = () => outcome === 'failure' ? reject(Error('old image')) : resolve(decoded(staleDisposed));
+      }));
+      const controller = new AbortController();
+      cache.demand!([model], { representationId: model.representation.id, signal: controller.signal });
+      await vi.waitFor(() => expect(complete).toBeTypeOf('function'));
+      controller.abort(); cache.demand!([]); cache.demand!([model]); complete();
+      await cache.idle();
+      expect(cache.state(model)).toEqual({ phase: 'ready' });
+      expect(reads).toHaveBeenCalledTimes(3);
+      expect(decodeModel).toHaveBeenCalledTimes(outcome === 'reading' ? 2 : 3);
+      expect(staleDisposed).toHaveBeenCalledTimes(outcome === 'success' ? 1 : 0);
+    } finally { cache.dispose(); await cache.idle(); await resources.dispose(); }
+    expect(resources.snapshot().cpuBytes).toBe(0);
   });
   it('keeps initially visible Review residents once, then releases hidden resources and rechecks on demand', async () => {
     const bytes = glb(), source = { ...await inspectValidationGlb(bytes, budget, decode), raster: { cpuBytes: 6000, gpuBytes: 0, images: [{ width: 30, height: 50 }], maximumEdge: 50 } };

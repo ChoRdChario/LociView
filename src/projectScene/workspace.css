@@ -40,6 +40,7 @@
 .lv-resume-reading li { border-bottom: 1px solid var(--lv-rule); }
 .lv-resume-reading li > button { width: 100%; text-align: start; border-color: transparent; background: transparent; overflow-wrap: anywhere; }
 .lv-import-reading li > button { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv-resume-reading .lv-reader-match:not([hidden]) { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--lv-muted); font-size: 13px; font-weight: 400; }
 .lv-import-reading .lv-resume-detail h3 { overflow-wrap: anywhere; }
 .lv-resume-reading button[aria-pressed="true"] { background: var(--lv-selected); }
 .lv-resume-detail { flex: 1 1 auto; min-height: 0; overflow: auto; border-top: 1px solid var(--lv-rule); }

@@ -114,7 +114,7 @@ for (const touch of [false, true]) test(`autosaved text and photos survive file 
     await detail.getByLabel('本文', { exact: true }).dispatchEvent('compositionstart');
     await detail.getByLabel('本文', { exact: true }).fill('元のバックアップ本文');
     await expect(detail.getByRole('button', { name: '変更を適用', exact: true })).toBeHidden();
-    await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toBeHidden();
+    await expect(page.getByLabel('バックアップの状態', { exact: true })).toBeHidden();
     await expect(page.locator('header').getByRole('button',{name:'ファイルに保存',exact:true})).toBeDisabled();
     await Promise.all([
       page.waitForEvent('dialog').then(async dialog => { expect(dialog.type()).toBe('beforeunload'); await dialog.dismiss(); }),
@@ -137,7 +137,7 @@ for (const touch of [false, true]) test(`autosaved text and photos survive file 
     await nativeBody.press('Control+z');await expect(nativeBody).toHaveValue('元のバックアップ本文');
     await finishCaptionEditing(page,{body:'元のバックアップ本文'});
     await expect(detail.getByLabel('本文', { exact: true })).toBeFocused();
-    await expect(page.getByLabel('保存ファイルの状態', { exact: true }).locator(':scope > span').first()).toHaveText('未出力');
+    await expect(page.getByLabel('バックアップの状態', { exact: true }).locator(':scope > span').first()).toHaveText('このブラウザでは未作成');
     const rowEdit = page.locator('.lv-caption-row').first().getByRole('button', { name: '編集', exact: true, includeHidden: true });
     const rowDescription = await rowEdit.getAttribute('aria-describedby'); expect(rowDescription).toBeTruthy();
     await expect(page.locator('#' + rowDescription)).toHaveText('再開時の記録');
@@ -151,11 +151,11 @@ for (const touch of [false, true]) test(`autosaved text and photos survive file 
     await expect(files.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false');
     await expect(files.locator('.lv-operation-status')).toContainText(download.suggestedFilename());
     await closeFileSurface(page);
-    await expect(page.getByLabel('保存ファイルの状態', { exact: true }).locator(':scope > span').first()).toHaveText('ダウンロード開始');
-    await expect(page.getByLabel('保存ファイルの状態', { exact: true })).toHaveAttribute('title',`${download.suggestedFilename()}\n保存先で完了を確認してください。`);
+    await expect(page.getByLabel('バックアップの状態', { exact: true }).locator(':scope > span').first()).toHaveText('ダウンロード開始');
+    await expect(page.getByLabel('バックアップの状態', { exact: true })).toHaveAttribute('title',`${download.suggestedFilename()}\n保存先で完了を確認してください。`);
     await expect(page.locator('.lv-project-shell > .lv-operation-status').filter({hasText:download.suggestedFilename()})).toHaveCount(1);
     if(!touch){
-      const notice=page.getByLabel('保存ファイルの状態',{exact:true});
+      const notice=page.getByLabel('バックアップの状態',{exact:true});
       await expect(notice).toBeFocused();await notice.press('Enter');
       await expect(files.locator('.lv-operation-status')).toHaveAttribute('data-busy','false');
       await notice.press('Escape');await expect(save).toBeFocused();

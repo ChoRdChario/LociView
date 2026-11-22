@@ -16,6 +16,30 @@ interface RecoveryHost {
   membership: (token: string, sceneId: string, captionId: string, ids: readonly string[], keep: string, choice: 'one' | 'both') => MetadataEdit;
 }
 
+/** Mark the differing passage while keeping the complete text, including combined characters. */
+function changedBodyPassages(choices: WorkspaceRecoveryGroup['choices']): Map<string, { start: number; end: number }> {
+  const ranges = new Map<string, { start: number; end: number }>();
+  if (choices.length !== 2) return ranges;
+  const a = choices[0]?.bodyText, b = choices[1]?.bodyText;
+  if (!a || !b || a === b) return ranges;
+  if (typeof Intl.Segmenter !== 'function') return ranges;
+  const shorter = Math.min(a.length, b.length);
+  let head = 0, tail = 0;
+  while (head < shorter && a[head] === b[head]) head++;
+  while (tail < shorter - head && a[a.length - 1 - tail] === b[b.length - 1 - tail]) tail++;
+  if (!head && !tail) return ranges;
+  const segmenter = new Intl.Segmenter();
+  for (const candidate of choices) {
+    const body = candidate.bodyText!;
+    if (head + tail === body.length) continue;
+    const characters = segmenter.segment(body);
+    const first = characters.containing(head)!, last = characters.containing(body.length - tail - 1)!;
+    const labelLength = candidate.label.length - body.length;
+    ranges.set(candidate.id, { start: labelLength + first.index, end: labelLength + last.index + last.segment.length });
+  }
+  return ranges;
+}
+
 function recoveryChoices(document: Document, group: WorkspaceRecoveryGroup, changed: () => void) {
   const { make } = panelNodes(document), root = make('div');
   const label = `${group.label}に残す内容`;
@@ -24,8 +48,16 @@ function recoveryChoices(document: Document, group: WorkspaceRecoveryGroup, chan
     root.className = 'lv-text-choices';
     root.setAttribute('role', 'radiogroup'); root.setAttribute('aria-label', label);
     const name = newProjectId('choice'), radios: HTMLInputElement[] = [];
+    const changedPassages = changedBodyPassages(group.choices);
     function add(value: string, text: string, editor?: string | null) {
-      const row = make('label'), radio = make('input'), content = make('span', text);
+      const row = make('label'), radio = make('input'), content = make('span');
+      const passage = changedPassages.get(value);
+      if (passage) {
+        content.textContent = text.slice(0, passage.start);
+        content.append(make('mark', text.slice(passage.start, passage.end)));
+        if (passage.end < text.length) content.append(make('span', text.slice(passage.end)));
+      }
+      else content.textContent = text;
       radio.type = 'radio'; radio.name = name; radio.value = value;
       const by = attribution(editor);
       if (by) content.append(make('bdi', by));

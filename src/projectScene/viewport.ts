@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { defaultPose, fittedPose, placementMatrix, projectBounds, switchProjection, type CameraPose, type RenderDisplay, type EditableDisplay } from './viewportModel';
 import { renderOwner, renderPlacement, isReadonlyModel, isSavedModel } from './modelTypes';
-import type { ViewportFactory, ViewportObservation, ViewportPresentationFrame } from './viewportPorts';
+import type { PhotoPinTarget, ViewportFactory, ViewportObservation, ViewportPresentationFrame } from './viewportPorts';
 import { PROJECT_SCENE_STANDARD_BACKGROUND_HEX, readProjectCamera, readSolidBackground, type SolidBackground } from './viewDisplay';
 import type { DisplayCapture } from './displayCapture';
 import { pickResidentCreation, pickResidentSurface, type PinSurfaceTarget, type ResidentSurface } from './viewportPicking';
@@ -41,7 +41,22 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
   let rendererTarget: RasterLease | undefined;
   const fileModels=(rows:readonly RenderDisplay['models'][number][])=>rows.flatMap(m=>isReadonlyModel(m)||isSavedModel(m)?[m]:[]);
   const wantedModels = (next: RenderDisplay) => fileModels(saved.demand ? next.models.filter(m => !next.hiddenAssetIds?.includes(renderOwner(m))) : next.models);
-  const requestModels = (next: RenderDisplay | null) => { if (next && active) { released = false; saved.demand?.(wantedModels(next)); } };
+  let painted: RenderDisplay | null = null;
+  let paintedModelKey: string | undefined;
+  let photoWitness: { target: PhotoPinTarget; modelKey: string } | undefined;
+  let photoRequest: AbortController | undefined;
+  const forgetPhoto = () => { photoWitness = undefined; photoRequest?.abort(); photoRequest = undefined; };
+  const samePin = (a: PhotoPinTarget, b?: PhotoPinTarget) => a.token === b?.token && a.sceneId === b.sceneId &&
+    a.captionId === b.captionId && a.assetId === b.assetId && a.assetFrameId === b.assetFrameId;
+  function photoModel(view: RenderDisplay | null, target: PhotoPinTarget) {
+    if (!view || view.readOnly || view.materialPreview || view.preview || view.pinEdit || view.modelEdit || view.token !== target.token || view.sceneId !== target.sceneId ||
+      view.models.length !== 1 || view.hiddenAssetIds?.includes(target.assetId) || !view.pins.some(p => p.id === target.captionId && p.status === 'normal')) return;
+    const model = view.models[0];
+    if (model?.shape === 'saved-glb' && !model.proxy && model.binding.assetId === target.assetId && model.assetFrame.id === target.assetFrameId) return model;
+  }
+  const requestModels = (next: RenderDisplay | null, photo?: { representationId: string; signal: AbortSignal }) => {
+    if (next && active) { released = false; saved.demand?.(wantedModels(next), photo); }
+  };
   const trackTexture = (texture: THREE.Texture) => {
     if (!renderer || !saved.rasterResources) { rendererTextures.add(texture); return; }
     if (rendererTextures.has(texture)) return;
@@ -190,7 +205,7 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       ...textures.map(texture=>()=>texture.dispose()),...leases.map(lease=>()=>lease.release()),()=>oldRenderer?.dispose(),()=>oldTarget?.release()]);
     released = true;
   }
-  function fail(e: unknown) { issue = `3D表示を停止しました。${errorText(e)} 編集内容は保持しています。`;
+  function fail(e: unknown) { painted = null; forgetPhoto(); issue = `3D表示を停止しました。${errorText(e)} 編集内容は保持しています。`;
     try { release(); } catch (cleanup) { active=false;issue+=` ${errorText(cleanup)}`; } serial++; notify(); }
   function buildModels() {
     if (!display || !renderer) return;
@@ -415,6 +430,15 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
         const current = active && !disposed && !issue && !contextLost && display === owner.display && frameGeneration === owner.generation &&
           renderer === owner.renderer && camera === owner.camera && serial === owner.serial;
         // A resource callback may reenter/update during renderFrame. It must not publish the old frame.
+        if (drew && current) {
+          painted = owner.display;
+          const model = painted?.models.length === 1 ? painted.models[0] : undefined;
+          paintedModelKey = model?.shape === 'saved-glb' && !modelFailures.has(model.binding.assetId) &&
+            !smoothIssue && !smoothPending && !waitingBudget ? residentModelKeys.get(model.binding.assetId) : undefined;
+          if (photoRequest && paintedModelKey === photoWitness?.modelKey && paintedModelKey) {
+            photoRequest = undefined; photoWitness = undefined;
+          }
+        }
         const handled = !semanticChange && drew && current && presentFrame();
         if (!handled) changed();
       }
@@ -539,12 +563,34 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
     setPointDiameter(assetId, input) { const resolved = resolvePointPresentation(pointRegistrySnapshot, defaultPointProfile, input), diameter = resolved.diameterCssPixels; pointDiameterNotice = resolved.diagnosedDefault ? '点の大きさを既定の3pxに戻しました。' : null;
       if (diameter === (pointDiameters.get(assetId) ?? 3)) return;
       pointDiameters.set(assetId, diameter); configurePoints(); pickEpoch++; serial++; notify(); },
-    setActive(next) {
+    setActive(next, photo) {
+      if (photoWitness && !samePin(photoWitness.target, photo)) forgetPhoto();
+      if (photoRequest && photoWitness && active && next) {
+        const model = photoModel(display, photoWitness.target);
+        if (!model || display?.selectedId !== photoWitness.target.captionId || residentModelKey(model) !== photoWitness.modelKey) forgetPhoto();
+      }
+      let inspection: { representationId: string; signal: AbortSignal } | undefined;
+      if (active && !next) {
+        forgetPhoto();
+        const model = photo && photoModel(painted, photo);
+        const modelKey = model && residentModelKeys.get(model.binding.assetId);
+        const pin = photo && painted?.pins.find(row => row.id === photo.captionId);
+        if (photo && modelKey && modelKey === paintedModelKey && pin && projectPosition(pin.position).visible && !issue && !contextLost &&
+          !modelFailures.has(photo.assetId) && !smoothIssue && !smoothPending && !waitingBudget)
+          photoWitness = { target: photo, modelKey };
+        painted = null;
+      } else if (!active && next) {
+        const model = photo?.returning && photoModel(display, photo);
+        if (photoWitness && model && display?.selectedId === photo?.captionId && residentModelKey(model) === photoWitness.modelKey) {
+          photoRequest = new AbortController();
+          inspection = { representationId: model.representation.id, signal: photoRequest.signal };
+        } else forgetPhoto();
+      }
       if (cleanupFailure) { active=false;issue=errorText(cleanupFailure);return; }
       const activating=next&&!active,retained=Boolean(next&&active&&renderer&&camera&&!issue);
       active = next;
       if (!next) try { release(); } catch(error) { cleanupFailure??=error;issue=errorText(error);return; }
-      requestModels(blockedNext ?? display);
+      requestModels(blockedNext ?? display, inspection);
       if(activating&&blockedNext)viewport.update(blockedNext);
       // Unchanged active state is common after camera/sort observations. Actual
       // size/DPR changes still enter ensure through ResizeObserver/the draw loop.
@@ -661,8 +707,8 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       catch (e) { pose = previousPose; background = previousBackground; axis = previousAxis; throw e; }
       poses.set(display.sceneId, pose); backgrounds.set(display.sceneId, background); notice = null; serial++; notify();
     },
-    retry() { saved.retry?.(); if(blockedNext){this.update(blockedNext);ensure();return;} if (contextLost) throw new Error('描画環境の復旧を待って再試行してください。'); release(); issue = null; requestModels(display); ensure(); },
-    dispose() { disposed = true;presentationListeners.clear();unsubscribeTargets?.();unsubscribeResidents?.();unsubscribeAdmission?.(); try { release(); }
+    retry() { painted = null; forgetPhoto(); saved.retry?.(); if(blockedNext){this.update(blockedNext);ensure();return;} if (contextLost) throw new Error('描画環境の復旧を待って再試行してください。'); release(); issue = null; requestModels(display); ensure(); },
+    dispose() { painted = null; forgetPhoto(); disposed = true;presentationListeners.clear();unsubscribeTargets?.();unsubscribeResidents?.();unsubscribeAdmission?.(); try { release(); }
       finally { resize.disconnect(); canvas.removeEventListener('pointerdown', mouseNavigation, true);
       canvas.removeEventListener('webglcontextlost', lost); canvas.removeEventListener('webglcontextrestored', restored); } },
   };

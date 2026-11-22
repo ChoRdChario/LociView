@@ -9,6 +9,21 @@ describe('one mounted deferred presentation',()=>{
  const capture={camera:{position:[1,2,5] as const,target:[0,0,0] as const,up:[0,1,0] as const,projection:{kind:'perspective' as const,verticalFovRadians:Math.PI/4}},background:{kind:'solid' as const,colorSrgb:[1,1,1] as const}};
  function renderer(){let current:RenderDisplay|undefined;const dispose=vi.fn(),recall=vi.fn();const factory=vi.fn<ViewportFactory>(()=>({update(next){current=next;},setActive(){},camera(){},retry(){},dispose,capture:()=>capture,recall,
    read:()=>({token:'camera',display:current,ready:true,issue:null,dragging:false,projection:'perspective',axis:null,pins:[]})}));return{factory,dispose,recall};}
+ it('forwards a photo return without replaying it on initial or replacement attachment', async () => {
+  const deferred = createDeferredViewport(), a = renderer(), b = renderer();
+  const runtime = deferred.factory(new RecordedDocument().createElement('canvas') as unknown as HTMLCanvasElement, () => {});
+  const photo = { token: 'generation', sceneId: 'scene', captionId: 'pin', assetId: 'asset', assetFrameId: 'frame', returning: true };
+  const first = vi.fn(), second = vi.fn();
+  runtime.setActive(true, photo);
+  deferred.attach((...args) => ({ ...a.factory(...args), setActive: first }));
+  expect(first.mock.calls).toEqual([[true]]);
+  runtime.setActive(false, { ...photo, returning: false }); runtime.setActive(true, photo);
+  expect(first).toHaveBeenLastCalledWith(true, photo);
+  deferred.attach((...args) => ({ ...b.factory(...args), setActive: second }));
+  await runtime.idle!();
+  expect(second.mock.calls).toEqual([[true]]);
+  runtime.dispose();
+ });
  it.each([false,true])('keeps concrete retirement after bridge disposal, including synchronous cleanup failure=%s',async failed=>{
   const deferred=createDeferredViewport(),a=renderer(),fault=Error('native cleanup refused');let finish!:()=>void;
   const native=new Promise<void>(resolve=>{finish=resolve;}),idle=vi.fn(()=>native);

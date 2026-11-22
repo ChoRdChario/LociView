@@ -483,7 +483,7 @@ for (const touch of [false, true])
           return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), v => v.toString(16).padStart(2, '0')).join('');
         });
         expect(receivedDigest).toBe(createHash('sha256').update(smallPng()).digest('hex'));
-        const locatePhoto = photoViewer.getByRole('button', { name: 'ピンを表示', ...exact });
+        const locatePhoto = photoViewer.getByRole('button', { name: '3Dでピンを見る', ...exact });
         if (touch) await locatePhoto.tap(); else await locatePhoto.press('Enter');
         await expect(photoViewer).toBeHidden();
         await expect(selectedPin).toHaveAttribute('data-caption-id', exported[0]!.id);

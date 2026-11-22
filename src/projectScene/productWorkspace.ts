@@ -302,14 +302,23 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
         update(next) {
           if (closed) return; state = next; viewportScene = next.sceneId; refreshPreview?.();
           const snapshot = host.authority.read();
+          const anchor = next.photoContext && next.selectedId ? snapshot.resources.captions[next.selectedId]?.anchor : undefined;
+          const photo = anchor?.kind === 'value' && anchor.value.kind === 'asset' && next.selectedId &&
+            next.available && !next.readOnly && snapshot.state.token === next.token && host.mode?.current === 'edit'
+            ? { token: next.token, sceneId: next.sceneId, captionId: next.selectedId, assetId: anchor.value.assetId,
+              assetFrameId: anchor.value.assetFrameId, returning: next.photoContext === 'return' } : undefined;
+          const setActive = (active: boolean) => {
+            if (photo) runtime.setActive(active, photo);
+            else runtime.setActive(active);
+          };
           if (previewOpen){runtime.setActive(false);return;}
-          if (!next.available || next.visible === false || snapshot.state.token !== next.token) { renderedInput = ''; runtime.setPinPointerActive?.(false); runtime.setActive(false); return; }
+          if (!next.available || next.visible === false || snapshot.state.token !== next.token) { renderedInput = ''; runtime.setPinPointerActive?.(false); setActive(false); return; }
           // A renderer observation can request another UI render. Identical typed
           // input must retain the exact display and must not start a new renderer
           // revision/notification cycle (which would repeatedly replace controls).
           const input = JSON.stringify(next);
           if (input === renderedInput) {
-            runtime.setPinPointerActive?.(pointerHeld || !!next.windowMoving); runtime.setActive(true); return;
+            runtime.setPinPointerActive?.(pointerHeld || !!next.windowMoving); setActive(true); return;
           }
           const modelEdit = next.model && next.model.target.token === next.token ? { target: next.model.target, position: next.model.placement.translation,
             enabled: !next.readOnly, manipulation: { mode: next.model.mode, rotationXYZW: next.model.placement.rotationXYZW, uniformScale: next.model.placement.uniformScale,
@@ -355,7 +364,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
           rendered = next.readOnly ? { ...display, pinEdit: undefined } : display;
           runtime.update(rendered);
           renderedInput = input;
-          runtime.setPinPointerActive?.(pointerHeld || !!next.windowMoving); runtime.setActive(true);
+          runtime.setPinPointerActive?.(pointerHeld || !!next.windowMoving); setActive(true);
         },
         read: observation, target, setPointDiameter: (assetId, diameter) => runtime.setPointDiameter?.(assetId, diameter), pointDiameter: assetId => runtime.pointDiameter?.(assetId) ?? 3,
         revealPin(captionId, destination) {

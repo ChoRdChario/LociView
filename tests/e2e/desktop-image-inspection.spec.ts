@@ -88,6 +88,7 @@ test('image details, Scene keyboard focus and dismissible header sheets retain P
     const gallery = page.getByRole('region', { name: 'メディアの整理', exact: true }).getByRole('region', { name: '添付メディア', exact: true });
     const portraitCard = gallery.locator('figure').filter({ hasText: '縦向きの写真.jpg' });
     await expect(portraitCard).toHaveCount(1);
+    await expect(portraitCard.getByRole('button', { name: '画像を表示', exact: true })).toHaveAccessibleDescription(/縦向きの写真\.jpg/);
     await info.attach('portrait-thumbnail-before-scroll', { body: JSON.stringify(await portraitCard.evaluate(node => {
       const card = node.getBoundingClientRect(), pane = node.closest('.lv-caption-reading'), bounds = pane?.getBoundingClientRect();
       return { card: { top: card.top, bottom: card.bottom }, pane: bounds && { top: bounds.top, bottom: bounds.bottom, scrollTop: pane!.scrollTop },
@@ -97,6 +98,10 @@ test('image details, Scene keyboard focus and dismissible header sheets retain P
     await expect.poll(() => portraitCard.locator('img').evaluate(n => [(n as HTMLImageElement).naturalWidth,(n as HTMLImageElement).naturalHeight])).toEqual([4,8]);
     await portraitCard.getByRole('button', { name: '画像を表示', exact: true }).click();
     await expect.poll(() => dialog.locator('img').evaluate(n => [(n as HTMLImageElement).naturalWidth,(n as HTMLImageElement).naturalHeight])).toEqual([4,8]);
+    const previousPhoto = dialog.getByRole('button', { name: '前のメディア', exact: true });
+    const nextPhoto = dialog.getByRole('button', { name: '次のメディア', exact: true });
+    await previousPhoto.focus(); await page.keyboard.press('Enter'); await expect(nextPhoto).toBeFocused();
+    await page.keyboard.press('Enter'); await expect(previousPhoto).toBeFocused();
     await dialog.getByRole('button', { name: '閉じる', exact: true }).click();
     const phoneSource = await backup(page, info, 'with-portrait');
     const phoneContext = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block', acceptDownloads: true });

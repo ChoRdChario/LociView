@@ -176,6 +176,7 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
           target: isText ? { kind: 'text', captionId, field: name } : { kind: 'field', captionId, field: name as 'anchor' | 'colorSrgb' },
           ...(isText ? { manual: name } : {}), ...(name === 'anchor' ? { note: '比較中の位置は未確定です。モデルが非表示、または座標の基準を確認できない場合は表示されません。' } : {}),
           choices: field.candidates.map((c, i) => ({ id: c.operationId, editorName: editorNames.get(c.changeId) ?? null, label: `候補 ${i + 1}：${ready || isText ? describe(name!, c.value.kind === 'value' ? c.value.value : undefined) : '確認が必要な値'}`,
+            ...(ready && name === 'body' && c.value.kind === 'value' && typeof c.value.value === 'string' ? { bodyText: c.value.value } : {}),
             ...(ready && name === 'anchor' && c.value.kind === 'value' ? { anchor: c.value.value as unknown as import('../scene/types').Anchor } : {}) })) });
       }
       for (const [attachmentId, row] of Object.entries(p.details.mutable.captionAttachmentsById)) {

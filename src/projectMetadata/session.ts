@@ -1148,7 +1148,8 @@ export class MetadataProjectSession {
       if (entries.some(e => e !== own)) return fail('import-other-transaction');
       if (!own?.prepared) {
         const parts = initialWorkspaceChanges(source, this.limits);
-        const facts = await this.modelFacts.planImported(source, ref => job.inspection.archive.entryBlob(`blobs/sha256/${ref.digest}`), incomingBlobs(job.inspection.archive.control.manifest.blobs));
+        const facts = await this.measure('import.model-plan', () => this.modelFacts!.planImported!(source,
+          ref => job.inspection.archive.entryBlob(`blobs/sha256/${ref.digest}`), incomingBlobs(job.inspection.archive.control.manifest.blobs)));
         if (facts.baseToken !== null || facts.finalToken !== source.token) return fail('model-facts-token');
         const introduced = new Set((facts.stagedBlobs ?? []).map(b => b.digest));
         await this.media.inventory(inventory.filter(b => !introduced.has(b.digest)));

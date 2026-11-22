@@ -127,7 +127,7 @@ test('PC Caption work continues after empty tag focus and cancelled file checks,
     await tags.getByLabel('タグ名', { exact: true }).focus(); await page.keyboard.press('Tab');
     const backup = await output(page, info, '現地確認', 'backup');
     const before = await BackupArchive.inspect(new Blob([Uint8Array.from(await readFile(backup)).buffer]), limits);
-    const fileState = page.getByLabel('保存ファイルの状態', { exact: true });
+    const fileState = page.getByLabel('バックアップの状態', { exact: true });
     await expect(fileState).toBeVisible();
     await expect(fileState.locator(':scope > span').first()).toHaveText('ダウンロード開始');
     await expect(fileState).toHaveAttribute('title',`${await fileState.locator('.lv-save-filename').innerText()}\n保存先で完了を確認してください。`);

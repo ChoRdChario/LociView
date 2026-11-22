@@ -73,7 +73,7 @@ export function validationModelFacts(content: ValidationContent, timing?: Metada
   }, planReceived: (base, next, bodyFor, hasIncoming) => validationReceivedFacts(content, base, next, bodyFor, hasIncoming),
     planRestored: (next, bodyFor, refs) => restoredFacts(content, next, bodyFor, refs, timing),
     planImported: (next, bodyFor, hasIncoming) => content.withImportedGsInspection(inspect =>
-      receivedFacts(content, null, next, bodyFor, hasIncoming, inspect)), async plan(base, next) {
+      receivedFacts(content, null, next, bodyFor, hasIncoming, inspect, timing)), async plan(base, next) {
     const used = new Set<string>(), introduced = new Set<string>(), revisions=new Set<string>(), newRevisions=new Set<string>(); let work = 0;
     const charge = () => { if (++work > limits.maxWork) fileError('モデルの検証範囲を超えています。'); };
     for (const change of base.read().history.changes) for (const w of change.writes) {

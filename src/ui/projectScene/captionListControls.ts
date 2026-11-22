@@ -1,4 +1,4 @@
-import { captionColorKey, captionListView, captionOwnerLabel, captionTitle, planCaptionList,
+import { captionColorKey, captionListView, captionMatchExcerpt, captionOwnerLabel, captionTitle, planCaptionList,
   type CaptionListContext, type CaptionListIntent, type CaptionListPlan, type CaptionListRow } from './captionListState';
 import { sceneSwitchReason } from './navigationState';
 import { CaptionRowLayout } from './captionRowLayout';
@@ -127,7 +127,9 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     const body = preview?.token === context!.source.token && preview.sceneId === context!.source.sceneId && preview.captionId === item.id
       ? preview.body : undefined;
     const text = body ?? (item.body.kind === 'value' ? item.body.value : '');
-    label(entry.excerpt, text.slice(0, 160).replace(/\s+/g, ' ').trim().replace(/[\uD800-\uDBFF]$/, ''));
+    const match = captionMatchExcerpt(title ?? captionTitle(item), text, context!.memory.search);
+    label(entry.excerpt, match || text.slice(0, 160).replace(/\s+/g, ' ').trim().replace(/[\uD800-\uDBFF]$/, ''));
+    entry.excerpt.dataset.match = String(!!match);
     entry.excerpt.hidden = !entry.excerpt.textContent;
     entry.node.dataset.selected = String(item.id === context!.memory.selectedCaptionId);
     label(entry.title, title === undefined ? captionTitle(item) : title.trim() ? title : '無題'); label(entry.owner, captionOwnerLabel(item));
@@ -314,6 +316,16 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     const target = selected ? rows.get(selected)?.select : undefined;
     (target ?? search).focus?.({ preventScroll: true });
   }
+  function restoreFirstRow(id: string) {
+    const index = layout.index(id);
+    if (index === undefined || !list.clientHeight) return;
+    if (virtual) drawRows(layout.top(index));
+    const row = rows.get(id)?.node;
+    if (row) {
+      list.scrollTop += row.getBoundingClientRect().top - list.getBoundingClientRect().top - list.clientTop;
+      request({ kind: 'scroll', top: list.scrollTop });
+    }
+  }
   // A native scroll already moved the mounted rows. Only a virtual list needs
   // to replace rows at the new position. Keep the next intent's base memory current.
   function acceptScroll(next: CaptionListContext) {
@@ -324,5 +336,5 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     const index = captionId === null ? undefined : layout.index(captionId);
     return { previous: index !== undefined && index > 0, next: index !== undefined && index + 1 < (currentView?.rows.length ?? 0) };
   }
-  return { root, tools, searchId: search.id, render, acceptScroll, neighbors, revealSelected, focusSelection, focusSearch: () => search.focus?.({ preventScroll: true }), dispose, isComposing: () => composing };
+  return { root, tools, searchId: search.id, render, acceptScroll, neighbors, revealSelected, restoreFirstRow, focusSelection, focusSearch: () => search.focus?.({ preventScroll: true }), dispose, isComposing: () => composing };
 }

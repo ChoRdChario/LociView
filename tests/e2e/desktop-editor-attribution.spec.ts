@@ -127,7 +127,7 @@ test('08b editor names remain exact through collaboration, purpose privacy, rest
     await chooseHomeFiles(b.p, initial); await b.p.getByRole('button', { name: 'プロジェクトを取り込む', exact: true }).click();
     await expect(b.p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 }); await selected(b.p);
     const bs = b.p.getByLabel('設定', { exact: true }); await bs.locator(':scope > summary').click(); await expect(bs.getByRole('checkbox')).not.toBeChecked();
-    await editor(b.p, nameB); await edit(b.p, '本文', 'Bの手元編集'); await edit(a.p, '本文', 'Aの変更');
+    await editor(b.p, nameB); await edit(b.p, '本文', '接合部の写真\nBの手元編集\n確認日未定'); await edit(a.p, '本文', '接合部の写真\nAの変更\n確認日未定');
     const photo = smallPng(), chooser = b.p.waitForEvent('filechooser');
     await b.p.getByLabel('メディアを追加', { exact: true }).tap();
     await (await chooser).setFiles({ name: '接合部.png', mimeType: 'image/png', buffer: photo });
@@ -135,6 +135,11 @@ test('08b editor names remain exact through collaboration, purpose privacy, rest
     await receive(b.p, await output(a.p, info, 'A-update', 'teamWorkspace'), true);
     const group = b.p.getByRole('region', { name: '記録の競合', exact: true }).getByRole('listitem', { name: `${caption}：本文`, exact: true });
     await expect(group).toContainText(nameA); await expect(group).toContainText(nameB);
+    await expect(group.locator('mark')).toHaveCount(2);
+    for (const change of ['Aの変更', 'Bの手元編集']) {
+      await expect(group.locator('mark').filter({ hasText: change })).toHaveText(change);
+      await expect(group.getByRole('radio', { name: new RegExp(`接合部の写真.*${change}.*確認日未定`) })).not.toBeChecked();
+    }
     await group.getByRole('radio', { name: '自分で書く' }).check(); await group.getByRole('textbox').fill('AとBの確認済み本文');
     await group.getByRole('button', { name: '競合を解消', exact: true }).click(); await expect(group).toBeHidden({ timeout: 90_000 });
     console.log('08b: both editor names displayed and conflict resolved');

@@ -46,7 +46,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const header = make('header'), introduction = make('p', 'LociViewは3Dモデルと記録を編集できるアプリです。');
   const headerActions = make('div'); headerActions.className = 'lv-workspace-actions';
   const projectTitle = make('h1'), resumeStatus = make('p'), fileStatus = make('p'), help = make('details');
-  projectTitle.setAttribute('aria-label', 'プロジェクト名'); resumeStatus.setAttribute('aria-label', '再開データの状態'); fileStatus.setAttribute('aria-label', '保存ファイルの状態');
+  projectTitle.setAttribute('aria-label', 'プロジェクト名'); resumeStatus.setAttribute('aria-label', '再開データの状態');
   fileStatus.tabIndex = -1;
   const fileStateText = make('span'), fileNameText = make('span');
   fileNameText.className = 'lv-save-filename'; fileNameText.hidden = true; fileStatus.append(fileStateText, fileNameText);
@@ -92,7 +92,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const saveSummary = make('div'), browserState = make('div'), savedFileState = make('div');
   saveSummary.className = 'lv-save-summary'; saveSummary.setAttribute('role', 'group'); saveSummary.setAttribute('aria-label', '保存状況');
   browserState.className = savedFileState.className = 'lv-save-state';
-  const browserLabel = make('span', 'ブラウザ内'), fileLabel = make('span', 'ファイル');
+  const browserLabel = make('span', 'ブラウザ内'), fileLabel = make('span', 'バックアップ');
   browserLabel.className = fileLabel.className = 'lv-save-location';
   browserState.append(browserLabel, resumeStatus); savedFileState.append(fileLabel, fileStatus);
   saveSummary.append(browserState, savedFileState); identity.append(projectTitle, saveSummary);
@@ -459,7 +459,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     if (summary.backup === 'download-started') return 'ダウンロード開始';
     if (summary.backup === 'unavailable') return 'ファイル操作を確認';
     if (summary.backupOutdated) return '変更あり';
-    if (summary.backupCreated === false) return '未出力';
+    if (summary.backupCreated === false) return 'このブラウザでは未作成';
     if (summary.backupCreated) return '作成記録あり・照合前';
     return '保存未確認';
   }
@@ -877,7 +877,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   };
   document.addEventListener?.('pointerdown',dismissHeaderSheets,true);document.addEventListener?.('focusin',dismissHeaderSheets);
   let photoCaptions: readonly CaptionListItem[] = [];
-  let photoReturn: { token: string; sceneId: string; captionId: string } | undefined;
+  let photoReturn: { token: string; sceneId: string; captionId: string; displayedPhoto: boolean } | undefined;
   const cancelPhotoReturn = () => { photoReturn = undefined; };
   // A new gesture takes precedence over an earlier request waiting for the model.
   root.addEventListener('pointerdown', cancelPhotoReturn, true);
@@ -888,9 +888,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     const item = photoCaptions.find(c => c.id === captionId);
     const colors = memory().pinColors;
     if (item?.pin !== 'visible' || colors && !colors.includes(captionColorKey(item.color) ?? '')) return;
-    return () => {
+    return displayedPhoto => {
       if (memory().selectedCaptionId !== captionId) selectCaption(captionId, { openWindow: false });
-      photoReturn = { captionId, sceneId, token: provider().token };
+      photoReturn = { captionId, sceneId, token: provider().token, displayedPhoto };
       compactSurface = 'stage'; render(); list.revealSelected(); canvas.focus({ preventScroll: true });
     };
   }); media.append(mediaManager.root);
@@ -1453,6 +1453,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       const localText = awaitingReceiveFile ? '更新の受信を中断中。元のファイルを選び直してください。' : localSaveText(summary, !!hasDraft, saving, !!failed);
       if (resumeStatus.textContent !== localText) resumeStatus.textContent = localText;
       const fileWorking = readDuringOutput();
+      const fileSubject = fileWorking || summary.backup === 'unavailable' ? '書き出し' : 'バックアップ';
+      if (fileLabel.textContent !== fileSubject) fileLabel.textContent = fileSubject;
+      fileStatus.setAttribute('aria-label', `${fileSubject}の状態`);
       resumeStatus.hidden = fileWorking;
       browserState.hidden = resumeStatus.hidden;
       fileStatus.hidden = !fileWorking && !!(hasDraft || saving || failed);
@@ -1465,7 +1468,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       fileNameText.hidden = !fileName; fileNameText.title = fileName;
       fileStatus.dataset.fileBusy = String(fileWorking);
       fileStatus.title = !fileWorking && summary.backup === 'download-started' ? [fileName, '保存先で完了を確認してください。'].filter(Boolean).join('\n') :
-        summary.backup === 'unconfirmed' && summary.backupCreated === false ? 'このブラウザからの書き出し前です。元のファイルは変更しません。' : '';
+        !fileWorking && summary.backup === 'unconfirmed' && summary.backupCreated === false ? '「ファイルに保存」で、このブラウザの作業をバックアップできます。' : '';
       fileStatus.dataset.state = summary.backup === 'verified' ? 'verified' : summary.backup === 'unavailable' || summary.backupOutdated ? 'attention' : 'unconfirmed';
       const nextGestureContext = JSON.stringify([p.token, sceneId, ports.readOnly, ports.imageScope(), ports.otherPending(), models?.hidden(), memory().pinColors]);
       if (gestureContext !== nextGestureContext) { gestureContext = nextGestureContext; gesture = null; gestureGeneration++; }
@@ -1597,7 +1600,12 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       body.dataset.surface = compactSurface; body.dataset.inlinePreview = String(inlinePreview());
       body.dataset.drawingEditing = String(inlinePreview() && task === 'materials' && materials.hasChanges());
       const resolved = sceneId ? resolveScene(p.state, p.resources, sceneId) : null;
+      const selectedCaption = selected ? captions.find(caption => caption.id === selected) : undefined;
+      const selectedPinId = selectedCaption?.pin === 'visible' ? selectedCaption.id : undefined;
       const viewportInput:WorkspaceViewportState={ token: p.token, sceneId, selectedId: selected, pin, choosing,
+        ...(compactLayout() && task === 'captions' && ports.mode === 'edit' && document.hidden !== true && selectedPinId &&
+          (fieldValue(selectedCaption?.mediaCount) ?? 0) > 0 ?
+          { photoContext: photoReturn?.displayedPhoto && photoReturn.token === p.token && photoReturn.sceneId === sceneId && photoReturn.captionId === selected ? 'return' : 'record' } : {}),
         pinColors: memory().pinColors, hiddenAssetIds: models!.hidden(), model: models!.proposal(), windowMoving,
         available: resolved?.kind === 'ready', visible: stageVisible() && document.hidden !== true && !mediaWork.active, readOnly: !!blocked || resolved?.kind !== 'ready', comparison: recovery!.comparison(), material: materials.proposal() };
       installedViewportInput=viewportInput;viewport.update(viewportInput);
@@ -1643,7 +1651,6 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       if (drawingNotice.textContent !== (seen.drawingNotice ?? '')) drawingNotice.textContent = seen.drawingNotice ?? '';
       retryViewport.hidden = !seen.issue && !viewportFeedback&&!seen.retryAvailable; retryViewport.disabled = viewBlocked();
       let camera: unknown=seen.camera; try { camera ??= viewport.capture().camera; } catch { /* Preparation has no camera yet. */ }
-      const selectedPinId = captions.find(caption => caption.id === selected && caption.pin === 'visible')?.id;
       const selectedPin = seen.ready && seen.token === p.token && seen.sceneId === sceneId && viewportInput.available && viewportInput.visible !== false && selectedPinId ? seen.pins.find(pin => pin.id === selectedPinId) : undefined;
       if (photoReturn) {
         if (photoReturn.token !== p.token || photoReturn.sceneId !== sceneId || photoReturn.captionId !== selected || seen.issue) cancelPhotoReturn();
@@ -1701,11 +1708,12 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     } finally { rendering = false; if (renderAgain) { renderAgain = false; render(); } }
   }
   mounted = true; render();
-  if (reading?.focus) queueMicrotask(() => {
+  if (reading && (reading.focus || reading.firstVisibleId)) queueMicrotask(() => {
     if (disposed || !root.isConnected) return;
-    if (reading.focus === 'row' && memory().selectedCaptionId) list.focusSelection();
+    if (reading.firstVisibleId) list.restoreFirstRow(reading.firstVisibleId);
+    if (reading.focus === 'row') list.focusSelection(reading.focusedRowId ?? memory().selectedCaptionId);
     else if (reading.focus === 'detail' && memory().selectedCaptionId) detailHeading.focus({ preventScroll: true });
-    else list.focusSearch();
+    else if (reading.focus) list.focusSearch();
   });
   return { root, headerActions, fileStatus, projectNavigation: otherProject, utilityArea: settingsSheet, clearNotice(){if(!pending&&ports.status().kind==='idle')feedback='';},
     dismissDisclosures() {

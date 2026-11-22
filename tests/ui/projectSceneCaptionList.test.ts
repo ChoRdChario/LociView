@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { value, type Field } from '../../src/scene/types';
-import { captionColorKey, captionListPlanIsCurrent, captionListView, ownerFilterKey, planCaptionList,
+import { captionColorKey, captionListPlanIsCurrent, captionListView, captionMatchExcerpt, ownerFilterKey, planCaptionList,
   type CaptionListContext, type CaptionListItem, type CaptionListPlan } from '../../src/ui/projectScene/captionListState';
 import { createCaptionListControls } from '../../src/ui/projectScene/captionListControls';
 import { planNavigation } from '../../src/ui/projectScene/navigationState';
@@ -9,6 +9,14 @@ import { RecordedDocument, record } from './domRecorder';
 const a = 'cap_' + '1'.repeat(32), b = 'cap_' + '2'.repeat(32), c = 'cap_' + '3'.repeat(32);
 const model = 'ast_' + '1'.repeat(32), scene = 'scn_' + '1'.repeat(32);
 const red = '#ff0000', blue = '#0000ff';
+it('shows the original passage around a body-only hit beyond the normal excerpt', () => {
+  const passage = '風防枠内側は同色 <写真8>';
+  const body = 'İ'.repeat(200) + '🛩️' + passage;
+  expect(captionMatchExcerpt('写真8', body, '風防')).toContain(passage);
+  expect(captionMatchExcerpt('風防', body, '風防')).toBe('');
+  expect(captionMatchExcerpt('写真8', body, '脚庫')).toBe('');
+  expect(captionMatchExcerpt('写真8', body, '')).toBe('');
+});
 const unresolved = <T>(): Field<T> => ({ kind: 'unresolved', reason: 'conflict' });
 const item = (id: string, title: string, color: string): CaptionListItem => ({ id, title: value(title), body: value('記録'),
   color: value(color), owner: value({ kind: 'asset', assetId: model, name: value('試験モデル') }), mediaCount: value(2), pin: 'visible' });
