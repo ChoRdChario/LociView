@@ -1,5 +1,5 @@
 import { chooseHomeFiles, beginMaterialEditing } from './workspaceUi';
-import { revealCoordinateAdd, lookAlongFront, revealCaptionList } from './workspaceUi';
+import { revealCoordinateAdd, lookAlongFront, revealCaptionList, expectResumedProject } from './workspaceUi';
 import { test, expect, chromium, type BrowserContext, type Page } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir } from 'node:fs/promises';
@@ -10,7 +10,6 @@ import { inspectProjectCandidates } from '../../src/domain/projectCandidates';
 import { validationMetadataLimits } from '../../src/projectFiles/validation';
 import { smallPng, triangleGlb } from './fixtures';
 
-const entry = `http://127.0.0.1:4182/dev.html?editor=project${process.env.LOCIVIEW_E2E_TIMINGS === '1' ? '&timings=1' : ''}`;
 const projectName = '自動検証のプロジェクト', captionName = '三角形の確認';
 const body = '自動検証の本文\n画像と位置を保存します。';
 const tracing = process.env.LOCIVIEW_E2E_TRACE !== '0';
@@ -29,7 +28,8 @@ async function checkCaption(page: Page, expectedBody = body) {
   const detail = page.getByRole('region', { name: '記録の詳細', exact: true });
   await expect(detail.getByLabel('タイトル', { exact: true })).toHaveValue(captionName);
   await expect(detail.getByLabel('本文', { exact: true })).toHaveValue(expectedBody);
-  const image = page.getByRole('region', { name: 'メディアの整理', exact: true }).locator('img').first();
+  const image = detail.locator('img:visible').or(page.locator('.lv-caption-window').filter({ hasText: captionName }).locator('img:visible'));
+  await expect(image).toHaveCount(1);
   await expect(image).toBeVisible();
   await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth)).toBe(2);
 }
@@ -70,7 +70,7 @@ async function saveBackup(page: Page, path: string, name: string, boundaries?: R
   await download.saveAs(path); expect(await download.failure()).toBeNull();
   const history = files.locator('details').filter({ has: page.locator('summary', { hasText: /^作成したファイル$/ }) });
   await history.locator('summary').first().click();
-  const row = history.locator('section').filter({ hasText: `バックアップ ${name} —` });
+  const row = history.locator('section').filter({ hasText: `保存ファイル ${name} —` });
   await row.getByText('保存したファイルを確認', { exact: true }).click();
   const choosing = page.waitForEvent('filechooser');
   await row.getByRole('button', { name: 'ファイルを選択', exact: true }).click();
@@ -81,7 +81,8 @@ async function saveBackup(page: Page, path: string, name: string, boundaries?: R
   if (boundaries) boundaries[`${name}.selected-file-to-ack-ms`] = performance.now() - verifyStarted;
 }
 
-test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相当の復元から続けられる', async ({}, testInfo) => {
+test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相当の復元から続けられる', async ({ baseURL }, testInfo) => {
+  const entry = new URL(`/dev.html?editor=project${process.env.LOCIVIEW_E2E_TIMINGS === '1' ? '&timings=1' : ''}`, baseURL).href;
   const root = testInfo.outputPath('profiles'); await mkdir(root, { recursive: true });
   const profile = await mkdtemp(join(root, 'workflow-'));
   const restoredProfile = await mkdtemp(join(root, 'restored-'));
@@ -157,7 +158,7 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
   try {
     let page = await launch(profile);
     await page.goto(entry);
-    const html = await page.request.get('http://127.0.0.1:4182/dev.html');
+    const html = await page.request.get(entry);
     expect(sha256(await html.body())).toBe(sha256(await readFile('validation-dist/dev.html')));
     const assets = await readdir('validation-dist/assets');
     await testInfo.attach('実行環境', { body: JSON.stringify({ browser: context!.browser()!.version(), headless: true, tracing,
@@ -235,12 +236,12 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
     const first = await inspectBackup(backup, glb, png, body);
     await measure('通常の再読込から編集画面の準備', async () => { await page.reload(); await projectReady(page); });
     await selectCaption(page); await checkCaption(page);
-    await expect(page.getByLabel('バックアップの状態', { exact: true })).toContainText('一致しています');
+    await expect(page.getByLabel('バックアップの状態', { exact: true })).toHaveText('選択ファイルと一致');
     await close();
 
     page = await measure('完全終了後の起動と再開', async () => {
       const resumed = await launch(profile); await resumed.goto(entry);
-      await expect(resumed.getByText(`最後のプロジェクトを再開しました：${projectName}`, { exact: true })).toBeVisible({ timeout: 90_000 });
+      await expectResumedProject(resumed, projectName, 90_000);
       return resumed;
     });
     await selectCaption(page); await checkCaption(page);
@@ -251,8 +252,8 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
     await chooseHomeFiles(page, backup);
     await measure('空の保存領域への初回復元', async () => {
       await page.getByRole('button', { name: 'このファイルから再開', exact: true }).click();
-      await expect(page.getByText('バックアップから復元しています。', { exact: true })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'このファイルから再開', exact: true })).toBeDisabled();
+      await expect(page.locator('.lv-restore-progress')).toBeVisible();
+      await expect(page.locator('.lv-first-restore-actions button').filter({ hasText: 'このファイルから再開' })).toBeDisabled();
       await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(projectName, { timeout: 90_000 });
     });
     await selectCaption(page); await checkCaption(page);

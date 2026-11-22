@@ -3758,7 +3758,9 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const reader=all(root).find(n=>n.attributes.get('aria-label')==='復元中の記録')!;expect(reader).toBeDefined();
       expect(all(root).find(n=>n.parent===root&&n.tag==='button'&&n.textContent==='選択を取り消す')!.hidden).toBe(true);
       const find=(n:RecordedNode):RecordedNode[]=>[n,...n.children.flatMap(find)];
-      expect(find(reader).some(n=>n.textContent==='記録・写真・モデルを保存して照合しています。 記録は閲覧・検索できます。編集・保存は完了後に使えます。')).toBe(true);
+      const progress = find(reader).find(n => n.className === 'lv-restore-progress')!;
+      expect(find(progress).map(n => n.textContent)).toEqual(expect.arrayContaining(['工程 2 / 4', '記録・写真・モデルを保存して照合しています。', '記録を閲覧・検索できます。編集・保存は復元後に使えます。']));
+      expect(find(progress).filter(n => n.dataset.state).map(n => n.dataset.state)).toEqual(['done', 'current', 'waiting', 'waiting']);
       const search=find(reader).find(n=>n.tag==='input')!;search.value='';search.fire('input');
       const rows=find(reader).find(n=>n.tag==='ul')!.children;expect(rows.length).toBeGreaterThan(0);
       rows[0]!.children[0]!.fire('click');expect(find(reader).find(n=>n.attributes.get('aria-label')==='記録の詳細')!.hidden).toBe(false);
@@ -3782,8 +3784,8 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await ui.dispose(); const cold = owned(await openValidationEntry(r.options)); if ('kind' in cold) throw Error('selected Host');
     expect(cold.read().source!.originalChanges()).toEqual(edited.originalChanges()); expect(r.openStorage).not.toHaveBeenCalled();
   }, 60_000);
-  it.each(['failure', 'dispose', 'render-dispose', 'composition-dispose'] as const)('clears first-restore text without exposing commands after %s', async outcome => {
-    const f = await restoreFileFixture(true), r = await firstBackupHostFixture(f.backupFile);
+  it.each(['failure', 'empty-failure', 'dispose', 'render-dispose', 'composition-dispose'] as const)('clears first-restore text without exposing commands after %s', async outcome => {
+    const f = await restoreFileFixture(outcome !== 'empty-failure'), r = await firstBackupHostFixture(f.backupFile);
     let reject!: (error: Error) => void, finish!: () => void, confirmed: Awaited<ReturnType<typeof openValidationHost>> | undefined;
     const ready = new Promise<void>((resolve, fail) => { finish = resolve; reject = fail; }), release = vi.fn();
     let enterRender!: () => void; const renderEntered = new Promise<void>(resolve => { enterRender = resolve; });
@@ -3807,7 +3809,11 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     Object.assign(input, { files: [new File([f.backupFile], '復元する記録.zip')] });
     input.fire('change');
     await vi.waitFor(() => expect(button('このファイルから再開')?.disabled).toBe(false)); button('このファイルから再開')!.fire('click');
-    await vi.waitFor(() => expect(all(root).some(n => n.attributes.get('aria-label') === '復元中の記録')).toBe(true), { timeout: 20000 });
+    if (outcome === 'empty-failure') {
+      await renderEntered;
+      expect(all(root).some(n => n.textContent === '先に表示できる記録はありません。編集・保存は復元後に使えます。')).toBe(true);
+      expect(all(root).some(n => n.attributes.get('aria-label') === '復元中の記録')).toBe(false);
+    } else await vi.waitFor(() => expect(all(root).some(n => n.attributes.get('aria-label') === '復元中の記録')).toBe(true), { timeout: 20000 });
     expect(all(root).some(n => n.className === 'lv-project-workspace')).toBe(false);
     await renderEntered;
     if (outcome === 'composition-dispose') {
@@ -3824,6 +3830,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       await vi.waitFor(() => expect(ui.hasChanges()).toBe(true));
     }
     expect(all(root).some(n => n.attributes.get('aria-label') === '復元中の記録')).toBe(false);
+    expect(all(root).some(n => n.className === 'lv-restore-progress')).toBe(false);
     expect(all(root).some(n => n.className === 'lv-project-workspace')).toBe(false); expect(release).toHaveBeenCalledOnce();
     await ui.dispose();
   }, 60000);
@@ -8117,7 +8124,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const input=operation==='receive'?named('更新ファイルを選択'):restoreInput;Object.assign(input,{files:[file]});input.fire('change');
     if(operation==='receive')button('更新を受け取る',root).parent!.fire('submit',{preventDefault(){}});else button('内容を確認',restoreArea).fire('click');
     const active=operation==='receive'?common:restoreStatus,inactive=operation==='receive'?restoreStatus:common;
-    expect(active.dataset.busy).toBe('true');expect(inactive.dataset.busy).toBe('false');expect(active.textContent).toBe(operation==='receive'?'更新を確認しています。':'復元を確認しています。');
+    expect(active.dataset.busy).toBe('true');expect(inactive.dataset.busy).toBe('false');expect(active.textContent).toBe(operation==='receive'?'更新を確認しています。':'バックアップの内容を確認しています。');
     if(operation==='restore')expect(common.textContent).toBe('');expect(button('保存',named('ファイル')).disabled).toBe(true);expect(h.ui.hasChanges()).toBe(true);
     release();await vi.waitFor(()=>expect(active.dataset.busy).toBe('false'));expect(active.textContent).toBe(operation==='receive'?'受信の検証失敗':'復元の検証失敗');
     expect((input as unknown as HTMLInputElement).files?.[0]).toBe(file);expect(host.read().source!.token).toBe(source.token);expect(h.ui.hasChanges()).toBe(true);action.mockRestore();

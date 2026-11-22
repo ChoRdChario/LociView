@@ -27,6 +27,7 @@ import { BackupArchive } from '../projectPackage/backupArchive';
 import type { PngDecoder } from '../projectFiles/png';
 import { isJpeg, type JpegDecoder } from '../projectFiles/jpeg';
 import type { openValidationHost, ValidationHostOptions, ValidationNormalHost, FirstBackupRecovery, InterruptedLocalEditRecovery, FirstRestoreCaptionPreview, FirstRestoreStage } from './validationHost';
+import { createFirstRestoreProgress } from './firstRestoreProgress';
 import { createValidationModeHost, type ValidationDisplayHost } from './validationModeHost';
 import type { LocalOpenMode } from './hostPorts';
 import type { ResumeReadingRequest, ValidationProjectEntry } from './validationCatalog';
@@ -714,6 +715,9 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       ? 'バックアップの時点に切り替えます。現在の作業と元ファイルは残ります。' : 'このブラウザで編集できるようにします。元ファイルは変更しません。'
       : state.phase === 'terminal' ? 'プロジェクトはまだありません。復元の記録は保持しています。ファイルを選択して開き直せます。' : state.phase === 'beforeStart'
         ? '復元はまだ始まっていません。「復元を取りやめる」で一覧に戻り、元のバックアップを選び直してください。' : 'バックアップの初回復元が未完了です。記録を使って再開するか、取りやめてください。');
+    if (state.phase === 'preview' && !state.replacing && !recoveryFailure && ports.progressivePresentation) {
+      note.textContent += ' 確認できた本文は、復元中でも読めます。';
+    }
     const summary = document.createElement('h2'); summary.textContent = state.title; summary.tabIndex = -1; firstRestoreHeading = summary;
     const fileSummary = document.createElement('p'); fileSummary.textContent = [state.fileName, state.memo].filter(Boolean).join(' — '); fileSummary.hidden = !fileSummary.textContent;
     const button = (label: string, action: () => Promise<void>) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = label;
@@ -730,25 +734,23 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       } catch (error) { renderFirstRecovery(); throw error; }
     });
     else if (state.phase === 'preview' || state.phase === 'pending' && state.retryable) button(state.phase === 'preview' ? state.replacing ? 'バックアップから復元' : 'このファイルから再開' : '復元を再開', async () => {
-      status.textContent = 'バックアップから復元しています。';
+      const progress = createFirstRestoreProgress(document, state.phase === 'preview' && !state.replacing, !!ports.progressivePresentation && !state.replacing);
+      status.textContent = '';
+      panel.insertBefore(progress.root, readerSlot);
+      note.textContent = state.replacing ? '現在の作業と元ファイルは残ります。' : '元のファイルは変更しません。';
+      details.render(undefined);
       let staged: Awaited<ReturnType<ValidationWorkspacePorts['render']>> | undefined,
         preparation: Parameters<ValidationDisplayHost['setDisplayPreparation']>[0] | undefined, sourceContent: ValidationNormalHost['content'] | undefined,
         reading: ReturnType<typeof createCaptionTextReading> | undefined, fallback: ReturnType<typeof createResumeReading> | undefined, preview: FirstRestoreCaptionPreview | undefined, opened: ValidationNormalHost | undefined;
-      let accepting = true, progressText = '復元を始めています。';
+      let accepting = true;
       const showProgress = (stage: FirstRestoreStage) => {
-        if (!accepting || disposed || firstRecovery !== target) return;
-        const stages: Record<FirstRestoreStage, string> = {
-          persist: '復元の準備を保存しています。', 'open-staging': '復元先を準備しています。',
-          initialize: '記録・写真・モデルを保存して照合しています。', projection: '保存した記録を確認しています。',
-          display: '3Dの表示を準備しています。', select: '復元先を確定しています。', adopt: '保存した作業を開いています。',
-          'restore-existing': 'バックアップから復元しています。', 'inspect-recovery': '中断した復元を確認しています。',
-        };
-        progressText = stages[stage];
-        const view = reading ?? fallback;
-        if (view) { view.setProgress(progressText); status.textContent = ''; }
-        else status.textContent = progressText;
+        if (accepting && !disposed && firstRecovery === target) progress.stage(stage);
       };
-      const withdraw = () => { reading?.dispose(); reading = undefined; preview = undefined; };
+      const withdraw = () => {
+        if (!reading) return;
+        if (accepting && !disposed && firstRecovery === target) { panel.insertBefore(progress.root, readerSlot); progress.waiting(); }
+        reading.dispose(); reading = undefined; preview = undefined;
+      };
       try {
         opened = await target[state.phase === 'preview' ? 'confirm' : 'retry'](async (next, preparedContent) => {
           if (disposed || firstRecovery !== target) throw Error('画面を閉じました。復元記録は保持しています。');
@@ -761,9 +763,10 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
               if (records.length) {
                 fallback?.dispose(); fallback = createResumeReading(document, { token: next.state.token, sceneId: scene.composition.sceneId,
                   title: state.title, records, ...(scene.composition.name.kind === 'value' ? { sceneName: scene.composition.name.value } : {}) }, 'restore');
-                fallback.setProgress(progressText); readerSlot.replaceChildren(fallback.root); status.textContent = '';
+                fallback.showRestoreProgress(progress.root); readerSlot.replaceChildren(fallback.root);
               }
-            }
+              progress.readable(records.length);
+            } else progress.readable(0);
           } catch { fallback?.dispose(); fallback = undefined; }
           sourceContent = preparedContent; const candidate = await untilOpen(ownRender(ports.render({ authority: { readOnly: true, read: () => next,  },
             content: { model: record => sourceContent!.model(record), modelContent: record => sourceContent!.modelContent(record) },
@@ -780,8 +783,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
           if (!accepting) return;
           if (preview || fallback) return;
           const view = createCaptionTextReading(document, value, 'first-restore');
-          status.textContent = ''; summary.textContent = state.title; note.textContent = '元のファイルは変更しません。';
-          view.setProgress(progressText); preview = value; reading = view; readerSlot.replaceChildren(view.root);
+          preview = value; reading = view; view.showRestoreProgress(progress.root); readerSlot.replaceChildren(view.root); progress.readable(value.records.length);
         } : undefined, showProgress);
         accepting = false;
         if (disposed || firstRecovery !== target) return;

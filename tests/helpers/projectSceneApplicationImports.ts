@@ -612,6 +612,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./hostPorts",
     "./modelCandidatePreview",
     "./productWorkspace",
+    "./firstRestoreProgress",
     "./resumeReading",
     "./reviewView",
     "./reviewWorkspace",
@@ -628,6 +629,9 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
   "src/projectScene/resumeReading.ts": [
     "../ui/projectScene/captionListState",
     "./validationCatalog"
+  ],
+  "src/projectScene/firstRestoreProgress.ts": [
+    "./validationHost"
   ],
   "src/projectScene/viewDisplay.ts": [
     "../scene/types",

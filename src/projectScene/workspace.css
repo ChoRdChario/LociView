@@ -12,6 +12,20 @@
 .lv-first-restore-reading .lv-project-stage { display: none; }
 .lv-first-restore-reading .lv-project-body { display: flex; }
 .lv-first-restore-reading aside { flex: 1; height: 100%; }
+.lv-restore-progress { min-width: 0; color: var(--lv-ink); font-size: .875rem; line-height: 1.4; }
+.lv-first-restore-panel > .lv-restore-progress { margin-block: 12px; }
+.lv-restore-progress p { margin: 0; overflow-wrap: anywhere; }
+.lv-restore-progress p:first-child { font-weight: 600; }
+.lv-restore-progress p:last-child { margin-top: .2em; }
+.lv-restore-counter { margin-inline-end: .65em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lv-restore-steps:not([hidden]) { display: flex; gap: 3px; width: min(9rem, 100%); margin-block: 4px; }
+.lv-restore-steps > span { flex: 1; height: 4px; box-sizing: border-box; border: 1px solid var(--lv-rule); }
+.lv-restore-steps > [data-state="done"] { background: currentColor; border-color: currentColor; }
+.lv-restore-steps > [data-state="current"] { border-color: currentColor; }
+@media (prefers-reduced-motion: no-preference) {
+  .lv-restore-steps > [data-state="current"] { animation: lv-restore-current 1.8s ease-in-out infinite; }
+}
+@keyframes lv-restore-current { 50% { background-color: currentColor; } }
 /* Shared ProjectScene shell and viewport styles. Legacy/Native roots keep their own styles. */
 .lv-validation-host:has(> .lv-validation-content > .lv-resume-reading) { height: 100dvh; padding-top: 0; }
 .lv-validation-host:has(> .lv-validation-content > .lv-resume-reading) > .lv-home-settings,
@@ -350,7 +364,7 @@
 .lv-first-restore-panel:not(:has(.lv-resume-reading)) { box-sizing: border-box; max-width: 948px; margin: 16px auto; padding: 16px 20px; background: var(--lv-panel); border: 1px solid var(--lv-rule); border-radius: 6px; }
 .lv-first-restore-panel > h2 { margin: 0 0 12px; font-size: 18px; line-height: 1.5; }
 .lv-first-restore-panel:has(.lv-resume-reading) > h2 { margin: 4px 12px; font-size: 16px; }
-.lv-first-restore-panel:has(.lv-resume-reading) > .lv-first-restore-actions { padding-inline: 12px; }
+.lv-first-restore-panel:has(.lv-resume-reading) > .lv-first-restore-actions { display: none; }
 .lv-first-restore-panel > p { margin: 12px 0; }
 .lv-first-restore-actions { display: flex; flex-wrap: wrap; gap: 8px; padding-block: 4px; }
 .lv-first-restore-actions > button { box-sizing: border-box; min-height: 44px; min-width: 44px; max-width: 100%; padding: 8px 12px; border: 1px solid var(--lv-line); border-radius: 6px; background: var(--lv-field); color: var(--lv-ink); font: inherit; white-space: normal; }

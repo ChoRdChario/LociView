@@ -125,8 +125,9 @@ export function createCaptionTextReading(document: Document, reading: Omit<Resum
   return { root, restoreScroll(top: number) { list.scrollTop = top; observedTop = list.scrollTop; }, readingPosition: () => ({
     focusedRowId: rows.find(item => item.button === document.activeElement)?.record.id, scrollTop: scrolled, picked
   }), composition: () => composition, selection,
-    setProgress(message: string) { if (status.dataset.busy === 'true') status.textContent = `${message} 記録は閲覧・検索できます。編集・保存は完了後に使えます。`; },
-    setReady() { status.textContent = importing ? '取り込みが完了しました。入力を終えると編集画面に移ります。' : '復元が完了しました。入力を終えると編集画面に移ります。'; status.dataset.busy = 'false'; }, dispose() { finish?.(); root.remove(); } };
+    showRestoreProgress(progress: HTMLElement) { identity.replaceChildren(heading, progress); },
+    setReady() { status.textContent = importing ? '取り込みが完了しました。入力を終えると編集画面に移ります。' : '復元が完了しました。入力を終えると編集画面に移ります。'; status.dataset.busy = 'false'; if (status.parentElement !== identity) identity.replaceChildren(heading, status); },
+    dispose() { finish?.(); root.remove(); } };
 }
 
 /** Ordinary saved/staged-source reading retains its actual token. */

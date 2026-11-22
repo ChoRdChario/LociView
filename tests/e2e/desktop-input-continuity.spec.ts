@@ -219,8 +219,12 @@ for (const touch of [false, true]) test(`autosaved text and photos survive file 
     const firstReader = resumed.getByRole('region', { name: '復元中の記録', exact: true });
     await expect(firstReader).toBeVisible(); await expect.poll(() => resumed.evaluate(() => (window as any).firstRestoreGate.held)).toBeGreaterThan(0);
     await expect(firstReader.getByRole('status')).toContainText('記録・写真・モデルを保存して照合');
+    await expect(firstReader.getByRole('status')).toContainText('工程 2 / 4');
+    await expect(firstReader.getByRole('status')).toContainText('記録を閲覧・検索できます');
     await expect(resumed.locator('main.lv-project-workspace')).toHaveCount(0); await expect(firstReader.locator('textarea,input[type=file],canvas,img,video,audio')).toHaveCount(0);
-    await expect(resumed.getByRole('button', { name: 'キャンセル', exact: true })).toBeDisabled();
+    const restoreActions = resumed.locator('.lv-first-restore-actions');
+    await expect(restoreActions).toBeHidden();
+    await expect(restoreActions.locator('button').filter({ hasText: 'キャンセル' })).toBeDisabled();
     if (touch) await resumed.setViewportSize({ width: 320, height: 365 });
     await firstReader.getByRole('button', { name: '再開時の記録', exact: true }).click();
     await expect(firstReader.getByText('元のバックアップ本文', { exact: true })).toBeVisible();
@@ -233,6 +237,7 @@ for (const touch of [false, true]) test(`autosaved text and photos survive file 
     await expect.poll(() => resumed.evaluate(() => performance.getEntriesByName('lociview.restore.first.adopt').length), { timeout: restoreTimeLeft() }).toBeGreaterThan(0);
     expect(await firstReaderNode!.evaluate(node => node.isConnected)).toBe(true); await expect(firstSearch).toBeFocused();
     await expect(firstReader.getByText('復元が完了しました。入力を終えると編集画面に移ります。', { exact: true })).toBeVisible();
+    await expect(firstReader.locator('.lv-restore-progress')).toHaveCount(0);
     await firstSearch.dispatchEvent('compositionend'); await expect(firstReader).toHaveCount(0);
     // Existing first-backup operation budget, separate from the 15s UI/180s overall limits.
     await expect(resumed.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled({ timeout: restoreTimeLeft() });

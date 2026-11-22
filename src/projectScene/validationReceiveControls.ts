@@ -76,15 +76,18 @@ export function createValidationReceiveControls(document: Document, host: Return
     editOnly(b);
     b.addEventListener('click', () => { if (!b.disabled) action(); }); parent.append(b);
   };
-  const performRestore = (action: () => Promise<void>, recovery: boolean, completed: string, consume = true) => {
+  const performRestore = (action: () => Promise<void>, recovery: boolean, completed: string, operation: 'switch' | 'inspect' | 'cancel' = 'switch') => {
     if (busy || disposed || output.hasChanges() || input.files?.length || selectedJob || selectedCopy || cancel) return;
     feedback = '';
     try { guard(recovery,true); } catch (error) { restoreFeedback = (error as Error).message; render(); return; }
-    busy = true; activeOperation = 'restore'; restoreFailure = undefined; restoreFeedback = '復元を確認しています。'; render(); changed();
+    busy = true; activeOperation = 'restore'; restoreFailure = undefined;
+    restoreFeedback = operation === 'switch' ? 'バックアップの内容に切り替えています。復元先の記録は切り替え後に読めます。' :
+      operation === 'cancel' ? '復元を取りやめています。' : 'バックアップの内容を確認しています。';
+    render(); changed();
     void (async () => {
       try {
         await action(); if (disposed) return;
-        if (consume) { restoreInput.value = ''; restorePrepared = false; restoreCancel = false; }
+        if (operation !== 'inspect') { restoreInput.value = ''; restorePrepared = false; restoreCancel = false; }
         await recovered(); restoreFeedback = completed;
       } catch (error) { if (!disposed) { restoreFeedback = error instanceof Error ? error.message : '復元を完了できません。元のデータは保持しています。'; restoreFailure = { raw: restoreFeedback, error }; } }
       finally { busy = false; activeOperation = null; if (!disposed) { render(); changed(); } }
@@ -165,7 +168,7 @@ export function createValidationReceiveControls(document: Document, host: Return
     if (host.backupRestore.cancellable) button(restoreCommands, '復元を取りやめる', () => { restoreCancel = true; render(); changed(); });
     if (restoreCancel) {
       const note = document.createElement('p'); note.textContent = '復元を取りやめ、現在の作業を続けます。'; restoreCommands.append(note);
-      button(restoreCommands, '取りやめる', () => performRestore(() => host.backupRestore.cancel(), true, '復元を取りやめました。'));
+      button(restoreCommands, '取りやめる', () => performRestore(() => host.backupRestore.cancel(), true, '復元を取りやめました。', 'cancel'));
       button(restoreCommands, '戻る', () => { restoreCancel = false; render(); changed(); });
     } else if (!host.backupRestore.pending && !host.backupRestore.needsDisplay) {
       if (restorePrepared) {
@@ -176,7 +179,7 @@ export function createValidationReceiveControls(document: Document, host: Return
       } else if (restoreInput.files?.length) button(restoreCommands, '内容を確認', () => performRestore(async () => {
         const file = restoreInput.files?.[0]; if (!file) throw Error('バックアップを選択してください。');
         await host.backupRestore.prepare(file); restorePrepared = true;
-      }, false, '復元内容を確認してください。', false));
+      }, false, '復元内容を確認してください。', 'inspect'));
       if (restoreChanges()) button(restoreCommands, '復元の選択を取り消す', () => {
         host.backupRestore.clearPreparation(); restoreInput.value = ''; restorePrepared = false; restoreFeedback = ''; render(); changed();
       });
