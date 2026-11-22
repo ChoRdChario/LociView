@@ -28,6 +28,11 @@ for(const touch of [false,true])test(`Home sample follows normal inspection, sav
   await page.getByRole('button',{name:'画像を表示',exact:true}).locator('visible=true').first().click();const viewer=page.getByRole('dialog',{name:'メディアビューア',exact:true});
   await expect.poll(()=>viewer.locator('img').evaluate((node:HTMLImageElement)=>node.naturalWidth)).toBe(320);
   await expect(viewer.getByRole('button',{name:'倍率 100%',exact:true})).toHaveCount(0);await viewer.getByRole('button',{name:'閉じる',exact:true}).click();
+  await page.getByRole('button',{name:'画像を表示',exact:true}).locator('visible=true').first().click();
+  await viewer.getByRole('button',{name:'ピンを表示',exact:true}).click();
+  await expect(viewer).toBeHidden(); await expect(canvas).toBeFocused();
+  await expect(page.locator('.lv-project-stage button[data-caption-id][aria-pressed="true"]')).toBeInViewport();
+  if(touch){await revealCaptionList(page);await row.click();}
   const body='サンプルに書き加えた記録';await detail.getByLabel('本文',{exact:true}).fill(body);await expect(detail.locator('[data-save-state]')).toHaveAttribute('data-save-state','saved',{timeout:30000});
   const header=page.locator('main.lv-project-workspace > header');await expect(header.getByRole('button',{name:'共有',exact:true})).toBeVisible();
   const [download]=await Promise.all([page.waitForEvent('download'),header.getByRole('button',{name:'ファイルに保存',exact:true}).click()]);const file=info.outputPath('sample-backup.zip');await download.saveAs(file);expect(await download.failure()).toBeNull();

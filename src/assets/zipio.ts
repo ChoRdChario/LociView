@@ -5,6 +5,7 @@ import {
   BlobReader,
   configure,
   ERR_BAD_FORMAT,
+  ERR_EOCDR_NOT_FOUND,
   Uint8ArrayReader,
   Uint8ArrayWriter,
   ZipReader,
@@ -29,7 +30,7 @@ export const DEFAULT_ZIP_LIMITS: ZipLimits = {
 };
 
 export function isUnrecognizedZip(error: unknown): boolean {
-  return error instanceof Error && error.message === ERR_BAD_FORMAT;
+  return error instanceof Error && (error.message === ERR_BAD_FORMAT || error.message === ERR_EOCDR_NOT_FOUND);
 }
 
 export class ZipGuardError extends Error {

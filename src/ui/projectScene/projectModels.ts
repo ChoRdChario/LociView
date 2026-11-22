@@ -210,7 +210,9 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
   pointSizeInput.type = 'range'; pointSizeInput.min = '1'; pointSizeInput.max = '20'; pointSizeInput.step = '1'; pointSizeInput.setAttribute('aria-label', '点の大きさ（px）'); pointSizeLabel.append(pointSizeInput); pointSizeArea.append(pointSizeLabel);
   pointSizeInput.addEventListener('input', () => { const assetId = memory().assetId; if (assetId && !pointSizeInput.disabled) { host.viewport().setPointDiameter?.(assetId, Number(pointSizeInput.value)); host.changed(); } });
   const manage = make('details'); manage.className = 'lv-model-management'; manage.append(make('summary', 'モデルを管理'), fileArea, remove, deletionNote, deletionBox);
-  root.append(list.root, proxyArea, placement, pointSizeArea, manage, review, placementActions); if (preview) root.append(preview.root);
+  const content = make('div'); content.className = 'lv-model-content';
+  content.append(list.root, proxyArea, placement, pointSizeArea, manage, review);
+  root.append(content, placementActions); if (preview) root.append(preview.root);
   editOnly(manage, placementActions, fileArea, proxyArea, placement, remove, deletionBox);
   function render() {
     if (disposed) return; placementActions.hidden = !edit; if (fileScope || deletion) manage.open = true; list.render(context()); const block = host.block('models'), selected = memory().assetId, { provider, sceneId } = host.source();

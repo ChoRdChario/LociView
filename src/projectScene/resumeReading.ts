@@ -1,7 +1,7 @@
 import type { ResumeReading } from './validationCatalog';
 
 /** Transient text reader. It owns no Project or file commands. */
-export function createCaptionTextReading(document: Document, reading: Omit<ResumeReading, 'token'> & { incomplete?: boolean }, context: 'resume' | 'restore' | 'first-restore' | 'review' = 'resume',
+export function createCaptionTextReading(document: Document, reading: Omit<ResumeReading, 'token'> & { incomplete?: boolean }, context: 'resume' | 'restore' | 'first-restore' | 'first-import' | 'review' = 'resume',
   initial?: { query: string; captionId: string | null }) {
   const root = document.createElement('section'), header = document.createElement('header'), heading = document.createElement('h1');
   const identity = document.createElement('div'), status = document.createElement('p'), layout = document.createElement('div');
@@ -10,10 +10,12 @@ export function createCaptionTextReading(document: Document, reading: Omit<Resum
   const label = document.createElement('label'), search = document.createElement('input');
   const list = document.createElement('ul'), detail = document.createElement('section');
   const title = document.createElement('h3'), body = document.createElement('p'), empty = document.createElement('p');
-  root.className = 'lv-project-workspace lv-resume-reading'; root.setAttribute('aria-label', context === 'review' ? '共有シーンの記録' : context !== 'resume' ? '復元中の記録' : '再開中の記録');
+  const importing = context === 'first-import';
+  root.className = 'lv-project-workspace lv-resume-reading'; root.setAttribute('aria-label', importing ? '取り込み中の記録' : context === 'review' ? '共有シーンの記録' : context !== 'resume' ? '復元中の記録' : '再開中の記録');
+  if (importing) root.classList.add('lv-import-reading');
   identity.className = 'lv-project-identity'; heading.textContent = reading.title;
   status.className = 'lv-operation-status'; status.dataset.busy = 'true';
-  status.setAttribute('role', 'status'); status.textContent = context === 'first-restore' ? '復元中です。最初のシーンの記録を読めます。編集・保存は完了後に使えます。' : context === 'restore' ? '復元しています。完了後に編集できます。' : '保存データを確認中です。記録は閲覧・検索できます。';
+  status.setAttribute('role', 'status'); status.textContent = importing ? '取り込み中です。記録を閲覧・検索できます。編集・保存は完了後に使えます。' : context === 'first-restore' ? '復元中です。最初のシーンの記録を読めます。編集・保存は完了後に使えます。' : context === 'restore' ? '復元しています。完了後に編集できます。' : '保存データを確認中です。記録は閲覧・検索できます。';
   identity.append(heading, status); header.append(identity); header.hidden = context === 'review';
   layout.className = 'lv-project-body'; layout.dataset.surface = 'panel';
   stage.className = 'lv-project-stage'; stage.setAttribute('aria-hidden', 'true');
@@ -25,8 +27,10 @@ export function createCaptionTextReading(document: Document, reading: Omit<Resum
   list.setAttribute('aria-label', '記録一覧'); detail.setAttribute('aria-label', '記録の詳細');
   detail.className = 'lv-resume-detail'; detail.append(back, title, body); detail.hidden = true;
   empty.textContent = '一致する記録がありません。'; empty.hidden = true;
-  if (reading.incomplete) { const note = document.createElement('p'); note.textContent = '一部の情報は復元後に確認してください。'; panel.append(note); }
-  index.append(label, empty, list); panel.append(panelHeading, index, detail); layout.append(stage, panel); root.append(header, layout);
+  if (reading.incomplete) { const note = document.createElement('p'); note.textContent = importing ? '一部の記録は取り込み後に確認できます。' : '一部の情報は復元後に確認してください。'; panel.append(note); }
+  index.append(label, empty, list); panel.append(panelHeading, index, detail);
+  if (!importing) layout.append(stage);
+  layout.append(panel); root.append(header, layout);
   let selected: string | null = null, composition: Promise<void> | undefined, finish: (() => void) | undefined;
   const mobile = () => document.defaultView?.matchMedia?.('(pointer: coarse) and (max-width: 760px), (pointer: coarse) and (max-width: 950px) and (max-height: 480px)').matches;
   let picked = false;
@@ -87,7 +91,7 @@ export function createCaptionTextReading(document: Document, reading: Omit<Resum
       root.contains(document.activeElement) ? mobile() && root.dataset.surface === 'list' ? 'row' as const : 'detail' as const : null,
     surface: root.dataset.surface === 'detail' ? 'detail' as const : 'list' as const }),
     setProgress(message: string) { if (status.dataset.busy === 'true') status.textContent = `${message} 記録は閲覧・検索できます。編集・保存は完了後に使えます。`; },
-    setReady() { status.textContent = '復元が完了しました。入力を終えると編集画面に移ります。'; status.dataset.busy = 'false'; }, dispose() { finish?.(); root.remove(); } };
+    setReady() { status.textContent = importing ? '取り込みが完了しました。入力を終えると編集画面に移ります。' : '復元が完了しました。入力を終えると編集画面に移ります。'; status.dataset.busy = 'false'; }, dispose() { finish?.(); root.remove(); } };
 }
 
 /** Ordinary saved/staged-source reading retains its actual token. */

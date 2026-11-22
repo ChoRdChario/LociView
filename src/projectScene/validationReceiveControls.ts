@@ -58,11 +58,16 @@ export function createValidationReceiveControls(document: Document, host: Return
         await action(); if (disposed) return;
         session()?.refreshHistory(); await recovered();
         input.value = ''; selectedJob = null; selectedCopy = null; cancel = null; feedback = completed;
-      } catch (error) { if (!disposed) feedback = error instanceof MetadataSourceError &&
-        ['receive-reselected-file', 'contribution-reselected-file'].includes(error.code) ?
-        '中断前と異なるファイルです。読み込みを始めた元のファイルを選び直してください。' :
-        error instanceof Error ? error.message : '受信できません。元のデータは保持しています。';
-        if (!disposed) failure = { raw: feedback, error }; }
+      } catch (error) {
+        if (!disposed) {
+          const differentInput = error instanceof MetadataSourceError && ['receive-reselected-file', 'contribution-reselected-file'].includes(error.code);
+          const differentPurpose = !!selectedJob && error instanceof Error && error.name === 'PackageControlError' &&
+            'code' in error && (error.code === 'contribution-purpose' || error.code === 'workspace-purpose');
+          feedback = differentInput || differentPurpose ? '中断前と異なるファイルです。読み込みを始めた元のファイルを選び直してください。' :
+            error instanceof Error ? error.message : '受信できません。元のデータは保持しています。';
+          failure = { raw: feedback, error };
+        }
+      }
       finally { busy = false; activeOperation = null; if (!disposed) { render(); changed(); } }
     })();
   };
@@ -105,7 +110,7 @@ export function createValidationReceiveControls(document: Document, host: Return
     status.textContent = activeOperation === 'restore' ? '' : feedback || host.workspaceFiles.reviewCopyError || host.workspaceFiles.error || (host.authority.readOnly ? '閲覧中。受信するには編集を開始してください。' : '');
     const received = status.textContent ? feedbackPresentation(status.textContent, failure, '更新を受け取れません。元のファイルと手元の編集は保持しています。再試行してください。') : undefined;
     if (received) status.textContent = received.message;
-    failureDetails.render(received?.diagnostic);
+    failureDetails.render(status.hidden ? undefined : received?.diagnostic);
     jobs.replaceChildren();
     for (const copy of copies) {
       if (['completed', 'abandoned'].includes(copy.state)) continue;

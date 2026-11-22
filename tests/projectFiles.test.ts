@@ -800,10 +800,11 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(records.project).toMatchObject({title:'複数モデル'});
     const assets=records.assetsById as Record<string,JsonObject>,members=Object.values(records.sceneAssetMembershipsById as Record<string,JsonObject>).sort((a,b)=>(a.orderKey as string).localeCompare(b.orderKey as string));
     expect(members.map(m=>assets[m.assetId as string]!.label)).toEqual(['model-b','model-a']);expect(Object.keys(records.mediaResourcesById as JsonObject)).toHaveLength(1);
-    expect(input.disabled).toBe(true);expect(title.disabled).toBe(true);expect(button('選択を取り消す').disabled).toBe(true);
+    const cancelCreation = all(create.parent!).find(n => n.tag === 'button' && n.textContent === '選択を取り消す')!;
+    expect(input.disabled).toBe(true);expect(title.disabled).toBe(true);expect(cancelCreation.disabled).toBe(true);
     button('閲覧で開く').fire('click');await vi.waitFor(()=>expect(all(root).some(n=>n.textContent.includes('選択を取り消してください'))).toBe(true));expect(open).toHaveBeenCalledOnce();
     // Even a queued synthetic event cannot select a new initial/run after opening was attempted.
-    title.value='遅い入力';title.fire('input');Object.assign(input,{files:[]});input.fire('change');button('選択を取り消す').fire('click');
+    title.value='遅い入力';title.fire('input');Object.assign(input,{files:[]});input.fire('change');cancelCreation.fire('click');
     button('作成を再試行').parent!.fire('submit',{preventDefault(){}});await vi.waitFor(()=>expect(open).toHaveBeenCalledTimes(2));
     expect(open.mock.calls[1]![0]).toBe(attempt[0]);expect(open.mock.calls[1]![1]).toBe(attempt[1]);expect(ui.hasChanges()).toBe(true);expect(await r.fs.list('')).toEqual([]);
   });
@@ -5868,6 +5869,51 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       fileLimits: budget, decode, packageLocks: f.locks, openStorage: async () => ({ factory: f.factory, dispose: async () => {} }) };
     return { ...f, options, host: await openValidationHost(options) };
   }
+  it('06g first team import previews the inspected scene, hands off the published text once and withdraws on interrupted input', async () => {
+    const f = await restoreFileFixture(true), source = f.current.source!;
+    const file = await f.sender.download(await f.sender.generate(source.token));
+    const run = String(source.proof.identity.projectId).slice(4);
+    type Preview = Parameters<NonNullable<Parameters<typeof openValidationHost>[0]['importReading']>>[0];
+    for (const interrupt of [false, true]) {
+      const r = firstWorkspaceRecipient(), options = { run, base: r.fs, store: r.store, coordinator: ProjectMutationCoordinator.browser(r.locks),
+        fileLimits: budget, decode, packageLocks: r.locks, openStorage: async () => ({ factory: r.factory, dispose: async () => {} }) };
+      const notifications: Preview[] = [], write = r.fs.writeStream.bind(r.fs);
+      let inspectedBeforeWrite = false, stopWrite = interrupt;
+      vi.spyOn(r.fs, 'writeStream').mockImplementation(async (path, stream) => {
+        if (path.endsWith('/input.zip')) {
+          inspectedBeforeWrite = !!notifications[0];
+          if (stopWrite) { await stream.cancel(); throw Error('interrupted input'); }
+        }
+        return write(path, stream);
+      });
+      const importReading = (value: Preview) => { notifications.push(value); };
+      const opened = owned(await openValidationHost({ ...options, workspaceFile: file, standaloneWorkspace: true, importReading }));
+      const preview = notifications[0];
+      expect(inspectedBeforeWrite).toBe(true);
+      expect(preview?.records).toContainEqual({ id: f.captionId, title: '最初の記録', body: '手元の追記' });
+      expect(preview).not.toHaveProperty('token');
+      if (interrupt) {
+        expect(notifications).toEqual([preview, null]); expect(opened.takeImportReading).toBeUndefined();
+        const job = opened.workspaceFiles.jobs[0]!;
+        expect(opened.hasPending()).toBe(true); expect(job.state).toBe('input-required');
+        stopWrite = false;
+        await opened.workspaceFiles.reselectImportedInput(job.id, file);
+        expect(opened.hasPending()).toBe(false);
+        expect(opened.read().source!.originalChanges()).toEqual(source.originalChanges());
+        expect(notifications).toEqual([preview, null]);
+      } else {
+        expect(notifications).toHaveLength(1); expect(opened.hasPending()).toBe(false);
+        const actual = opened.takeImportReading?.(preview!);
+        expect(actual?.token).toBe(source.token); expect(actual?.records).toEqual(preview!.records);
+        expect(opened.takeImportReading?.(preview!)).toBeNull();
+        expect(opened.read().source!.originalChanges()).toEqual(source.originalChanges());
+      }
+      await opened.dispose();
+      const again = vi.fn();
+      await expect(openValidationHost({ ...options, workspaceFile: file, standaloneWorkspace: true, importReading: again })).rejects.toThrow('同じプロジェクト');
+      expect(again).not.toHaveBeenCalled();
+    }
+  });
   async function initialWorkspaceHostFixture(transform?: (source: ProjectMetadataSource) => ProjectMetadataSource) {
     const f = await workspaceFileFixture(transform), r = firstWorkspaceRecipient(), run = (f.source.proof.identity.projectId as string).slice(4);
     const options = { run, base: r.fs, coordinator: ProjectMutationCoordinator.browser(r.locks), store: r.store,
@@ -11134,11 +11180,12 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       button('3D').fire('click'); expect(activation).toHaveBeenLastCalledWith(true);
       expect(tabs.children.every(n => n.attributes.get('aria-selected') === 'false')).toBe(true);
       const before = activation.mock.calls.length;
-      button('描画').fire('click'); expect(body.dataset.drawingPreview).toBe('true'); expect(activation).toHaveBeenLastCalledWith(true);
+      button('描画').fire('click'); expect(body.dataset.inlinePreview).toBe('true'); expect(activation).toHaveBeenLastCalledWith(true);
       expect(body.dataset.surface).toBe('panel'); expect(activation.mock.calls.slice(before).some(([value]) => !value)).toBe(false);
-      button('3D').fire('click'); expect(body.dataset.drawingPreview).toBe('false'); expect(activation).toHaveBeenLastCalledWith(true);
-      button('描画').fire('click'); expect(body.dataset.drawingPreview).toBe('true'); expect(activation).toHaveBeenLastCalledWith(true);
-      button('記録').fire('click'); expect(body.dataset.drawingPreview).toBe('false'); expect(activation).toHaveBeenLastCalledWith(false);
+      button('モデル').fire('click'); expect(body.dataset.inlinePreview).toBe('true'); expect(activation).toHaveBeenLastCalledWith(true);
+      button('3D').fire('click'); expect(body.dataset.inlinePreview).toBe('false'); expect(activation).toHaveBeenLastCalledWith(true);
+      button('描画').fire('click'); expect(body.dataset.inlinePreview).toBe('true'); expect(activation).toHaveBeenLastCalledWith(true);
+      button('記録').fire('click'); expect(body.dataset.inlinePreview).toBe('false'); expect(activation).toHaveBeenLastCalledWith(false);
       nodes().find(n => n.className === 'lv-caption-select')!.fire('click'); button('位置を調整').fire('click');
       expect(body.dataset.surface).toBe('stage'); expect(button('描画').disabled).toBe(true);
       button('描画').fire('click'); expect(body.dataset.surface).toBe('stage');

@@ -42,6 +42,9 @@ for (const touch of [false, true]) test(`autosaved text and photos survive file 
     await (await cancelledPicker).setFiles([]);await expect(page.getByText('ファイルを選択してください。',{exact:true})).toBeHidden();
     await expect(page.getByRole('button',{name:'プロジェクトを作成',exact:true})).toBeHidden();
     const sample = { name: 'continuity.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() };
+    await chooseHomeFiles(page, { name: '未完の作業.zip', mimeType: 'application/zip', buffer: Buffer.from('incomplete zip file, no directory') });
+    await expect(page.getByText('未完の作業.zip', { exact: true })).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'ZIPの内容を確認できません' })).toBeVisible();
     await chooseHomeFiles(page, sample);
     const create = page.getByRole('button', { name: 'プロジェクトを作成', exact: true });
     await expect(create).toBeFocused();
@@ -50,7 +53,8 @@ for (const touch of [false, true]) test(`autosaved text and photos survive file 
     await expect(page.getByRole('button', { name: 'ファイルを開く', exact: true })).toBeFocused();
     const firstPicker=page.waitForEvent('filechooser');await page.getByRole('button',{name:'ファイルを開く',exact:true}).click();
     await (await firstPicker).setFiles(sample);
-    await expect(page.getByText('3Dモデル・点群から新規作成、保存したファイルから再開できます。', { exact: true })).toBeVisible();
+    await expect(page.getByText(sample.name, { exact: true })).toBeVisible();
+    await expect(page.getByText('3Dモデル・点群から新規作成、保存したファイルから再開できます。', { exact: true })).toBeHidden();
     await page.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('操作の継続'); await page.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
     const stage = page.getByRole('button', { name: '3D', exact: true });
     if (touch) { await expect(stage).toBeVisible(); if (await stage.getAttribute('aria-pressed') !== 'true') await stage.click(); }

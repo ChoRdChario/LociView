@@ -26,6 +26,8 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   shareOptions.append(partialLabel, scopeLabel);
   const history = document.createElement('details'), historyTitle = document.createElement('summary'), completedFiles = document.createElement('div');
   const primary = document.createElement('button'); primary.type = 'button'; primary.className = 'lv-file-primary'; editOnly(primary); commands.append(primary);
+  const scopeHint = document.createElement('span'); scopeHint.id = `lv-share-hint-${crypto.randomUUID()}`;
+  scopeHint.className = 'lv-share-hint';
   historyTitle.textContent = '作成したファイル'; history.append(historyTitle, completedFiles);
   const maintenance = document.createElement('details'), maintenanceTitle = document.createElement('summary'), maintenanceActions = document.createElement('div');
   maintenanceTitle.textContent = 'メンテナンス'; maintenance.append(maintenanceTitle, maintenanceActions);
@@ -351,6 +353,9 @@ export function createValidationOutputControls(document: Document, host: ReturnT
       } else return generateAndDownload(() => host.workspaceOutput.generate(token));
     };
     create.disabled ||= purpose === 'contribution' && !chosen || purpose === 'review' && !sceneIds.length || !!selected || !!cancellation;
+    if (presentation === 'share' && purpose === 'review' && !sceneIds.length) {
+      scopeHint.textContent = '渡すシーンを選んでください。'; commands.append(scopeHint); create.setAttribute('aria-describedby', scopeHint.id);
+    } else create.removeAttribute('aria-describedby');
     create.className = 'lv-file-primary';
     if (choicePending) button(commands, '選択を取り消す', () => {
       resetChoice(); feedback = ''; completedFeedback = false; render(); changed(); if (presentation === 'share') partial.focus();

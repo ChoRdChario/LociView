@@ -38,7 +38,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   fileClose.type = 'button'; fileClose.textContent = '閉じる'; fileNotice.setAttribute('role', 'status');
   fileNotice.className = 'lv-operation-status'; fileNotice.id = `${fileContent.id}-notice`;
   if(fileMenu){fileMenu.className='lv-project-files';const summary=document.createElement('summary');fileSummary=summary;summary.textContent='ファイル';
-    fileContent.append(tools!.root); filePanel.append(fileHeader,fileNavigation,fileCloseNote,fileContent); fileMenu.append(summary,filePanel);
+    fileContent.append(tools!.root); fileHeader.append(fileNavigation); filePanel.append(fileHeader,fileCloseNote,fileContent); fileMenu.append(summary,filePanel);
     if (navigation?.fileActionsRoot) filePanel.append(navigation.fileActionsRoot);
     summary.addEventListener('click', event => { if(fileMenu.open && tools!.hasChanges() && !readingOutput()) event.preventDefault();
       else if(!fileMenu.open) { if (core?.dismissDisclosures() === false) event.preventDefault(); else fileOrigin=summary; } });
@@ -48,7 +48,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     if (!fileMenu?.open) return;
     const rect=fileSummary?.getBoundingClientRect?.(), win=document.defaultView;
     if(!rect||!win)return;
-    const top=Math.min(rect.bottom+8,Math.max(12,win.innerHeight-180));
+    const top=win.innerWidth <= 760 ? 12 : Math.min(rect.bottom+8,Math.max(12,win.innerHeight-180));
     filePanel.style.top=`${top}px`;filePanel.style.maxHeight=`${Math.max(120,win.innerHeight-top-12)}px`;
   };
   document.defaultView?.addEventListener('resize',positionFiles);
@@ -77,7 +77,9 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
       }
       fileNotice.dataset.compact='false';
       if (core?.dismissDisclosures() === false) return;
-      fileMenu.open=true;if(b.getAttribute('role')!=='tab')filePanel.focus?.({preventScroll:true});})().catch(error=>{
+      if (fileMenu.open) changed();
+      else fileMenu.open = true;
+      if (b.getAttribute('role') !== 'tab') filePanel.focus?.({preventScroll:true});})().catch(error=>{
         if(!disposed&&core===owner){const failure=failurePresentation(error,'ファイル処理を完了できません。保存済みの内容は保持しています。再試行してください。');outputNotice=failure.message;outputFailure={text:failure.message,diagnostic:failure.diagnostic};fileNotice.dataset.compact='false';changed();}
       });}); return b;
   };
@@ -212,6 +214,8 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
       const namedBackup = lastHandoff && jobs.find(job => job.id === lastHandoff.id && job.purpose === 'backup' && job.token === provider.token &&
         job.state === 'generated' && job.stale !== true && tools?.hasHandedOff(job.id));
       return { title: candidate?.kind === 'value' && typeof candidate.value === 'string' ? candidate.value : null,
+        receiveNeedsInput: current.state === 'ready' && !!current.publication && current.source?.token === provider.token &&
+          !host.backupRestore.pending && !host.backupRestore.needsDisplay && host.workspaceFiles.jobs.some(job => job.state === 'input-required'),
         resumable: current.state === 'ready' && !!current.publication && current.source?.token === provider.token && !host.hasPending(),
         backupOutdated: jobs.some(job => job.purpose === 'backup' && (job.token !== provider.token || job.stale === true) && ['generated', 'file-verified'].includes(job.state)),
         backupCreated: jobs.some(job => job.purpose === 'backup' && ['generated', 'file-verified'].includes(job.state)),
@@ -354,6 +358,9 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
           runtime.setPinPointerActive?.(pointerHeld || !!next.windowMoving); runtime.setActive(true);
         },
         read: observation, target, setPointDiameter: (assetId, diameter) => runtime.setPointDiameter?.(assetId, diameter), pointDiameter: assetId => runtime.pointDiameter?.(assetId) ?? 3,
+        revealPin(captionId, destination) {
+          return !closed && !!rendered && rendered.token === read().token && runtime.revealPin?.(rendered, captionId, destination) === true;
+        },
         reservePointer(active) { pointerHeld = active; if (!closed) runtime.setPinPointerActive?.(active || !!state?.windowMoving); },
         pick(x, y, assetId, directCreation = false) {
           if (closed || !state || state.readOnly || host.authority.readOnly || !state.choosing && !directCreation) return null;

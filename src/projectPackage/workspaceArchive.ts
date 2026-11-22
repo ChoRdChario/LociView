@@ -193,12 +193,14 @@ export class WorkspaceArchive {
   static async inspect(file: Blob, limits: MetadataLimits, signal?: AbortSignal): Promise<WorkspaceArchive> {
     return this.fromArchive(await PackageArchive.inspect(file, signal), limits, signal);
   }
-  static async fromSelectedArchive(selected: PackageArchive, limits: MetadataLimits, signal?: AbortSignal): Promise<WorkspaceArchive> {
+  static async fromSelectedArchive(selected: PackageArchive, limits: MetadataLimits, signal?: AbortSignal,
+    observe?: WorkspaceInspectionObserver): Promise<WorkspaceArchive> {
     if (!(selected instanceof PackageArchive)) return fail('workspace-archive');
     checkAbort(signal);
-    return this.fromArchive(await selected.reopenCapturedControl(), limits, signal);
+    return this.fromArchive(await selected.reopenCapturedControl(), limits, signal, observe);
   }
-  private static async fromArchive(archive: PackageArchive, limits: MetadataLimits, signal?: AbortSignal): Promise<WorkspaceArchive> {
+  private static async fromArchive(archive: PackageArchive, limits: MetadataLimits, signal?: AbortSignal,
+    observe?: WorkspaceInspectionObserver): Promise<WorkspaceArchive> {
     const manifest = archive.control.manifest;
     if (manifest.purpose !== 'teamWorkspace') return fail('workspace-purpose');
     const bytes = await archive.entryBytes('metadata.am', L.sourceBytes, signal);
@@ -211,6 +213,9 @@ export class WorkspaceArchive {
     if (counts.workUsed + closure.workUsed > L.inspectionWork) return fail('workspace-work-budget');
     if (!same(closure.entries, manifest.blobs)) return fail('workspace-closure');
     if (!same(counts.entityClasses, manifest.summary.entityClasses) || !same(counts.fieldClasses, manifest.summary.fieldClasses)) return fail('workspace-summary');
+    if (observe) try { observe(inspection.candidates, counts.workUsed + closure.workUsed); } catch { /* Optional text projection cannot reject an import. */ }
     return new WorkspaceArchive(archive, source, closure.entries);
   }
 }
+
+type WorkspaceInspectionObserver = (candidates: Awaited<ReturnType<ProjectMetadataSource['inspectOriginal']>>['candidates'], workUsed: number) => void;

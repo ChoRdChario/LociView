@@ -2,7 +2,7 @@ import type { ProjectWorkspaceFS, WorkspaceFS } from '../platform/fs';
 import type { MetadataProjectSession } from '../projectMetadata/session';
 import type { MetadataLimits } from '../projectMetadata/format';
 import { WorkspaceReceiveJob } from '../projectPackage/receiveJob';
-import { fileError } from './validation';
+import { FileReadError, fileError } from './validation';
 import { json } from '../projectMetadata/persistence';
 import { OriginBlobStore } from '../projectMetadata/blobStore';
 import { PACKAGE_LIMITS as L } from '../projectPackage/contract';
@@ -14,6 +14,9 @@ import { receiveJobKeys, openReceiveJob, withReceiveJobDiscovery, type ReceiveJo
 import { reviewEditChildBinding, type ReviewEditBinding } from '../projectPackage/reviewEditControls';
 
 export interface WorkspaceReceiveState { id: string; state: 'incomplete' | 'completed' | 'cancelled' | 'repair-required' | 'input-required' | 'unbound-input' | 'abandoned' | 'stale' }
+
+/** A recognized file selected in the wrong surface, before a receive job exists. */
+export class UpdateFilePurposeError extends FileReadError {}
 
 export async function workspaceFileOperation<T>(locks: LockManager | null, action: () => Promise<T>): Promise<T> {
   if (!locks) return fileError('このブラウザではファイル処理を排他的に実行できません。');
@@ -51,11 +54,15 @@ export class WorkspaceReceiver {
   receive(expectedToken: string, file: Blob | PackageArchive) {
     return this.operation(async () => {
       const archive = file instanceof PackageArchive ? await file.reopenCapturedControl() : await PackageArchive.inspect(file), purpose = archive.control.manifest.purpose;
-      if (purpose === 'clean') return fileError('独立コピーはプロジェクト一覧の「ファイルを開く」から開いてください。現在の作業は変更していません。');
+      if (purpose === 'clean') throw new UpdateFilePurposeError('独立コピーはプロジェクト一覧の「ファイルを開く」から開いてください。現在の作業は変更していません。');
       let input: ReceiveJob;
       try { input = purpose === 'contribution' ? await ContributionReceiveJob.fromSelectedArchive(this.fs, archive, this.store, this.limits) :
         await WorkspaceReceiveJob.fromSelectedArchive(this.fs, archive, this.limits); }
       catch (error) {
+        if (error instanceof PackageControlError && error.code === 'workspace-purpose') {
+          if (purpose === 'review') throw new UpdateFilePurposeError('これは閲覧用のシーンです。選択を取り消し、プロジェクト一覧の「ファイルを開く」から開いてください。');
+          if (purpose === 'backup') throw new UpdateFilePurposeError('これは保存ファイルです。選択を取り消し、「復元」から開いてください。');
+        }
         if (error instanceof PackageControlError && error.code === 'contribution-base-unavailable')
           return fileError('先に、この変更分の元になった作業一式を開いてください。元のデータは変更していません。');
         throw error;

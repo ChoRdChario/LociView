@@ -6,7 +6,8 @@ import { fieldValue, projectAttachments, projectIdentity, projectMediaResources,
 import { newProjectId, panelNodes, sameProjectValue, type ProjectPanelHost, type ProjectPanel } from './projectPanel';
 
 /** Attachment commands and local viewing only; binary verification stays in the current host. */
-export function createProjectMedia(document: Document, host: ProjectPanelHost, caption: () => string | null, viewer: MediaViewer) {
+export function createProjectMedia(document: Document, host: ProjectPanelHost, caption: () => string | null, viewer: MediaViewer,
+  photoPin?: (captionId: string) => (() => void) | undefined) {
   const { make, button } = panelNodes(document), root = make('section'), galleryHost = make('section'), stored = make('details');
   root.setAttribute('aria-label', 'メディアの整理'); galleryHost.setAttribute('aria-label', '添付メディア');
   stored.setAttribute('aria-label', '既存のメディアを添付'); stored.append(make('summary', '既存のメディアを添付'));
@@ -52,6 +53,7 @@ export function createProjectMedia(document: Document, host: ProjectPanelHost, c
       const { provider } = source(), resources = projectMediaResources(provider);
       if (captionId === null) return { scope: captured, label: '登録済みメディア', items: resources.map(r => ({ id: r.id, resourceId: r.id, label: r.label, kind:r.record.mediaKind as 'image'|'video'|'audio',description: mediaDisplayDescription('',r.record.portableDisplay!==undefined), image: image(r.id, r.record) })) };
       return { scope: JSON.stringify([captured, captionId]), label: String(fieldValue(provider.resources.captions[captionId]?.title) || '記録'),
+        get showPin() { return photoPin?.(captionId); },
         items: rows(captionId).map(r => { const resource = resources.find(m => m.id === r.media!.id), alt = r.fields.altText;
           return { id: r.id, resourceId: String(r.media!.id), label: r.label, kind:r.media!.mediaKind as 'image'|'video'|'audio', description: mediaDisplayDescription(alt?.kind === 'value' ? r.alt : '説明の更新候補を確認してください。',resource?.record.portableDisplay!==undefined),
             image: resource ? image(resource.id, resource.record) : null }; }) };

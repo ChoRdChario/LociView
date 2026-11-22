@@ -172,9 +172,20 @@
 .lv-stage-overlay > .lv-project-viewport-tools > .lv-project-viewport-status { flex: 0 1 auto; min-height: 0; overflow: auto; }
 .lv-stage-overlay > .lv-project-viewport-tools > button { flex: 0 0 auto; }
 .lv-stage-overlay > .lv-project-viewport-tools:has(> button:not([hidden])) { min-height: 88px; }
+@media (max-width: 600px) {
+  .lv-project-stage:has(.lv-stage-search:not([hidden])) .lv-stage-overlay > .lv-project-viewport-tools {
+    margin-bottom: 48px;
+  }
+}
 .lv-project-workspace .lv-stage-overlay > .lv-pin-task { position: static; inset: auto; transform: none; align-self: center; display: flex; flex-direction: column; flex: 0 1 auto; min-height: 0; max-width: 100%; overflow: hidden; pointer-events: auto; }
 .lv-project-shell .lv-project-body [role="tab"] { border: 0; border-radius: 0; border-bottom: 3px solid transparent; background: transparent; }
 .lv-project-shell .lv-project-body [role="tab"][aria-selected="true"] { border-bottom-color: var(--lv-action); font-weight: 600; }
+@media (hover: none) {
+  .lv-project-shell .lv-project-workspace [role="tab"][aria-selected="false"]:hover:not(:disabled) {
+    background: transparent;
+    border-color: transparent;
+  }
+}
 .lv-project-shell .lv-project-body [aria-label="シーン"] { padding-bottom: 8px; }
 .lv-project-shell .lv-project-body [aria-label="シーン"] h2 { margin: 0; font-size: 14px; font-weight: 500; }
 .lv-project-shell .lv-project-body [aria-label="シーン"] [aria-pressed="true"] { font-weight: 600; }
@@ -350,6 +361,9 @@
 .lv-caption-task[data-selected="true"] .lv-caption-heading > h2 { border-inline-start: 3px solid var(--lv-action); padding-inline-start: 8px; }
 .lv-caption-heading > h2:focus-visible { outline: 2px solid var(--lv-ink); outline-offset: 2px; }
 .lv-caption-heading > nav { display: flex; flex: 0 0 auto; gap: 4px; }
+.lv-caption-heading:has(.lv-caption-step-target:not([hidden])) { flex-wrap: wrap; }
+.lv-caption-heading > nav:has(.lv-caption-step-target:not([hidden])) { flex: 1 1 100%; align-items: center; }
+.lv-caption-step-target { flex: 1; min-width: 0; overflow-wrap: anywhere; color: var(--lv-muted); font-size: .875em; }
 .lv-project-workspace .lv-caption-heading :is(.lv-caption-previous,.lv-caption-next) { width: 44px; min-width: 44px; padding: 0; font-size: 0; }
 .lv-caption-previous::before { content: '‹'; font-size: 28px; line-height: 1; }
 .lv-caption-next::before { content: '›'; font-size: 28px; line-height: 1; }
@@ -362,6 +376,10 @@
 .lv-drawing-task > .lv-material-editor { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .lv-material-content { flex: 1 1 0; min-height: 0; overflow: auto; scroll-padding-block: 12px; }
 .lv-drawing-task .lv-material-actions { position: static; flex: 0 0 auto; padding: 10px 0 0; }
+.lv-project-body > aside > .lv-model-task:not([hidden]) { display: flex; flex: 1 1 0; min-height: 0; flex-direction: column; overflow: hidden; }
+.lv-model-task > .lv-model-content { flex: 1 1 0; min-height: 0; overflow: auto; scroll-padding-block: 8px; }
+.lv-model-content input[type="number"] { scroll-margin-block: 1.5em 0; }
+.lv-model-task > .lv-task-footer { position: static; flex: 0 0 auto; margin: 0; padding: 8px 0 0; }
 .lv-project-shell .lv-project-workspace .lv-material-primary { background: var(--lv-action); border-color: var(--lv-action); color: var(--lv-field); }
 .lv-project-shell .lv-project-workspace .lv-material-primary:hover:not(:disabled) { background: var(--lv-action-hover); }
 .lv-project-shell .lv-project-workspace .lv-material-primary:disabled { background: var(--lv-selected); border-color: var(--lv-rule); color: var(--lv-muted); }
@@ -472,19 +490,23 @@
   .lv-project-body > aside > .lv-caption-task[data-selected="true"]:not([data-editing="true"]):has(> .lv-caption-browser[data-few-rows="true"]):not([data-mobile-surface]) { --lv-caption-rows: fit-content(50%) minmax(0, 1fr); }
 }
 
-/* The existing canvas stays visible while compact Drawing controls preview it. */
+@media (pointer: coarse) and (min-width: 700px) and (max-width: 950px) and (max-height: 480px) {
+  .lv-project-workspace > header > .lv-project-identity { flex: 1 1 12rem; }
+  .lv-project-workspace > header > .lv-header-tools { flex: 0 1 auto; }
+}
+/* Model placement and drawing controls share the existing canvas. */
 @media (max-width: 760px), (pointer: coarse) and (max-width: 950px) and (max-height: 480px) {
-  .lv-project-shell .lv-project-body[data-drawing-preview="true"] { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 40fr) minmax(0, 60fr); min-height: 0; }
-  .lv-project-shell .lv-project-body[data-drawing-preview="true"] > :is(.lv-project-stage,aside) { display: flex; height: auto; min-height: 0; }
-  .lv-project-shell .lv-project-body[data-drawing-preview="true"] > aside { border-top: 1px solid var(--lv-rule); }
+  .lv-project-shell .lv-project-body[data-inline-preview="true"] { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 40fr) minmax(0, 60fr); min-height: 0; }
+  .lv-project-shell .lv-project-body[data-inline-preview="true"] > :is(.lv-project-stage,aside) { display: flex; height: auto; min-height: 0; }
+  .lv-project-shell .lv-project-body[data-inline-preview="true"] > aside { border-top: 1px solid var(--lv-rule); }
   .lv-project-workspace[data-mobile-layout="true"] .lv-material-editor input { font-size: 16px; }
-  .lv-project-shell .lv-project-workspace[data-keyboard="true"] .lv-project-body[data-drawing-preview="true"] { grid-template-rows: minmax(0, 20fr) minmax(0, 80fr); }
-  .lv-project-workspace[data-keyboard="true"] .lv-project-body[data-drawing-preview="true"] :is(.lv-project-camera,.lv-camera-positions) { display: none; }
+  .lv-project-shell .lv-project-workspace[data-keyboard="true"] .lv-project-body[data-inline-preview="true"] { grid-template-rows: minmax(0, 20fr) minmax(0, 80fr); }
+  .lv-project-workspace[data-keyboard="true"] .lv-project-body[data-inline-preview="true"] :is(.lv-project-camera,.lv-camera-positions) { display: none; }
 }
 @media (max-width: 760px) and (max-height: 640px), (pointer: coarse) and (max-width: 950px) and (max-height: 480px) {
-  .lv-project-shell .lv-project-body[data-drawing-preview="true"] { grid-template-rows: minmax(0, 28fr) minmax(0, 72fr); }
+  .lv-project-shell .lv-project-body[data-inline-preview="true"] { grid-template-rows: minmax(0, 28fr) minmax(0, 72fr); }
   /* The small preview retains direct orbit; all camera tools remain in full3D. */
-  .lv-project-body[data-drawing-preview="true"] :is(.lv-project-camera,.lv-camera-positions) { display: none; }
+  .lv-project-body[data-inline-preview="true"] :is(.lv-project-camera,.lv-camera-positions) { display: none; }
 }
 @media (max-width: 400px) {
   .lv-project-shell .lv-project-workspace > header { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; }

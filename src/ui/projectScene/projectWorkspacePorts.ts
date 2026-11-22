@@ -88,7 +88,8 @@ export interface WorkspaceViewport {
   read(): { token: string; sceneId: string; pickToken: string; ready: boolean; dragging: boolean; issue: string | null; notice: string | null;readonly loading?:boolean;readonly retryAvailable?:boolean;readonly camera?:CameraOrientation;readonly navigating?:boolean;readonly cameraReady?:boolean;
     readonly placementNotice?: string | null;
     readonly drawingNotice?: string | null;
-    pins: readonly { id: string; x: number; y: number; visible: boolean; scale?: number; color?: string; status?: 'normal' | 'needsReview'; notice?: string }[]; readonly assetIds?: readonly string[]; readonly view?: ViewRuntime };
+    pins: readonly { id: string; x: number; y: number; visible: boolean; depthVisible?: boolean; scale?: number; color?: string; status?: 'normal' | 'needsReview'; notice?: string }[]; readonly assetIds?: readonly string[]; readonly view?: ViewRuntime };
+  revealPin?(captionId: string, destination: { x: number; y: number }): boolean;
   target(assetId: string): WorkspaceSurface | null;
   camera(action: 'fit' | 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom'): void;
   retry(): void;
@@ -136,7 +137,7 @@ export interface ProjectWorkspacePorts {
     sceneOrderChoices(token: string, sceneId: string): readonly { operationId: string; orderKey: string }[];
   };
   read(): WorkspaceProvider;
-  projectStatus(): { readonly title: string | null; readonly resumable: boolean; readonly backup: 'verified' | 'download-started' | 'unconfirmed' | 'unavailable'; readonly backupOutdated?: boolean; readonly backupCreated?: boolean; readonly backupFileName?: string };
+  projectStatus(): { readonly title: string | null; readonly resumable: boolean; readonly receiveNeedsInput?: boolean; readonly backup: 'verified' | 'download-started' | 'unconfirmed' | 'unavailable'; readonly backupOutdated?: boolean; readonly backupCreated?: boolean; readonly backupFileName?: string };
   openProject?(): void;
   projectNavigationBlocked?(): boolean;
   /** Coordinate presentation surfaces only; false retains the current file input. */

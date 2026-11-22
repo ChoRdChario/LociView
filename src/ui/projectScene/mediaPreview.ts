@@ -135,9 +135,11 @@ export function createMediaViewer(document: Document, raster?: RasterResources,d
   let resumeImage: { image: PreviewPng | null; view: ReturnType<typeof imageViewport.capture> } | undefined;
   const selected = () => { const group = reader?.(); return group?.scope === scope ? group.items.find(i => i.id === id && i.resourceId === resourceId) ?? null : null; };
   const pauseThumbnails = () => resources?.setThumbnailsActive(!disposed && !reader && document.hidden !== true);
-  function close(restore = true) {
+  function close(restore = true, navigate?: () => void) {
     const from = opener; opener = null;
-    reader = null; resumeImage = undefined; preview?.dispose(); preview = null; presentedImage = null; content.replaceChildren(); root.close(); pauseThumbnails();
+    reader = null; resumeImage = undefined; preview?.dispose(); preview = null; presentedImage = null; content.replaceChildren(); root.close();
+    // Let the destination retire its hidden gallery before waking thumbnail readers.
+    try { navigate?.(); } finally { pauseThumbnails(); }
     const target = restore && !disposed ? typeof from === 'function' ? from() : from : null;
     if (target?.isConnected && !(target as HTMLButtonElement).disabled) target.focus({ preventScroll: true });
   }
@@ -176,10 +178,9 @@ export function createMediaViewer(document: Document, raster?: RasterResources,d
   }
   closeButton.addEventListener('click', () => close()); previous.addEventListener('click', () => step(-1)); next.addEventListener('click', () => step(1));
   pin.addEventListener('click', () => {
-    const group = reader?.();
-    if (disposed || !group?.showPin || group.scope !== scope || !selected()) return;
-    close(false);
-    group.showPin();
+    const group = reader?.(), showPin = group?.showPin;
+    if (disposed || !showPin || group?.scope !== scope || !selected()) return;
+    close(false, showPin);
   });
   root.addEventListener('cancel', event => { event.preventDefault(); close(); });
   const visibility = () => { if (!disposed) { pauseThumbnails(); render(); } };

@@ -36,6 +36,6 @@ export function createFailureDetails(document: Document) {
   summary.textContent = '詳細'; root.className = 'lv-failure-details'; root.hidden = true; root.append(summary, text);
   return { root, render(diagnostic: string | undefined) {
     root.hidden = !diagnostic;
-    if (text.textContent !== (diagnostic ?? '')) text.textContent = diagnostic ?? '';
+    if (text.textContent !== (diagnostic ?? '')) { root.open = false; text.textContent = diagnostic ?? ''; }
   } };
 }

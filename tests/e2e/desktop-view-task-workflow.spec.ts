@@ -31,7 +31,7 @@ async function tabsVisible(p: Page) {
   }
 }
 async function scrollTask(p: Page) {
-  await p.locator('.lv-material-content:visible,.lv-caption-content:visible,.lv-camera-position-content:visible').evaluateAll(nodes=>nodes.forEach(n=>{n.scrollTop=n.scrollHeight;})); await tabsVisible(p);
+  await p.locator('.lv-model-content:visible,.lv-material-content:visible,.lv-caption-content:visible,.lv-camera-position-content:visible').evaluateAll(nodes=>nodes.forEach(n=>{n.scrollTop=n.scrollHeight;})); await tabsVisible(p);
   const stage = await p.locator('.lv-project-stage').boundingBox(); expect(stage!.y).toBeGreaterThanOrEqual(0); expect(stage!.y + stage!.height).toBeLessThanOrEqual(p.viewportSize()!.height + 1);
 }
 async function save(p: Page, info: TestInfo, name: string) {
@@ -63,7 +63,14 @@ test('PC task navigation retains model, View and material drafts through keyboar
     await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText('視点と材質の整理', { timeout: 90_000 }); await expect(page.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false');
     await page.evaluate(() => { (window as any).__taskCanvas = document.querySelector('.lv-project-stage canvas'); });
     await tab(page, 'モデル').click(); const modelPanel = page.getByRole('tabpanel', { name: 'モデル', exact: true }); await modelPanel.locator('.lv-model-select').filter({ hasText: '作業するモデル.glb' }).click();
-    await modelPanel.getByRole('button', { name: '配置を調整', exact: true }).click(); await modelPanel.getByLabel('モデル位置 X', { exact: true }).fill('2.5'); await scrollTask(page);
+    await modelPanel.getByRole('button', { name: '配置を調整', exact: true }).click();
+    const xField = modelPanel.getByLabel('モデル位置 X', { exact: true });
+    await xField.fill('2.5'); await xField.scrollIntoViewIfNeeded();
+    expect(await xField.evaluate(input => {
+      const box = input.getBoundingClientRect();
+      return document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2) === input;
+    })).toBe(true);
+    await scrollTask(page);
     await tab(page, 'モデル').focus(); await page.keyboard.press('ArrowRight'); await expect(tab(page, '描画')).toHaveAttribute('aria-selected', 'true'); await revealCameraPositions(page);await expect(views(page).getByRole('button', { name: /開始視点を(?:記録|更新)/, exact: true })).toBeDisabled();await page.locator('.lv-camera-positions > summary').click();await tab(page,'描画').focus();
     await page.keyboard.press('ArrowLeft'); await expect(modelPanel.getByLabel('モデル位置 X', { exact: true })).toHaveValue('2.5'); await modelPanel.getByRole('button', { name: '配置を取り消す', exact: true }).click();
     await modelPanel.getByRole('button', { name: '配置を調整', exact: true }).click(); await modelPanel.getByLabel('モデル位置 X', { exact: true }).fill('1'); await modelPanel.getByLabel('モデル倍率', { exact: true }).fill('1.25'); await modelPanel.getByRole('button', { name: '配置を確定', exact: true }).click(); await ready(page, 'モデルの配置を確定しました。');

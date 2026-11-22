@@ -145,8 +145,32 @@ test('PC Caption work continues after empty tag focus and cancelled file checks,
     await page.getByRole('button', { name: 'プロジェクトを選ぶ', exact: true }).click(); await page.getByRole('button', { name: '編集で開く', exact: true }).first().click();
     await expect(page.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(projectTitle, { timeout: 90_000 }); await chooseCaption(page, '確認する場所');
     const workspace = await output(page, info, '作業一式', 'teamWorkspace');await page.locator('details.lv-project-files').getByRole('button',{name:'閉じる',exact:true}).click();
-    await b.goto(entry); await chooseHomeFiles(b, workspace); await b.getByRole('button', { name: 'プロジェクトを取り込む', exact: true }).click();
-    await expect(b.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(projectTitle, { timeout: 90_000 }); await chooseCaption(b, '確認する場所');
+    await b.goto(entry); await chooseHomeFiles(b, workspace);
+    const reader = b.getByRole('region', { name: '取り込み中の記録', exact: true });
+    await expect(reader).toHaveCount(0);
+    await b.evaluate(() => {
+      const write = FileSystemFileHandle.prototype.createWritable;
+      const gate = new Promise<void>(resolve => Object.assign(window, { releaseImportWrite: resolve }));
+      FileSystemFileHandle.prototype.createWritable = async function(options) {
+        if (document.querySelector('.lv-resume-reading')) await gate;
+        return write.call(this, options);
+      };
+    });
+    await b.getByRole('button', { name: 'プロジェクトを取り込む', exact: true }).click();
+    const search = reader.getByRole('searchbox', { name: '検索', exact: true });
+    try {
+      await expect(reader).toBeVisible();
+      await expect(reader.locator('textarea,input[type=file],img,canvas')).toHaveCount(0);
+      await expect(b.locator('main.lv-project-workspace')).toHaveCount(0);
+      await reader.getByRole('button', { name: '確認する場所', exact: true }).click();
+      await search.focus(); await search.dispatchEvent('compositionstart'); await search.fill('確認する場所');
+    } finally { await b.evaluate(() => (window as any).releaseImportWrite()); }
+    await expect(reader.getByRole('status')).toContainText('取り込みが完了', { timeout: 90_000 });
+    await expect(search).toBeFocused(); await search.dispatchEvent('compositionend');
+    await expect(b.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(projectTitle);
+    await expect(b.locator('.lv-caption-browser').getByRole('searchbox', { name: '検索', exact: true })).toHaveValue('確認する場所');
+    await expect(b.locator('.lv-caption-select').filter({ hasText: '確認する場所' })).toHaveAttribute('aria-current', 'true');
+    await chooseCaption(b, '確認する場所');
     await edit(b, 'タイトル', '相手のタイトル'); const returned = await output(b, info, '相手の更新', 'teamWorkspace'); await edit(page, '本文', '手元の本文');
     await fileMenu(page); const incoming = receive(page), incomingStatus = incoming.locator(':scope > p[role="status"]');
     await revealFileSurface(page,'受信');await incoming.getByLabel('更新ファイルを選択', { exact: true }).setInputFiles(returned); await holdDigest(page); await incoming.getByRole('button', { name: '更新を受け取る', exact: true }).click();

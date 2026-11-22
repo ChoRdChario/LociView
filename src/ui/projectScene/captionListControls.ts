@@ -34,6 +34,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
   if(presentation?.compact){root.className+=' lv-caption-browser-compact';const colors=make('details');colors.className='lv-caption-color-menu';colors.append(make('summary','ピンの色'),colorBar);filters.append(count,colors);}
   let context: CaptionListContext | undefined, composing = false, disposed = false, rendering = false;
   let observedScrollTop = 0;
+  let emptyMessage: string | undefined;
   let currentView: ReturnType<typeof captionListView> | undefined, virtual = false, measuredWidth = 0;
   const layout = new CaptionRowLayout(), spacers: HTMLLIElement[] = [];
   const scenePositions = new Map<string, { top: number; anchor: ReturnType<CaptionRowLayout['anchor']> }>();
@@ -189,7 +190,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
       }
       if (virtual) space(end, view.rows.length);
       if (!view.rows.length) { empty.textContent = view.issue ? '一覧を表示できません。' : view.total
-        ? 'このシーンに条件に合う記録はありません。' : 'このシーンに記録はありません。'; nodes.push(empty); }
+        ? 'このシーンに条件に合う記録はありません。' : emptyMessage ?? 'このシーンに記録はありません。'; nodes.push(empty); }
       orderChildren(list, nodes);
       if (virtual) {
         const anchor = layout.anchor(top); measureRows(); top = layout.restore(anchor, top);
@@ -233,7 +234,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
   };
   list.addEventListener('keydown', keyboard); cleanups.push(() => list.removeEventListener('keydown', keyboard));
   /** false means the host must keep the old Scene until search composition ends. */
-  function render(next: CaptionListContext): boolean {
+  function render(next: CaptionListContext, whenEmpty?: string): boolean {
     if (disposed) return false;
     if (composing && context && context.source.sceneId !== next.source.sceneId) {
       status.textContent = '文字の入力を確定してください。'; status.hidden = false; return false;
@@ -248,7 +249,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     const saved = changingScene ? scenePositions.get(next.source.sceneId) : undefined;
     const oldAnchor = visiblePosition && samePosition ? layout.anchor(list.scrollTop) :
       saved?.top === next.memory.listScrollTop ? saved.anchor : undefined;
-    context = next; rendering = true;
+    context = next; rendering = true; emptyMessage = whenEmpty;
     const view = captionListView(next.source, next.memory), active = document.activeElement;
     currentView = view; virtual = view.rows.length > 100;
     root.dataset.fewRows = String(view.rows.length <= 3);

@@ -45,7 +45,7 @@ import { validationMaterialSlots, validationMaterialIssue } from './validationMa
 import { same } from '../domain/projectGraphSupport';
 import type { MaterialIntent } from '../domain/materialIntent';
 import { selectedMaterialResolution } from '../projectMetadata/materialResolution';
-import { WorkspaceReceiver, workspaceFileOperation, type WorkspaceReceiveState } from '../projectFiles/receiveWorkspace';
+import { UpdateFilePurposeError, WorkspaceReceiver, workspaceFileOperation, type WorkspaceReceiveState } from '../projectFiles/receiveWorkspace';
 import type { PreparedReviewEdit } from '../projectPackage/reviewEdit';
 import type { PreparedReviewCopy } from '../projectPackage/reviewCopyInput';
 import type { ReviewArchive } from '../projectPackage/reviewArchive';
@@ -95,6 +95,7 @@ export interface ValidationHostOptions {
   };
   timing?: ValidationTiming;
   reading?: ResumeReadingRequest;
+  importReading?: (value: ProjectCaptionText | null) => void | Promise<void>;
   /** Typed UI reads images through its scoped per-resource port. Legacy projection stays eager. */
   lazyImages?: boolean;
   mode?: LocalOpenMode;
@@ -416,11 +417,13 @@ type ReviewBootstrapOperation = <T>(action: () => Promise<T>) => Promise<T>;
 async function openValidationHostOwned(options: ValidationHostOptions, run: string, root: string,
   inheritedLease?: ProjectMutationSession, reviewBootstrap?: ReviewBootstrapOperation, opening?: OpeningLeaseOwner) {
   const measure = <T>(stage: string, action: () => Promise<T>) => measureValidation(options.timing, stage, action);
-  const inspectInput = async (file: Blob | PackageArchive) => {
+  const inspectInput = async (file: Blob | PackageArchive, observe?: Parameters<typeof WorkspaceArchive.fromSelectedArchive>[3]) => {
     const selected = file instanceof PackageArchive ? await file.reopenCapturedControl() : await PackageArchive.inspect(file);
-    return selected.control.manifest.purpose === 'clean' ? CleanArchive.fromSelectedArchive(selected, limits) : WorkspaceArchive.fromSelectedArchive(selected, limits);
+    return selected.control.manifest.purpose === 'clean' ? CleanArchive.fromSelectedArchive(selected, limits) : WorkspaceArchive.fromSelectedArchive(selected, limits, undefined, observe);
   };
-  const incoming = options.workspaceFile ? await inspectInput(options.workspaceFile) : undefined;
+  let importText: ProjectCaptionText | null = null;
+  const incoming = options.workspaceFile ? await inspectInput(options.workspaceFile, options.standaloneWorkspace && options.importReading
+    ? (candidates, used) => { importText = projectCaptionText(candidates, used, { maxWork: PACKAGE_LIMITS.inspectionWork }); } : undefined) : undefined;
   if (incoming && incoming.source.proof.identity.projectId !== `prj_${run}`) throw Error('ファイルのプロジェクトと開く場所が一致しません。');
   if (options.initial && options.initial.source.proof.identity.projectId !== `prj_${run}`) throw Error('作成先を確認してください。');
   const lease = inheritedLease ?? (options.mode === 'view' ? options.coordinator.openView(options.base, root, `${validationArea}:${run}`) :
@@ -428,7 +431,13 @@ async function openValidationHostOwned(options: ValidationHostOptions, run: stri
   let connection: Awaited<ReturnType<typeof openValidationGeneration>> | undefined, operation: Promise<unknown> | undefined;
   let closed = false, busy = false, failure = '', ownsLease = !inheritedLease;
   let withdrawReading: (() => void) | undefined;
-  const dispose = async () => { if (closed) return; closed = true; if (ownsLease) lease.beginClose();
+  let importObserver: ValidationHostOptions['importReading'], stopImportAccess: (() => void) | undefined;
+  const endImportPreview = (withdraw: boolean) => {
+    const previous = importObserver; importObserver = undefined; importText = null;
+    stopImportAccess?.(); stopImportAccess = undefined;
+    if (withdraw && previous) try { void Promise.resolve(previous(null)).catch(() => {}); } catch { /* Display only. */ }
+  };
+  const dispose = async () => { if (closed) return; closed = true; endImportPreview(true); if (ownsLease) lease.beginClose();
     try { await operation; } catch { /* Stored journal/initial input remain authoritative, never silently discarded. */ }
     await lease.waitForWorkspaceIdle(); if (ownsLease) { lease.sealWorkspaceWritesForRelease(); lease.release(); } await connection?.dispose(); };
   try {
@@ -593,8 +602,11 @@ async function openValidationHostOwned(options: ValidationHostOptions, run: stri
         receiveDisplayPending = true;
         const project = await ready(result ?? await session.read()); receiveDisplayPending = false; return project;
       } catch (error) {
+        endImportPreview(true);
         receiveFailure = error instanceof Error ? error.message : '受信できません。元のデータは保持しています。';
-        await reloadReceive(); throw error;
+        await reloadReceive();
+        if (error instanceof UpdateFilePurposeError && !unfinishedReceive() && !receiveDisplayPending) receiveFailure = '';
+        throw error;
       }
     }, true);
     const reviewAction = (action: (job: ReviewEditJob) => Promise<MetadataSessionRead | void>, bootstrap?: ReviewBootstrapOperation) => execute(async () => {
@@ -643,9 +655,17 @@ async function openValidationHostOwned(options: ValidationHostOptions, run: stri
       }
     }
     if (incoming) {
+      if (importText && incoming instanceof WorkspaceArchive && fresh && options.standaloneWorkspace && lease.holdsWriteLock &&
+          last.state === 'empty' && !connection.restorePending && !unfinishedReceive() && !outputDiscoveryFailure && !unfinishedOutput()) {
+        importObserver = options.importReading;
+        stopImportAccess = lease.subscribeAccess(state => { if (state !== 'editable') endImportPreview(true); });
+        const notify = importObserver;
+        const failed = () => { if (notify && importObserver === notify) endImportPreview(true); };
+        try { void Promise.resolve(notify?.(importText)).catch(failed); } catch { failed(); }
+      }
       try { await (last.state === 'ready' && last.source ? workspaceFiles.receive(last.source.token, incoming.archive) :
         workspaceFiles.importWorkspace(incoming.archive)); }
-      catch { /* File and incomplete originals stay available through the same recovery controls. */ }
+      catch { endImportPreview(true); /* File and incomplete originals stay available through the same recovery controls. */ }
     }
     const outputAction = <T>(action: () => Promise<T>, recovery = false, presentation?: () => MetadataSessionRead | undefined,
       retainReadonlyHistory?: (result: T) => void | boolean) => execute(async () => {
@@ -1036,7 +1056,21 @@ async function openValidationHostOwned(options: ValidationHostOptions, run: stri
       dispose: async () => { await dispose(); content.releasePreparedImages(); content.releasePreparedModels(); prepareDisplay = undefined; } };
     if (opening) opening.claimLease = () => { if (closed) throw Error('画面を閉じました。'); ownsLease = true; };
     else ownsLease = true;
-    return { ...host, dispatch, editorSettings, get content() { return content; }, workspaceFiles, workspaceOutput, backupRestore, sceneAppend, display: () => restoreRetired ? undefined : project,
+    // The receiver has already inspected these jobs and this publication. Handoff reads no files.
+    const imported = importObserver && incoming ? { token: incoming.source.token, proof: json(incoming.source.proof), heads: [...incoming.source.heads] } : undefined;
+    const matchesImport = () => !!importObserver && !!imported && !closed && lease.holdsWriteLock && !host.hasPending() &&
+      !outputDiscoveryFailure && !unfinishedOutput() &&
+      last.state === 'ready' && last.source?.token === imported.token && json(last.source.proof) === imported.proof &&
+      same([...last.source.heads], imported.heads) && receiveJobs.some(job => job.id === last.publication && job.state === 'completed');
+    if (importObserver && !matchesImport()) endImportPreview(true);
+    const takeImportReading = (value: ProjectCaptionText): ResumeReading | null => {
+      try {
+        if (value !== importText || !matchesImport()) return null;
+        const actual = validatedResumeReading(last, run);
+        return actual?.sceneId === value.sceneId ? actual : null;
+      } catch { return null; } finally { endImportPreview(false); }
+    };
+    return { ...host, ...(importObserver ? { takeImportReading } : {}), dispatch, editorSettings, get content() { return content; }, workspaceFiles, workspaceOutput, backupRestore, sceneAppend, display: () => restoreRetired ? undefined : project,
       conversionReportAvailable: async () => {
         // Backup restores do not carry the originating device's conversion report.
         if (connection?.generationId != null && !localInitial && !connection.restorePending &&

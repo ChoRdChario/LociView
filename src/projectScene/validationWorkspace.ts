@@ -70,7 +70,8 @@ export interface ValidationWorkspacePorts {
   lastProject?: { read(): ProjectResumeReference | null; remember(reference: ProjectResumeReference): void };
   list(reading?: ResumeReadingRequest, onlyRun?: string): Promise<ValidationProjectEntry[]>;
   open(run: string, initial?: ReturnType<typeof prepareValidationCreation>, mode?: LocalOpenMode, workspaceFile?: Blob | PackageArchive, reviewEdit?: PreparedReviewEdit | PreparedReviewCopy,
-    firstBackup?: ValidationHostOptions['firstBackup'], standaloneWorkspace?: boolean, reading?: ResumeReadingRequest): Promise<ValidationNormalHost | FirstBackupRecovery | InterruptedLocalEditRecovery>;
+    firstBackup?: ValidationHostOptions['firstBackup'], standaloneWorkspace?: boolean, reading?: ResumeReadingRequest,
+    importReading?: ValidationHostOptions['importReading']): Promise<ValidationNormalHost | FirstBackupRecovery | InterruptedLocalEditRecovery>;
   render(host: ValidationDisplayHost): Promise<{ factory: ViewportFactory; readonly ready?:Promise<void>; detachPreparation?():void; dispose(): void; idle?():Promise<void> }>;
   renderReview?(view: ReviewView): Promise<{ factory: ViewportFactory; dispose(): void; idle?():Promise<void> }>;
   renderModelCandidate?(host: ValidationDisplayHost, display: Parameters<ModelCandidateRenderer>[0]): ReturnType<ModelCandidateRenderer>;
@@ -93,13 +94,16 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const form = document.createElement('form'), title = document.createElement('input'), creationNote = document.createElement('p'), cancelSelection = document.createElement('button');
   title.value = '新しいプロジェクト'; title.maxLength = 256; title.setAttribute('aria-label', 'プロジェクト名');
   const create = document.createElement('button'); create.textContent = 'プロジェクトを作成'; create.type = 'submit';
+  form.className = 'lv-home-create';
   cancelSelection.type = 'button'; cancelSelection.textContent = '選択を取り消す';
   const titleLabel = document.createElement('label'); titleLabel.textContent = 'プロジェクト名';
   titleLabel.append(title); form.append(creationNote, titleLabel, create); form.hidden = true;
   const workspaceForm = document.createElement('form'), workspaceLabel = document.createElement('label'), workspaceInput = document.createElement('input'), openFile = document.createElement('button');
+  workspaceForm.className = 'lv-home-picker';
   workspaceLabel.hidden = true; workspaceLabel.textContent = 'ファイルを選択'; workspaceInput.type = 'file'; workspaceInput.multiple = true; workspaceInput.setAttribute('aria-label', 'ファイルを選択'); workspaceLabel.append(workspaceInput);
   const fileHelp = document.createElement('p'); fileHelp.textContent = '3Dモデル・点群から新規作成、保存したファイルから再開できます。';
-  openFile.type = 'button'; openFile.textContent = 'ファイルを開く'; workspaceForm.append(openFile, workspaceLabel, fileHelp, fallback);
+  openFile.type = 'button'; openFile.textContent = 'ファイルを開く'; workspaceForm.append(openFile, workspaceLabel, fileHelp);
+  const pickedName = document.createElement('p'); pickedName.className = 'lv-picked-name'; pickedName.hidden = true;
   const sample = document.createElement('button'); sample.type = 'button'; sample.textContent = 'サンプルで試す'; sample.hidden = !ports.sampleFiles; workspaceForm.append(sample);
   const importPanel = document.createElement('section'), importNote = document.createElement('p');
   const importConfirm = document.createElement('button'), importCancel = document.createElement('button');
@@ -115,7 +119,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const convert = document.createElement('button'), cancelConversion = document.createElement('button');
   convert.type = cancelConversion.type = 'button'; convert.textContent = '新しいプロジェクトに変換'; cancelConversion.textContent = '選択を取り消す';
   conversionHelp.textContent = '元ファイルは変更しません。チームでは変換後のファイルを使ってください。変換元のZIPと変換の説明は、別に保管してください。';
-  conversionPanel.append(conversionNote, conversionHelp, convert, cancelConversion); conversionPanel.hidden = true; workspaceForm.append(conversionPanel, importPanel);
+  conversionPanel.className = 'lv-conversion-choice'; conversionPanel.hidden = true; workspaceForm.append(conversionPanel, importPanel, fallback);
+  for (const primary of [openFile, create, convert]) primary.className = 'lv-home-primary';
   const lociChoices = document.createElement('div'), workbookLabel = document.createElement('label'), workbook = document.createElement('select'),
     conversionTitleLabel = document.createElement('label'), conversionTitle = document.createElement('input'), relationLabel = document.createElement('label'), relation = document.createElement('input'),
     relationNote = document.createElement('p'), previewAgain = document.createElement('button'), saveReport = document.createElement('button');
@@ -137,7 +142,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const list = document.createElement('section'), refresh = document.createElement('button'), back = document.createElement('button');
   refresh.type = back.type = 'button'; refresh.textContent = '一覧を更新'; back.textContent = '別のプロジェクトを開く';
   const listHeading = document.createElement('h2'); listHeading.textContent = 'このブラウザから再開'; list.setAttribute('aria-label', 'このブラウザから再開');
-  navigation.append(heading, help, workspaceForm, form, listHeading, refresh, list,legacy); root.append(back, status, failureDetails.root, repairAdvice, repairDetails, cancelSelection, navigation, content);
+  navigation.append(heading, help, pickedName, workspaceForm, form, listHeading, refresh, list,legacy); root.append(back, status, failureDetails.root, repairAdvice, repairDetails, cancelSelection, navigation, content);
   function clearRepairPanel(): void {
     repairAdvice.hidden = repairDetails.hidden = true; repairDetails.open = false; repairDiagnostic.textContent = '';
     repairAdvice.textContent = '保存ファイルがある場合は、この作業を開いたことのない別のブラウザで再開を試せます。';
@@ -166,6 +171,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   let host: Host | undefined, workspace: MountedEditor | undefined;
   let resumeReading: ReturnType<typeof createResumeReading> | undefined;
   let openingReading: object | undefined;
+  let closeImportReader: (() => void) | undefined;
   const clearResumeReading = () => { resumeReading?.dispose(); resumeReading = undefined; };
   let presentation:{busy:boolean;reason:string}|null=null;
   let presentationState=()=>presentation;
@@ -200,6 +206,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   let lociEvaluation: Awaited<ReturnType<NonNullable<Awaited<ReturnType<typeof prepareLociMyuConversion>>>['evaluate']>> | null = null;
   let lociDraft = 0, lociDecision: string | undefined;
   let selectionGeneration = 0, creationDraft = 0, selectionPending = false;
+  let selectedFileError: string | undefined;
   let queuedFiles: readonly File[] | undefined;
   let pendingImport: { run: string; generation: number; context: ReturnType<typeof selectionContext> } &
     ({ kind: 'update'; file: File } | { kind: 'import'; archive: PackageArchive; newWorkspace: boolean }) | undefined;
@@ -240,8 +247,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       if (status.parentElement !== reviewOpening.root) reviewOpening.root.append(status);
     }
     else if(navigation.hidden){if(status.parentElement!==root)root.insertBefore(status,navigation);}
-    else navigation.insertBefore(status,form.hidden?form:listHeading);
-    if (failureDetails.root.parentElement !== status.parentElement) status.parentElement?.insertBefore(failureDetails.root,status.nextSibling ?? null);
+    else if (failureDetails.root.nextSibling !== workspaceForm || status.nextSibling !== failureDetails.root) navigation.insertBefore(status, workspaceForm);
+    if (status.nextSibling !== failureDetails.root) status.parentElement?.insertBefore(failureDetails.root,status.nextSibling ?? null);
     openFile.disabled = create.disabled = cancelConversion.disabled = inactive || composing;
     sample.disabled = openFile.disabled || !!creationAttempt;
     if (offline && homeSettings) {
@@ -262,7 +269,17 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     workspaceInput.disabled = title.disabled = inactive || !!creationAttempt;
     cancelSelection.disabled = !!retirementFailure || busy && !nativeSelectionChecking || composing || !!creationAttempt;
     cancelSelection.hidden = !selectionPending || !conversionPanel.hidden || !!pendingImport || !!firstRecovery;
-    openFile.hidden = !form.hidden || !conversionPanel.hidden || !!pendingImport;
+    const reselect = !!selectedFileError && !inactive && !navigation.hidden && !cancelSelection.hidden && form.hidden;
+    workspaceForm.dataset.reselect = String(reselect);
+    if (!form.hidden) {
+      if (cancelSelection.parentElement !== form) form.append(cancelSelection);
+    } else if (reselect) {
+      if (cancelSelection.parentElement !== workspaceForm) workspaceForm.insertBefore(cancelSelection, workspaceLabel);
+    } else if (cancelSelection.parentElement !== root) root.insertBefore(cancelSelection, navigation);
+    const deciding = !form.hidden || !conversionPanel.hidden || !!pendingImport;
+    help.hidden = fileHelp.hidden = listHeading.hidden = list.hidden = refresh.hidden = deciding;
+    legacy.hidden = deciding || !ports.openLegacy;
+    openFile.hidden = deciding;
     sample.hidden = !ports.sampleFiles || openFile.hidden;
     importConfirm.textContent = pendingImport?.kind === 'import' ? 'プロジェクトを取り込む' : '既存に取り込む';
     importPanel.hidden = !pendingImport; importConfirm.disabled = importCancel.disabled = inactive || composing;
@@ -281,7 +298,6 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   conversionTitle.addEventListener('compositionend', () => { composing = false; invalidateLoci(); controls(); });
   const focusIsUnclaimed = () => !document.activeElement || document.activeElement === document.body ||
     document.activeElement === openFile || document.activeElement === sample || document.activeElement === workspaceInput;
-  let selectedFileError: string | undefined;
   const execute = (action: () => Promise<void>, fileInspection?: {generation?: number}) => {
     if (busy || disposed || retirementFailure) return;
     const previousImport = pendingImport;
@@ -297,7 +313,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       if (disposed) return;
       const storageError = storageFailureText(error);
       const metadataError = showMetadataFailure(error);
-      const failure = failurePresentation(error, '処理を完了できません。入力と再開用データは保持しています。元のファイルを確認して再試行してください。');
+      const inspecting = fileInspection?.generation !== undefined && fileInspection.generation === selectionGeneration;
+      const failure = failurePresentation(error, inspecting ? 'このファイルの内容を確認できません。元のファイルを選び直してください。' : '処理を完了できません。入力と再開用データは保持しています。元のファイルを確認して再試行してください。');
       status.textContent = storageError ?? metadataError ?? failure.message;
       failureDetails.render(metadataError ? undefined : failure.diagnostic);
       if (localRecovery) renderLocalRecovery(status.textContent, error instanceof Error ? error.message : undefined);
@@ -326,6 +343,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       if (!focusIsUnclaimed() && !confirmFocused) return;
 
       if (reviewOpening) reviewOpening.retry.focus();
+      else if (firstRecovery && fileInspection) firstRestoreHeading?.focus();
       else if (pendingImport && (pendingImport !== previousImport || confirmFocused)) importConfirm.focus();
       else if (!navigation.hidden && (fileInspection || !wasHome)) {
         if (!form.hidden) create.focus();
@@ -343,6 +361,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     clearResumeReading();
     const oldLocalRecovery = localRecovery; localRecovery = undefined; localRecoveryAction = undefined;
     const oldWorkspace=workspace,oldHost=host,oldResident=resident,oldReview=reviewWorkspace,oldTools=receiveTools,oldRecovery=firstRecovery;
+    firstRestoreHeading = undefined;
     mounted=false;presentation=null;presentationState=()=>presentation;resumedLast=false;confirmingResume=false;workspace=undefined;host=undefined;resident=undefined;reviewWorkspace=undefined;reviewEditAttempt=undefined;receiveTools=undefined;firstRecovery=undefined;
     showColdReport(false);coldReportStatus.textContent='';if(reportUrl)URL.revokeObjectURL(reportUrl);reportUrl=undefined;recoveryControls.clear();
     const errors:unknown[]=[],attempt=async(action:()=>unknown)=>{try{await action();return true;}catch(error){errors.push(error);return false;}};
@@ -683,6 +702,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       status.textContent = '保存済みの内容から再開しました。';
     }); });
   };
+  let firstRestoreHeading: HTMLHeadingElement | undefined;
   const renderFirstRecovery = () => {
     const target = firstRecovery; if (!target || disposed) return;
     recoveryControls.clear();
@@ -694,7 +714,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
       ? 'バックアップの時点に切り替えます。現在の作業と元ファイルは残ります。' : 'このブラウザで編集できるようにします。元ファイルは変更しません。'
       : state.phase === 'terminal' ? 'プロジェクトはまだありません。復元の記録は保持しています。ファイルを選択して開き直せます。' : state.phase === 'beforeStart'
         ? '復元はまだ始まっていません。「復元を取りやめる」で一覧に戻り、元のバックアップを選び直してください。' : 'バックアップの初回復元が未完了です。記録を使って再開するか、取りやめてください。');
-    const summary = document.createElement('h2'); summary.textContent = state.title;
+    const summary = document.createElement('h2'); summary.textContent = state.title; summary.tabIndex = -1; firstRestoreHeading = summary;
     const fileSummary = document.createElement('p'); fileSummary.textContent = [state.fileName, state.memo].filter(Boolean).join(' — '); fileSummary.hidden = !fileSummary.textContent;
     const button = (label: string, action: () => Promise<void>) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = label;
       registerRecoveryControl(b); b.addEventListener('click', () => { if (!b.disabled) execute(action); }); commands.append(b); };
@@ -792,6 +812,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const clearSelection = () => {
     queuedFiles = undefined; selectionAbort?.abort(); selectionAbort = undefined; nativeSelectionChecking = false;
     selectionGeneration++; creationDraft++; selectionPending = false; pendingImport = undefined; rawSelection = undefined; creationAttempt = undefined; selectionHost = undefined;
+    pickedName.textContent = ''; pickedName.hidden = true;
     form.hidden = true; title.value = '新しいプロジェクト'; workspaceInput.value = ''; clearConversion(); controls();
   };
   const selectionContext = () => ({ host, workspace, reviewWorkspace, localRecovery, token: host?.read().source?.token });
@@ -808,10 +829,12 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     catch (error) { if (controller.signal.aborted && !selectionCurrent(generation, context)) return; throw error; }
     finally { if (selectionAbort === controller) { selectionAbort = undefined; nativeSelectionChecking = false; controls(); } }
   };
-  const replaceSelection = async (run: string, opened: ValidationNormalHost, generation: number, context: ReturnType<typeof selectionContext>, initialSceneId?: string) => {
+  const replaceSelection = async (run: string, opened: ValidationNormalHost, generation: number, context: ReturnType<typeof selectionContext>, initialSceneId?: string,
+    handoff?: () => ReturnType<typeof createResumeReading> | undefined) => {
     try { if (!guardSelection(generation, context)) { await opened.dispose(); return; } }
     catch (error) { await opened.dispose(); throw error; }
     try { await closeCurrent(); } catch (error) { await opened.dispose(); throw error; }
+    resumeReading = handoff?.();
     await adoptProject(run, opened, undefined, undefined, undefined, initialSceneId);
   };
   const exportReport = (blob: Blob, fromFile=false) => { if (disposed) return; if (reportUrl) URL.revokeObjectURL(reportUrl); reportUrl = URL.createObjectURL(blob);
@@ -875,6 +898,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   });
   function cancelPickedFile() {
     clearSelection(); status.textContent = '';
+    failureDetails.render(undefined);
     if (!openFile.disabled) openFile.focus();
   }
   cancelSelection.addEventListener('click', () => { if ((!busy || nativeSelectionChecking) && !composing && !creationAttempt) cancelPickedFile(); });
@@ -886,8 +910,41 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     if (!target || !guardSelection(target.generation, target.context)) return;
     if (target.kind === 'import') {
       status.textContent = 'プロジェクトを取り込んでいます。';
-      const opened = await openNormal(target.run, undefined, 'edit', target.archive, undefined, undefined, target.newWorkspace);
-      await replaceSelection(target.run, opened, target.generation, target.context);
+      let preview: Parameters<NonNullable<ValidationHostOptions['importReading']>>[0] = null;
+      let reader: ReturnType<typeof createCaptionTextReading> | undefined;
+      const withdraw = () => {
+        if (!reader) return;
+        reader.dispose(); reader = undefined; preview = null;
+        if (!disposed && pendingImport === target && !host) { navigation.hidden = false; controls(); }
+      };
+      const show: ValidationHostOptions['importReading'] = value => {
+        if (!value) { withdraw(); return; }
+        if (reader || pendingImport !== target || !selectionCurrent(target.generation, target.context)) return;
+        reader = createCaptionTextReading(document, value, 'first-import'); preview = value;
+        navigation.hidden = true; status.textContent = ''; content.append(reader.root); controls();
+      };
+      let opened: ValidationNormalHost | undefined;
+      try {
+        closeImportReader = withdraw;
+        opened = await openNormal(target.run, undefined, 'edit', target.archive, undefined, undefined, target.newWorkspace, undefined,
+          target.newWorkspace && ports.progressivePresentation ? show : undefined);
+        const composingInReader = reader?.composition();
+        if (composingInReader && opened.takeImportReading) { reader?.setReady(); await untilOpen(composingInReader); }
+        const selectedText = reader?.selection();
+        if (reader) reader.root.inert = true;
+        const candidate = opened; opened = undefined; // replaceSelection owns the Host from this point.
+        await replaceSelection(target.run, candidate, target.generation, target.context, undefined, () => {
+          const actual = preview && candidate.takeImportReading?.(preview);
+          if (!actual || !preview || !selectedText || !reader) return;
+          const selected = selectedText.captionId;
+          if (selected && !actual.records.some(c => c.id === selected && preview?.records.some(p => p.id === c.id && p.title === c.title && p.body === c.body))) return;
+          const selection = { ...selectedText, token: actual.token, sceneId: actual.sceneId };
+          return { ...reader, selection: () => selection };
+        });
+      } finally {
+        if (closeImportReader === withdraw) closeImportReader = undefined;
+        withdraw(); await opened?.dispose();
+      }
       return;
     }
     status.textContent = '更新を確認しています。';
@@ -924,6 +981,8 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const openSelection=async(files:readonly File[], inspection?: {generation?: number}, bundledSample = false)=>{
     ensureMaySwitch(); if (creationAttempt) throw Error('作成を再試行してください。');
     const generation = ++selectionGeneration, draft = creationDraft, context = selectionContext(); selectionPending = true;
+    pickedName.textContent = files.length ? files[0]!.name + (files.length > 1 ? ` ほか${files.length - 1}件` : '') : '';
+    pickedName.hidden = !pickedName.textContent;
     if (inspection) inspection.generation = generation;
     const selection = files.map(file => ({ file: file instanceof Blob ? file.slice() : file, label: file.name }));
     if (!selection.length) throw Error('ファイルを選択してください。');
@@ -991,7 +1050,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     const file = packages[0]!;
     const hint = await selectionRead(generation,context,signal=>inspectZipContainerMetadata(file,undefined,signal)).catch((error: unknown) => {
       if (isUnrecognizedZip(error))
-        throw new Error('ZIPの内容を確認できません。元のファイルを選び直してください。', { cause: error });
+        throw new AggregateError([error], 'ZIPの内容を確認できません。元のファイルを選び直してください。');
       throw error;
     });
     if(!hint||!guardSelection(generation,context))return;
@@ -1286,7 +1345,7 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
     }
   });
   return { root,ready:ready??Promise.resolve(), hasChanges: () => busy || composing || changed() || !navigation.hidden && (selectionPending || !!rawSelection || !!creationAttempt || !form.hidden && title.value !== '新しいプロジェクト'),
-    async dispose() { if (disposed) return; disposed = true; openingReading = undefined; clearResumeReading(); stopHelp();
+    async dispose() { if (disposed) return; disposed = true; openingReading = undefined; closeImportReader?.(); clearResumeReading(); stopHelp();
       homeSettings?.dispose();
       selectionAbort?.abort();
       stopPresentation();
