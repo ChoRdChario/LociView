@@ -36,9 +36,9 @@ export async function inspectValidationGlb(input: Uint8Array, limits: FileValida
   return inspectGlb(input, limits, decodePng);
 }
 /** Explicit additive profile; never an old-profile-refusal fallback. */
-export async function inspectValidationJpegGlb(input: Uint8Array, limits: FileValidationLimits, decodePng?: PngDecoder, decodeJpeg?: JpegDecoder): Promise<ValidatedGlb> {
+export async function inspectValidationJpegGlb(input: Uint8Array, limits: FileValidationLimits, decodePng?: PngDecoder, decodeJpeg?: JpegDecoder, signal?: AbortSignal): Promise<ValidatedGlb> {
   if (!validationGlbUsesJpeg(input, limits)) return fileError('JPEGモデルの形式が一致しません。');
-  return { ...await inspectGlb(input, limits, decodePng, decodeJpeg, true), jpeg: true };
+  return { ...await inspectGlb(input, limits, decodePng, decodeJpeg, true, signal), jpeg: true };
 }
 export function validationGlbUsesJpeg(input: Uint8Array, limits: FileValidationLimits): boolean {
   const { json } = validationGlbParts(input, limits);
@@ -47,14 +47,14 @@ export function validationGlbUsesJpeg(input: Uint8Array, limits: FileValidationL
 export function inspectFreshValidationGlb(input: Uint8Array, limits: FileValidationLimits, png?: PngDecoder, jpeg?: JpegDecoder) {
   return validationGlbUsesJpeg(input, limits) ? inspectValidationJpegGlb(input, limits, png, jpeg) : inspectValidationGlb(input, limits, png);
 }
-async function inspectGlb(input: Uint8Array, limits: FileValidationLimits, decodePng?: PngDecoder, decodeJpeg?: JpegDecoder, jpeg = false): Promise<ValidatedGlb> {
+async function inspectGlb(input: Uint8Array, limits: FileValidationLimits, decodePng?: PngDecoder, decodeJpeg?: JpegDecoder, jpeg = false, signal?: AbortSignal): Promise<ValidatedGlb> {
   checkFileLimits(limits);
   if (input.length > limits.maxFileBytes) return fileError('GLBがこの検証の上限を超えています。');
   const bytes = input.slice(), { json: j, bin } = validationGlbParts(bytes, limits);
-  return {bytes,...await inspectStaticMeshDocument(j,bin,limits,decodePng,decodeJpeg,jpeg)};
+  return {bytes,...await inspectStaticMeshDocument(j,bin,limits,decodePng,decodeJpeg,jpeg,signal)};
 }
 /** Shared static facts only. Container/resource adapters must validate their own original input. */
-export async function inspectStaticMeshDocument(j:Record<string,unknown>,bin:Uint8Array,limits:FileValidationLimits,decodePng?:PngDecoder,decodeJpeg?:JpegDecoder,jpeg=false):Promise<Omit<ValidatedGlb,'bytes'>> {
+export async function inspectStaticMeshDocument(j:Record<string,unknown>,bin:Uint8Array,limits:FileValidationLimits,decodePng?:PngDecoder,decodeJpeg?:JpegDecoder,jpeg=false,signal?:AbortSignal):Promise<Omit<ValidatedGlb,'bytes'>> {
   const max=limits.maxItems;
   fileFields(j, ['asset', 'scene', 'scenes', 'nodes', 'meshes', 'buffers', 'bufferViews', 'accessors', 'materials', 'textures', 'images', 'samplers', 'extensionsUsed', 'extensionsRequired']);
   const asset = fileObject(j.asset); fileFields(asset, ['version', 'minVersion', 'generator', 'copyright']);
@@ -130,10 +130,12 @@ export async function inspectStaticMeshDocument(j:Record<string,unknown>,bin:Uin
     raster = { images: shapes, maximumEdge: shapes.reduce((n, i) => Math.max(n, i.width, i.height), 0), cpuBytes, gpuBytes };
   }
   for (const image of imageBodies) {
-    const dimensions = image.jpeg ? await inspectValidationJpeg(image.body, limits, 'glb-texture', decodeJpeg) : await inspectValidationPng(image.body, limits, decodePng);
+    signal?.throwIfAborted();
+    const dimensions = image.jpeg ? await inspectValidationJpeg(image.body, limits, 'glb-texture', decodeJpeg, signal) : await inspectValidationPng(image.body, limits, decodePng, signal);
     if (limits.maxModelImagePixels === undefined) charge(dimensions.width * dimensions.height);
   }
   let implicitMaterial = false;
+  signal?.throwIfAborted();
   const meshes = fileList(j.meshes, max).map(raw => {
     const m = fileObject(raw); fileFields(m, ['primitives']);
     const primitives = fileList(m.primitives, max); if (!primitives.length) return fileError('モデルに面がありません。');

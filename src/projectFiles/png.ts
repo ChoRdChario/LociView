@@ -3,7 +3,7 @@ import { RasterResourceError, type RasterResources } from '../viewer/rasterResou
 import { checkFileLimits, fileError, fileLimitError, type FileValidationLimits } from './validation';
 
 export interface DecodedPng { readonly width: number; readonly height: number; close(): void }
-export type PngDecoder = ((bytes: Uint8Array) => Promise<DecodedPng>) & { readonly rasterResources?: RasterResources };
+export type PngDecoder = ((bytes: Uint8Array, signal?: AbortSignal) => Promise<DecodedPng>) & { readonly rasterResources?: RasterResources };
 export const browserPngDecoder: PngDecoder = async bytes => {
   if (typeof createImageBitmap !== 'function') return fileError('このブラウザでは画像の内容を検証できません。');
   return createImageBitmap(new Blob([bytes.slice().buffer], { type: 'image/png' }));
@@ -42,11 +42,11 @@ export function pngStructure(input: Uint8Array, limits: FileValidationLimits) {
   if (!ended) return fileError('PNGの画像データが不足しています。');
   return dimensions;
 }
-export async function inspectValidationPng(input: Uint8Array, limits: FileValidationLimits, decode: PngDecoder = browserPngDecoder) {
+export async function inspectValidationPng(input: Uint8Array, limits: FileValidationLimits, decode: PngDecoder = browserPngDecoder, signal?: AbortSignal) {
   const bytes = input.slice(), dimensions = pngStructure(bytes, limits);
   let image: DecodedPng | undefined;
   try {
-    image = await decode(bytes);
+    image = await (signal ? decode(bytes, signal) : decode(bytes));
     if (image.width !== dimensions.width || image.height !== dimensions.height) return fileError('PNGの表示サイズが一致しません。');
   } catch (error) { if (error instanceof RasterResourceError || error instanceof Error && error.name === 'AbortError') throw error; return fileError('PNGの画像を表示できません。','decode'); }
   finally { image?.close(); }

@@ -5,7 +5,7 @@ import { inspectValidationPng, type PngDecoder } from './png';
 
 export type JpegUse = 'photo' | 'glb-texture';
 export interface DecodedJpeg { readonly width: number; readonly height: number; close(): void }
-export type JpegDecoder = (bytes: Uint8Array, use: JpegUse) => Promise<DecodedJpeg>;
+export type JpegDecoder = (bytes: Uint8Array, use: JpegUse, signal?: AbortSignal) => Promise<DecodedJpeg>;
 export const browserJpegDecoder: JpegDecoder = async (bytes, use) => {
   if (typeof createImageBitmap !== 'function') return fileError('このブラウザでは画像の内容を検証できません。');
   return createImageBitmap(new Blob([bytes.slice().buffer], { type: 'image/jpeg' }), {
@@ -178,12 +178,12 @@ export function jpegStructure(bytes: Uint8Array, limits: FileValidationLimits, u
   return bad();
 }
 
-export async function inspectValidationJpeg(input: Uint8Array, limits: FileValidationLimits, use: JpegUse, decode: JpegDecoder = browserJpegDecoder) {
+export async function inspectValidationJpeg(input: Uint8Array, limits: FileValidationLimits, use: JpegUse, decode: JpegDecoder = browserJpegDecoder, signal?: AbortSignal) {
   checkFileLimits(limits); if (input.length > limits.maxFileBytes) return fileLimitError('JPEGの容量',input.length,limits.maxFileBytes,'B');
   const bytes = input.slice(), structure = jpegStructure(bytes, limits, use), swapped = use === 'photo' && structure.orientation >= 5;
   const width = swapped ? structure.height : structure.width, height = swapped ? structure.width : structure.height;
   let image: DecodedJpeg | undefined;
-  try { image = await decode(bytes, use); if (image.width !== width || image.height !== height) return fileError('JPEGの表示サイズが一致しません。'); }
+  try { image = await (signal ? decode(bytes, use, signal) : decode(bytes, use)); if (image.width !== width || image.height !== height) return fileError('JPEGの表示サイズが一致しません。'); }
   catch (error) { if (error instanceof RasterResourceError || error instanceof Error && error.name === 'AbortError') throw error; return fileError('JPEGの画像を表示できません。','decode'); }
   finally { image?.close(); }
   return { width, height, orientation: structure.orientation };

@@ -10,19 +10,19 @@ import { heicStructure } from './heic';
 
 /** One workspace owner is injected through the existing decoder port, outside persisted policy. */
 export function createRasterDecoders(limits: FileValidationLimits, resources: RasterResources) {
-  const decode = (bytes: Uint8Array, width: number, height: number, native: () => Promise<DecodedPng>,preserveNative=false) => resources.decode('retry', async () => {
+  const decode = (bytes: Uint8Array, width: number, height: number, native: () => Promise<DecodedPng>, preserveNative = false, signal?: AbortSignal) => resources.decode('retry', async () => {
     const pixels = rasterBytes(width, height), lease = resources.reserve({ cpuBytes: pixels + bytes.length * 2, gpuBytes: 0 }, '画像の検査');
     try {
       const image = await native(); lease.retain({ cpuBytes: pixels, gpuBytes: 0 }, '検査中の画像'); let closed = false;
       return { width: image.width, height: image.height,...(preserveNative?{nativeSource:image as CanvasImageSource}:{}), close() { if (!closed) { closed = true; try { image.close(); } finally { lease.release(); } } } };
     } catch (error) { lease.release(); throw error; }
-  }, image => image.close());
-  const png: PngDecoder = Object.assign(async (bytes: Uint8Array) => {
+  }, image => image.close(), signal);
+  const png: PngDecoder = Object.assign(async (bytes: Uint8Array, signal?: AbortSignal) => {
     const shape = pngDimensions(bytes); if (!shape) return fileError('PNGの大きさを確認してください。');
-    return decode(bytes, shape.width, shape.height, () => browserPngDecoder(bytes));
+    return decode(bytes, shape.width, shape.height, () => browserPngDecoder(bytes), false, signal);
   }, { rasterResources: resources });
-  const budgetJpeg = (native: JpegDecoder): JpegDecoder => async (bytes, use) => {
-    const shape = jpegStructure(bytes, limits, use); return decode(bytes, shape.width, shape.height, () => native(bytes, use));
+  const budgetJpeg = (native: JpegDecoder): JpegDecoder => async (bytes, use, signal) => {
+    const shape = jpegStructure(bytes, limits, use); return decode(bytes, shape.width, shape.height, () => native(bytes, use), false, signal);
   };
   const photo:PhotoDecoder=async(bytes,mime)=>{const shape=photoStructure(bytes,limits);return decode(bytes,shape.width,shape.height,()=>browserPhotoDecoder(bytes,mime));};
   const heic:HeicDecoder=async bytes=>{const shape=heicStructure(bytes,limits,resources);return decode(bytes,shape.width,shape.height,()=>browserHeicDecoder(bytes),true);};

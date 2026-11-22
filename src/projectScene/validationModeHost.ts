@@ -134,7 +134,7 @@ export function createValidationModeHost(initial: Host, open: (mode: LocalOpenMo
       displayReady: (...a) => { admit(); current.backupRestore.displayReady(...a); },
     },
     // The resident cache never retains a closed host's content service.
-    content: { get rasterResources() { return current.content.rasterResources; }, displayDimensions:(bytes,mime)=>current.content.displayDimensions(bytes,mime),modelSelectionNotice:file=>run(()=>current.content.modelSelectionNotice(file)), modelContent: (record, readOnly) => current.content.modelContent(record, readOnly), model: (record, readOnly) => current.content.model(record, readOnly), image: (record, readOnly) => current.content.image(record, readOnly), displayImage: (record, readOnly) => current.content.displayImage(record, readOnly) },
+    content: { get rasterResources() { return current.content.rasterResources; }, displayDimensions:(bytes,mime)=>current.content.displayDimensions(bytes,mime),modelSelectionNotice:file=>run(()=>current.content.modelSelectionNotice(file)), modelContent: (record, readOnly, signal, photoReturnJpeg) => current.content.modelContent(record, readOnly, signal, photoReturnJpeg), model: (record, readOnly) => current.content.model(record, readOnly), image: (record, readOnly) => current.content.image(record, readOnly), displayImage: (record, readOnly) => current.content.displayImage(record, readOnly) },
     imageScope() { if (imageOwner !== current.content) { imageOwner = current.content; imageEpoch++; } return String(imageEpoch); },
     setDisplayPreparation(callback) {
       admit(); if (prepare) throw Error('モデル表示の接続を確認してください。');

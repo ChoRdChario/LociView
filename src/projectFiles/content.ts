@@ -30,17 +30,26 @@ import type { JpegDecoder } from './jpeg';
 import { fileError, fileObject, validationGlbProfile, occurrenceGlbProfile, jpegGlbProfile, occurrenceJpegGlbProfile, validationMetadataLimits, projectFilePolicy, type FileValidationLimits, type ProjectFilePolicy, type ProjectFilePolicyInput } from './validation';
 import { identityPlacement, prepareValidationModel, prepareValidationMedia, sealValidationRecord, validationFileLabel, type ValidationFile, type ValidationModelFile, type GsModelPreparation } from './initialProject';
 
-export async function readValidationBody(file: WorkspaceReadableFile, maxBytes: number): Promise<Uint8Array<ArrayBuffer>> {
+export async function readValidationBody(file: WorkspaceReadableFile, maxBytes: number, signal?: AbortSignal): Promise<Uint8Array<ArrayBuffer>> {
+  signal?.throwIfAborted();
   if (!Number.isSafeInteger(file.size) || file.size <= 0 || file.size > maxBytes) return fileError('保存した本体が検査の上限を超えています。');
   const bytes = new Uint8Array(file.size), reader = file.stream().getReader(); let offset = 0;
+  const stopReading = () => { void reader.cancel(signal?.reason).catch(() => {}); };
+  signal?.addEventListener('abort', stopReading, { once: true });
   try {
-    for (;;) { const next = await reader.read(); if (next.done) break;
+    for (;;) {
+      const next = await reader.read();
+      signal?.throwIfAborted();
+      if (next.done) break;
       if (!(next.value instanceof Uint8Array) || next.value.length > bytes.length - offset) return fileError('保存した本体の大きさが一致しません。');
       bytes.set(next.value, offset); offset += next.value.length;
     }
     if (offset !== file.size) return fileError('保存した本体が不足しています。');
     return bytes;
-  } finally { try { await reader.cancel(); } finally { reader.releaseLock(); } }
+  } finally {
+    signal?.removeEventListener('abort', stopReading);
+    try { await reader.cancel(); } finally { reader.releaseLock(); }
+  }
 }
 
 /** Actual saved-content executor. A fixture/native profile cannot authorize this path. */
@@ -123,12 +132,18 @@ export class ValidationContent implements MetadataMediaPort {
     const body=this.preparedModel(record).body;
     return body.file?{externalMaterialsUnavailable:false}:this.modelSelectionNotice({size:body.bytes.length,arrayBuffer:async()=>body.bytes.slice().buffer});
   }
-  async modelContent(record: JsonObject, readOnly = false): Promise<ValidatedModel> {
+  async modelContent(record: JsonObject, readOnly = false, signal?: AbortSignal, photoReturnJpeg?: JpegDecoder): Promise<ValidatedModel> {
+    signal?.throwIfAborted();
     await this.checkRead?.(); const blob = await this.modelDeclaration(record);
+    signal?.throwIfAborted();
     const file=await (readOnly ? this.store.openReadOnly(blob) : this.store.open(blob));
     const model = record.contentKind==='gaussianSplat' && file.blob ? await inspectDeclaredValidationBlob(record,await file.blob(),this.policy) :
-      await this.inspectModel(record, await readValidationBody(file,this.limits.maxFileBytes));
-    await this.checkRead?.(); return model;
+      await inspectDeclaredValidationModel(record, await readValidationBody(file, this.limits.maxFileBytes, signal),
+        this.policy, this.decode, this.jpeg, 'saved', signal, readOnly ? undefined : photoReturnJpeg);
+    signal?.throwIfAborted();
+    await this.checkRead?.();
+    signal?.throwIfAborted();
+    return model;
   }
   private imageDeclaration(record: JsonObject): JsonObject {
     const blob = fileObject(record.blob) as JsonObject;
@@ -360,10 +375,11 @@ export async function validationModelDeclaration(record: JsonObject, use: 'saved
   return blob;
 }
 export async function inspectDeclaredValidationModel(record: JsonObject, bytes: Uint8Array, budget: ProjectFilePolicyInput,
-  png?: PngDecoder, jpeg?: JpegDecoder, use: 'saved' | 'review' = 'saved'): Promise<ValidatedModel> {
+  png?: PngDecoder, jpeg?: JpegDecoder, use: 'saved' | 'review' = 'saved', signal?: AbortSignal, photoReturnJpeg?: JpegDecoder): Promise<ValidatedModel> {
   const policy=projectFilePolicy(budget), limits=policy.nonGs;
   if(bytes.length>limits.maxFileBytes)return fileError('大きなGSは元ファイルから選択してください。');
   await validationModelDeclaration(record, use);
+  signal?.throwIfAborted();
   const mesh=meshSourceFormat(record.formatProfile);if(mesh)return inspectMeshSource(mesh,bytes,limits,png,jpeg);
   if (same(record.formatProfile, await pointSourceProfile()) || same(record.formatProfile, await nativePointSourceProfile())) return inspectPointPly(bytes, limits);
   if (same(record.formatProfile, await gsSourceProfile())) return inspectGsPly(bytes, policy.gs, { representationToAsset: record.representationToAsset as JsonObject, logicalBoundsAsset: record.logicalBoundsAsset as JsonObject });
@@ -371,7 +387,8 @@ export async function inspectDeclaredValidationModel(record: JsonObject, bytes: 
   const inspect = same(record.formatProfile, await occurrenceJpegGlbProfile()) ? inspectOccurrenceJpegGlb :
     same(record.formatProfile, await jpegGlbProfile()) ? inspectValidationJpegGlb :
     same(record.formatProfile, await occurrenceGlbProfile()) ? inspectOccurrenceGlb : inspectValidationGlb;
-  return inspect(bytes, limits, png, jpeg);
+  const returnTexture = use === 'saved' && signal && record.role === 'meshPrimary' && inspect === inspectValidationJpegGlb ? photoReturnJpeg : undefined;
+  return inspect(bytes, limits, png, returnTexture ?? jpeg, signal);
 }
 
 /** Exact checked immutable snapshot for GS; other formats retain their byte path. */

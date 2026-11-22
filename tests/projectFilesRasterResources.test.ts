@@ -5,6 +5,7 @@ import {createRasterDecoders} from '../src/projectFiles/rasterDecoders';
 import {inspectProjectMedia,prepareProjectMedia,mediaDisplayDimensions} from '../src/projectFiles/media';
 import {heicStructure} from '../src/projectFiles/heic';
 import {photoFixtures} from './helpers/photoFixtures';
+import {jpegBytes} from './helpers/jpegFixtures';
 import {createMediaPreviewResources} from '../src/ui/projectScene/mediaPreviewResources';
 
 const limits={maxFileBytes:64*1024*1024,maxJsonBytes:4*1024*1024,maxItems:100000,maxValues:8000000,maxPixels:16777216};
@@ -13,6 +14,29 @@ const shape=heicStructure(heic,limits),gate=<T=void>()=>{let resolve!:(value:T)=
 afterEach(()=>vi.unstubAllGlobals());
 
 describe('existing still-image validation shares workspace resources (native codecs injected)',()=>{
+  it('removes a queued photo-return texture before it can take the decoder from the next photo', async () => {
+    const raster = createRasterResources({ cpuBytes: 20000000, gpuBytes: 0 });
+    const decoder = createRasterDecoders(limits, raster).jpeg;
+    const started = gate(), finish = gate(), controller = new AbortController(), close = vi.fn();
+    const first = raster.decode('retry', async () => { started.resolve(); await finish.promise; }, () => {});
+    await started.promise;
+    const native = vi.fn(async () => ({ width: 8, height: 4, close }));
+    vi.stubGlobal('createImageBitmap', native);
+    const jpeg = jpegBytes('rgb-progressive');
+    const pending = decoder(jpeg, 'glb-texture', controller.signal);
+    expect(raster.snapshot().queued).toBe(1);
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    expect(raster.snapshot().queued).toBe(0);
+    const photo = decoder(jpeg, 'photo');
+    finish.resolve();
+    await first;
+    (await photo).close();
+    expect(native).toHaveBeenCalledOnce();
+    expect(close).toHaveBeenCalledOnce();
+    await raster.dispose();
+    expect(raster.snapshot().cpuBytes).toBe(0);
+  });
   it('retains a cancelled HEIC decode until native settlement, and serializes a queued GIF',async()=>{
     const raster=createRasterResources({cpuBytes:20000000,gpuBytes:0}),decoders=createRasterDecoders(limits,raster),started=gate(),finish=gate<ImageBitmap>(),closed=vi.fn();
     const gif=Uint8Array.from(atob(photoFixtures.find(p=>p.name==='gif-animated')!.base64),c=>c.charCodeAt(0));

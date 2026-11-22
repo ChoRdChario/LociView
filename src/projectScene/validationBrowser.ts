@@ -108,7 +108,12 @@ export async function createValidationBrowserWorkspace(document: Document, compo
       } catch (error) { return failedDisplay(resident,error); }
     },
     render: async host => {
-      const resident = await prepareValidationResidents(host.authority.read().modelVersions!, host.content,undefined,composition.progressivePresentation,raster,timing);
+      // Keep unmeasured browsers on their current saved-texture check, including iOS Safari.
+      const client = navigator as Navigator & { userAgentData?: { brands: readonly { brand: string }[] } };
+      const returnJpeg = client.userAgentData?.brands.some(({ brand }) => brand === 'Chromium') ? rasterDecoders?.reviewTextureJpeg : undefined;
+      const resident = await prepareValidationResidents(host.authority.read().modelVersions!, {
+        modelContent: (record, readOnly, signal) => host.content.modelContent(record, readOnly, signal, signal ? returnJpeg : undefined),
+      }, undefined, composition.progressivePresentation, raster, timing);
       try {
         const prepare = async (next: ProjectDisplay) => {
           await resident.prepare(next.modelVersions!);

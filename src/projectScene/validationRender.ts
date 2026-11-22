@@ -126,7 +126,11 @@ export async function decodeValidationModel(source: ValidatedGlb, signal?: Abort
 }
 
 /** Reusable resident cache, scoped to one opened validation Project; never shared metadata. */
-export async function prepareValidationResidents(versions: readonly DisplayModelVersion[], content: { modelContent?(record: JsonObject): Promise<ValidatedModel>; model?(record: JsonObject): Promise<ValidatedGlb> },
+type RenderContent = {
+  modelContent?(record: JsonObject, readOnly?: boolean, signal?: AbortSignal): Promise<ValidatedModel>;
+  model?(record: JsonObject): Promise<ValidatedGlb>;
+};
+export async function prepareValidationResidents(versions: readonly DisplayModelVersion[], content: RenderContent,
   decode: (source: ValidatedGlb, signal?: AbortSignal) => Promise<DecodedValidationModel> = decodeValidationModel, progressive = false, resources?: RasterResources, timing?: ResidentTiming): Promise<ValidationResidentCache> {
   const models = (rows: readonly DisplayModelVersion[]) => rows.map(v => {
     if (!isSavedModel(v.closure)) throw Error('実モデルの保存本体を選択してください。'); return renderModel(v.closure);
@@ -134,7 +138,7 @@ export async function prepareValidationResidents(versions: readonly DisplayModel
   const core = await prepareReadonlyResidents(models(versions), content, decode, progressive, resources, timing);
   return { ...core, label: c => versions.find(v=>v.assetId===renderModel(c).assetId)?.label??'3Dモデル', prepare: next => core.prepare(models(next)) };
 }
-export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderModel[], content: { modelContent?(record: JsonObject): Promise<ValidatedModel>; model?(record: JsonObject): Promise<ValidatedGlb> },
+export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderModel[], content: RenderContent,
   decode: (source: ValidatedGlb, signal?: AbortSignal) => Promise<DecodedValidationModel> = decodeValidationModel, progressive = false, resources?: RasterResources, timing?: ResidentTiming,
   initialDemand?: readonly ReadonlyRenderModel[]) {
   const lifetime = new AbortController();
@@ -159,7 +163,10 @@ export async function prepareReadonlyResidents(initial: readonly ReadonlyRenderM
     const blob = record.blob as JsonObject | undefined, count = blob?.byteLength;
     if (resources && (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0)) throw Error('保存したモデルの容量を確認してください。');
     return measureResident(timing, 'render.model.load', () => retainRasterModelReadStage<ValidatedModel, DecodedValidationModel>(typeof count === 'number' ? count : 0, record.contentKind === 'gaussianSplat' ? undefined : resources,
-      () => measureResident(timing, 'render.model.content', () => content.modelContent ? content.modelContent(record) : content.model!(record)), async source => {
+      () => measureResident(timing, 'render.model.content', () => {
+        if (!content.modelContent) return content.model!(record);
+        return photo ? content.modelContent(record, false, photo) : content.modelContent(record);
+      }), async source => {
         photo?.throwIfAborted();
         if (!same(nativeSpatialModelBounds(record, source), record.logicalBoundsAsset)) throw Error('保存したモデルの範囲が一致しません。');
         if (proxy && (isPointModel(source) || isGsModel(source))) throw Error('ピン配置用モデルを確認してください。');

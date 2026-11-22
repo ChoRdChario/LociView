@@ -113,7 +113,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const compactLayout = () => !!mobileLayout?.matches || !!document.defaultView?.matchMedia?.('(max-width: 760px)').matches;
   const inlinePreview = () => compactLayout() && compactSurface === 'panel' && (task === 'materials' || task === 'models');
   const stageVisible = () => compactSurface === 'stage' || !compactLayout() || inlinePreview();
-  const showStage = button('3D', () => { if(!viewBlocked()){compactSurface = 'stage'; render();} });
+  const showStage = button('3D', () => { if(!viewBlocked()){cancelPhotoReturn(); compactSurface = 'stage'; render();} });
   compactNavigation.append(showStage);
   const stage = make('section'), canvas = make('canvas'), markers = make('div');
   stage.className = 'lv-project-stage'; canvas.setAttribute('aria-label', '3Dモデルの表示'); canvas.tabIndex = 0;
@@ -956,6 +956,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     const tab = button(label, () => {
       if (taskEntryBlocked(key) || (busy || pending) && !autosave?.saving || windowMoving ||
         ports.otherPending() && !(key === 'captions' && readDuringOutput()) || composingInput()) return;
+      cancelPhotoReturn();
       task = key; if (compactLayout()) compactSurface = 'panel'; feedback = ''; render();
     });
     tab.setAttribute('role', 'tab'); tab.setAttribute('aria-controls', `lv-project-${key}`); tab.id = `lv-project-tab-${key}`; tabButtons.set(key, tab); taskTabs.append(tab);

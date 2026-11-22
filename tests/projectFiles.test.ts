@@ -101,7 +101,7 @@ import { planMetadataEdit } from '../src/projectMetadata/commands';
 import { materialResolutionContext } from '../src/projectMetadata/materialResolution';
 import { identityPlacement, prepareValidationModel, sealValidationRecord } from '../src/projectFiles/initialProject';
 import { validationModelFacts, validationReceivedFacts } from '../src/projectFiles/modelFacts';
-import { ValidationContent } from '../src/projectFiles/content';
+import { inspectDeclaredValidationModel, readValidationBody, ValidationContent } from '../src/projectFiles/content';
 import { conversionContentVerifier } from '../src/projectFiles/conversionContent';
 import { ProjectMetadataSource } from '../src/projectMetadata/source';
 import { fixture } from './helpers/projectRecordsFixture';
@@ -580,6 +580,49 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const bytes = glb(j => { j.images[0].mimeType = 'image/jpeg'; }, true, jpegBytes('rgb-progressive'));
     await expect(inspectValidationGlb(bytes, budget, decode)).rejects.toThrow();
     expect((await inspectValidationJpegGlb(bytes, budget, decode, decodeJpeg)).jpeg).toBe(true);
+  });
+  it('cancels a pending photo-return stream without accepting partial bytes or locking the next read', async () => {
+    const cancel = vi.fn();
+    const stream = new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(Uint8Array.of(1)); }, cancel });
+    const controller = new AbortController();
+    const pending = readValidationBody({ size: 2, stream: () => stream }, 2, controller.signal);
+    await Promise.resolve();
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(stream.locked).toBe(false);
+    const original = new Blob([Uint8Array.of(1, 2)]);
+    expect(await readValidationBody(original, 2)).toEqual(Uint8Array.of(1, 2));
+  });
+  it('releases the in-flight photo-return texture and skips the remaining images after cancellation', async () => {
+    const bytes = glb(j => { j.images[0].mimeType = 'image/jpeg'; j.images.push({ ...j.images[0] }); }, true, jpegBytes('rgb-progressive'));
+    const controller = new AbortController(), close = vi.fn();
+    const cancelledDecode: JpegDecoder = async (image, use) => {
+      const frame = await decodeJpeg(image, use);
+      controller.abort();
+      return { ...frame, close };
+    };
+    await expect(inspectValidationJpegGlb(bytes, budget, decode, cancelledDecode, controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    expect(close).toHaveBeenCalledOnce();
+    const freshDecode = vi.fn(decodeJpeg);
+    expect((await inspectValidationJpegGlb(bytes, budget, decode, freshDecode)).jpeg).toBe(true);
+    expect(freshDecode).toHaveBeenCalledTimes(2);
+  });
+  it('limits the optional photo-return JPEG check to the saved ordinary mesh texture with a live request', async () => {
+    const bytes = glb(j => { j.images[0].mimeType = 'image/jpeg'; }, true, jpegBytes('rgb-progressive'));
+    const { representation } = await prepareValidationModel({ label: '原寸写真', bytes }, budget, decode, undefined, decodeJpeg);
+    const normal = vi.fn(decodeJpeg), returning = vi.fn(decodeJpeg), signal = new AbortController().signal;
+    const check = (record: JsonObject, use: 'review' | 'saved', active?: AbortSignal) =>
+      inspectDeclaredValidationModel(record, bytes, budget, decode, normal, use, active, returning);
+    await check(representation, 'saved', signal);
+    expect(returning).toHaveBeenCalledOnce();
+    await check(representation, 'saved');
+    await check({ ...representation, purposes: ['display'] }, 'review', signal);
+    await check({ ...representation, formatProfile: await occurrenceJpegGlbProfile() }, 'saved', signal);
+    expect(normal).toHaveBeenCalledTimes(3);
+    returning.mockRejectedValueOnce(Error('invalid frame'));
+    await expect(check(representation, 'saved', signal)).rejects.toThrow();
+    expect(normal).toHaveBeenCalledTimes(3);
   });
   it('JPEG companion preserves old Native recipe-2 completed retry without adding independent PNG decode', async () => {
     const initial = await (await prepareNativeConversion(await nativeAppearanceFile(), budget, decode))!.create(), r = firstWorkspaceRecipient();
@@ -12412,6 +12455,7 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
       const controller = new AbortController();
       cache.demand!([model], { representationId: model.representation.id, signal: controller.signal });
       await vi.waitFor(() => expect(complete).toBeTypeOf('function'));
+      expect(reads).toHaveBeenLastCalledWith(model.representation, false, controller.signal);
       controller.abort(); cache.demand!([]); cache.demand!([model]); complete();
       await cache.idle();
       expect(cache.state(model)).toEqual({ phase: 'ready' });
