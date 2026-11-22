@@ -165,15 +165,19 @@ describe('same-host known PNG media connection; not decoder adoption, raster, IM
   it('keeps image retry on the exact target, ignores old events, releases URLs and never substitutes a retargeted attachment', () => {
     const document = new RecordedDocument(), viewer = createMediaViewer(document.asDocument()), root = record(viewer.root);
     const create = vi.spyOn(URL, 'createObjectURL'), revoke = vi.spyOn(URL, 'revokeObjectURL');
+    const showPin = vi.fn();
     let group: MediaPreviewGroup | null = { scope: 'scene/caption', label: '<script>Caption</script>', items: [
       { id: 'attachment', resourceId: 'resource', label: '画像', description: '説明', image: { blob: new Blob(['verified test port'], { type: 'image/png' }) } }] };
     viewer.open(() => group, 'attachment', document.createElement('button') as unknown as HTMLElement);
+    expect(button(root, 'ピンを表示').hidden).toBe(true);
+    group = { ...group, showPin }; viewer.render(); expect(button(root, 'ピンを表示').hidden).toBe(false);
     const original = nodes(root).find(n => n.tag === 'img')!; original.fire('error'); expect(button(root, '画像を再試行').hidden).toBe(false);
     viewer.render(); expect(button(root, '画像を再試行').hidden).toBe(false); button(root, '画像を再試行').fire('click');
     const retried = nodes(root).find(n => n.tag === 'img')!; expect(retried).not.toBe(original);
     retried.fire('error'); original.fire('load'); expect(button(root, '画像を再試行').hidden).toBe(false);
     button(root, '画像を再試行').fire('click'); nodes(root).find(n => n.tag === 'img')!.fire('load'); expect(button(root, '画像を再試行').hidden).toBe(true);
     group = { ...group!, items: [{ ...group!.items[0]!, resourceId: 'another-resource' }] }; viewer.render();
+    expect(button(root, 'ピンを表示').hidden).toBe(true); button(root, 'ピンを表示').fire('click'); expect(showPin).not.toHaveBeenCalled();
     expect(nodes(root).filter(n => n.tag === 'img')).toHaveLength(0); expect(nodes(root).some(n => n.textContent.includes('選び直してください'))).toBe(true);
     expect(named(root, '次のメディア').disabled).toBe(true); expect(revoke).toHaveBeenCalledTimes(create.mock.calls.length);
     group = null; viewer.render(); expect(root.open).toBe(false); viewer.dispose(); create.mockRestore(); revoke.mockRestore();

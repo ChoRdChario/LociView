@@ -189,6 +189,7 @@
 }
 .lv-review-workspace .lv-development-pin:is([aria-current="true"], :focus-visible) { z-index: 1; }
 .lv-review-workspace .lv-development-pin:is([aria-current="true"], :focus-visible)::before { box-shadow: 0 0 0 3px var(--lv-action), 0 0 0 4px white; }
+.lv-review-workspace .lv-development-pin[aria-current="true"]::before { outline: 2px dashed var(--lv-field); outline-offset: 6px; }
 .lv-review-workspace .lv-development-pin[data-status="needsReview"]::after,
 .lv-development .lv-development-pin[data-review="true"]::after { content: "!"; position: absolute; right: -7px; top: -7px; width: 16px; height: 16px; border: 1px solid var(--lv-action); border-radius: 50%; background: var(--lv-field); color: var(--lv-action); font-size: 12px; font-weight: 700; line-height: 14px; }
 .lv-development-stage { overflow-y: auto; }
@@ -240,6 +241,7 @@
 .lv-media-viewer > header { display: flex; align-items: start; flex: 0 0 auto; gap: 12px; position: sticky; top: 0; background: var(--lv-panel); z-index: 1; }
 .lv-media-viewer h2 { flex: 1; min-width: 0; max-height: 20dvh; overflow: auto; overflow-wrap: anywhere; }
 .lv-media-viewer > header > button { flex: 0 0 44px; font-size: 20px; }
+.lv-media-viewer > header > .lv-media-show-pin { flex-basis: auto; min-height: 44px; white-space: nowrap; font-size: 14px; }
 .lv-media-viewer-content { flex: 1; min-height: 96px; display: flex; align-items: center; justify-content: center; overflow: auto; }
 .lv-media-viewer-content .lv-media-image { width: 100%; max-height: 100%; text-align: center; }
 .lv-media-viewer-content img { display: block; width: 100%; height: min(52dvh, 540px); object-fit: contain; }

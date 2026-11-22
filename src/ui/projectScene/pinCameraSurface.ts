@@ -2,7 +2,7 @@
  * Only a solitary, stationary touch can activate a pin on release. */
 export function createPinCameraSurface(
   document: Document, canvas: HTMLCanvasElement, shortcut: HTMLButtonElement, pins: HTMLElement, stage: HTMLElement,
-  allowPinTouch: () => boolean,
+  allowPinNavigation: () => boolean,
   selectPin: (button: HTMLButtonElement, release: PointerEvent) => void,
 ) {
   const surface = document.createElement('div');
@@ -31,9 +31,11 @@ export function createPinCameraSurface(
   }, true);
   pins.addEventListener('pointerdown', event => {
     // Mouse pin drags have their own left/right button handling.
-    if (event.pointerType !== 'touch' || !allowPinTouch()) event.stopPropagation();
+    if (event.pointerType !== 'touch' || !allowPinNavigation()) event.stopPropagation();
   });
-  pins.addEventListener('wheel', event => event.stopPropagation());
+  pins.addEventListener('wheel', event => {
+    if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || !allowPinNavigation()) event.stopPropagation();
+  });
   surface.addEventListener('pointermove', event => {
     if (multiple && touches.size === 1 && touches.has(event.pointerId)) {
       event.stopPropagation(); // Lifting the last finger must not turn a pinch into an orbit.

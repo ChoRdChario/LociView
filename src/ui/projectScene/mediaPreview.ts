@@ -11,6 +11,7 @@ export interface MediaPreviewItem {
 }
 export interface MediaPreviewGroup {
   readonly scope: string; readonly label: string; readonly items: readonly MediaPreviewItem[];
+  readonly showPin?: () => void;
 }
 type MediaOpener = HTMLElement | (() => HTMLElement | null);
 export type MediaPreviewReader = () => MediaPreviewGroup | null;
@@ -120,13 +121,14 @@ export function createMediaViewer(document: Document, raster?: RasterResources,d
   const root = document.createElement('dialog'); root.className = 'lv-media-viewer'; root.setAttribute('aria-label', 'メディアビューア');
   const header = document.createElement('header'), title = document.createElement('h2'), closeButton = document.createElement('button');
   closeButton.type = 'button'; closeButton.textContent = '×'; closeButton.setAttribute('aria-label', '閉じる');
+  const pin = document.createElement('button'); pin.type = 'button'; pin.textContent = 'ピンを表示'; pin.hidden = true; pin.className = 'lv-media-show-pin';
   const content = document.createElement('div'), description = document.createElement('p'), status = document.createElement('p');
   content.className = 'lv-media-viewer-content'; status.setAttribute('role', 'status');
   const imageViewport = createMediaImageViewport(document, content);
   const footer = document.createElement('footer'), previous = document.createElement('button'), next = document.createElement('button'), count = document.createElement('span');
   previous.type = next.type = 'button'; previous.textContent = '←'; next.textContent = '→';
   previous.setAttribute('aria-label', '前のメディア'); next.setAttribute('aria-label', '次のメディア'); count.setAttribute('aria-live', 'polite');
-  header.append(title, closeButton); footer.append(previous, count, next); root.append(header, imageViewport.toolbar, content, description, status, footer);
+  header.append(title, pin, closeButton); footer.append(previous, count, next); root.append(header, imageViewport.toolbar, content, description, status, footer);
   let reader: MediaPreviewReader | null = null, scope = '', id = '', resourceId = '', opener: MediaOpener | null = null, disposed = false;
   let preview: ReturnType<typeof createPngPreview> | null = null, presentedImage: PreviewPng | null = null;
   let retirement: Promise<void> | undefined;
@@ -152,6 +154,7 @@ export function createMediaViewer(document: Document, raster?: RasterResources,d
       status.textContent = '画面に戻ると表示します。'; return;
     }
     const index = group.items.findIndex(i => i.id === id && i.resourceId === resourceId), item = group.items[index];
+    pin.hidden = !item || !group.showPin;
     root.setAttribute('data-media-kind', item?.kind ?? 'image');
     title.textContent = item ? `${group.label} — ${item.label}` : group.label;
     description.textContent = item?.description ?? ''; description.hidden = !description.textContent;
@@ -172,6 +175,12 @@ export function createMediaViewer(document: Document, raster?: RasterResources,d
     preview?.dispose(); preview = null; render();
   }
   closeButton.addEventListener('click', () => close()); previous.addEventListener('click', () => step(-1)); next.addEventListener('click', () => step(1));
+  pin.addEventListener('click', () => {
+    const group = reader?.();
+    if (disposed || !group?.showPin || group.scope !== scope || !selected()) return;
+    close(false);
+    group.showPin();
+  });
   root.addEventListener('cancel', event => { event.preventDefault(); close(); });
   const visibility = () => { if (!disposed) { pauseThumbnails(); render(); } };
   document.addEventListener?.('visibilitychange', visibility); pauseThumbnails();

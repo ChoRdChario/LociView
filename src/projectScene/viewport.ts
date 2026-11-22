@@ -602,7 +602,6 @@ export const sceneViewportFactory = (saved: SavedModelResidentPort, residency?: 
       camera.updateMatrixWorld(true);
       const position = new THREE.Vector3(...pin.position), projected = position.clone().project(camera);
       if (!Number.isFinite(projected.z) || projected.z < -1 || projected.z > 1) return false;
-      if (Math.abs(projected.x) <= 1 && Math.abs(projected.y) <= 1) return true;
       // Unproject at the pin's depth so a perspective view keeps its magnification.
       const atDestination = new THREE.Vector3(destination.x / width * 2 - 1, 1 - destination.y / height * 2, projected.z).unproject(camera);
       const translation = position.sub(atDestination);

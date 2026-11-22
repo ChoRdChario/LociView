@@ -254,6 +254,13 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
   front.addEventListener('change', changeFront); arrange.addEventListener('click', arrangeAll);
   return { root, tools, render,
     windowContent(captionId: string) { return cards.get(captionId)?.body.parentElement; },
+    coversPin(pin: { x: number; y: number }) {
+      if (context?.visible === false) return false;
+      for (const { rect } of cards.values()) {
+        if (pin.x >= rect.left && pin.x < rect.left + rect.width && pin.y >= rect.top && pin.y < rect.top + rect.height) return true;
+      }
+      return false;
+    },
     pinDestination(pin: { x: number; y: number }) {
       if (!hasExtent() || !Number.isFinite(pin.x) || !Number.isFinite(pin.y)) return null;
       const blocks = occupied(), margin = 24;

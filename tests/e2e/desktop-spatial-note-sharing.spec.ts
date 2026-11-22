@@ -1,4 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { PackageArchive } from '../../src/projectPackage/zipArchive';
 import { gsFixture } from '../helpers/gsFixture';
 import { smallPng, triangleGlb } from './fixtures';
 import { finishCaptionEditing, chooseHomeFiles, openAddOptions, beginSceneCreation, closeFileSurface, lookAlongFront, revealCameraPositions, revealCaptionList, revealFileSurface, selectShareOutput } from './workspaceUi';
@@ -158,6 +161,11 @@ for (const touch of [false, true])
           await canvas.click({ position });
         await expect(action(page, 'ここに記録を作る')).toBeEnabled();
         await expect(task.getByLabel('位置 X', exact)).toBeHidden();
+        const placedPosition = await Promise.all(['X', 'Y', 'Z'].map(async axis => {
+          const field = task.getByLabel('位置 ' + axis, exact);
+          return field.evaluate(node => (node as HTMLInputElement).valueAsNumber);
+        }));
+        expect(placedPosition.every(Number.isFinite)).toBe(true);
         await action(page, 'ここに記録を作る').click();
         await detail(page).getByLabel('タイトル', exact).fill('塗装の確認');
         await detail(page).getByLabel('本文', exact).fill('塗装の境界を確認。');
@@ -284,6 +292,11 @@ for (const touch of [false, true])
         const path = info.outputPath('shared-scene.zip');
         await download.saveAs(path);
         expect(await download.failure()).toBeNull();
+        const archive = await PackageArchive.inspect(new Blob([Uint8Array.from(await readFile(path)).buffer]));
+        const snapshot = JSON.parse(new TextDecoder().decode(await archive.entryBytes('review.json', 8_000_000)));
+        const exported = Object.values(snapshot.captionsById) as { id: string; title: string; anchor: { positionAsset: number[] } }[];
+        expect(exported).toHaveLength(1);
+        expect(exported[0]).toMatchObject({ title: sharedTitle, anchor: { positionAsset: placedPosition } });
 
         const other = await receiver.newPage();
         if (touch && kind === '点群') await other.addInitScript(() => {
@@ -462,7 +475,24 @@ for (const touch of [false, true])
         expect((await selectedPin.boundingBox())!.width).toBeGreaterThanOrEqual(44);
         const photoArea = touch ? other.getByLabel('選択中の記録のメディア', exact) : reader.locator('.lv-caption-window[data-active="true"]');
         await photoArea.getByRole('button', { name: '画像を表示', ...exact }).click();
-        await expect(other.getByRole('dialog', { name: 'メディアビューア', ...exact }).locator('img')).toHaveJSProperty('naturalWidth', 2);
+        const photoViewer = other.getByRole('dialog', { name: 'メディアビューア', ...exact });
+        const originalPhoto = photoViewer.locator('img');
+        await expect(originalPhoto).toHaveJSProperty('naturalWidth', 2);
+        const receivedDigest = await originalPhoto.evaluate(async node => {
+          const bytes = await (await fetch((node as HTMLImageElement).currentSrc)).arrayBuffer();
+          return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), v => v.toString(16).padStart(2, '0')).join('');
+        });
+        expect(receivedDigest).toBe(createHash('sha256').update(smallPng()).digest('hex'));
+        const locatePhoto = photoViewer.getByRole('button', { name: 'ピンを表示', ...exact });
+        if (touch) await locatePhoto.tap(); else await locatePhoto.press('Enter');
+        await expect(photoViewer).toBeHidden();
+        await expect(selectedPin).toHaveAttribute('data-caption-id', exported[0]!.id);
+        await expect.poll(() => selectedPin.evaluate(node => {
+          const box = node.getBoundingClientRect();
+          return document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2) === node;
+        })).toBe(true);
+        if (touch) await selectedPin.tap(); else await selectedPin.click();
+        await photoArea.getByRole('button', { name: '画像を表示', ...exact }).click();
         await other.getByRole('dialog', { name: 'メディアビューア', ...exact }).getByRole('button', { name: '閉じる', ...exact }).click();
         await expect(photoArea.getByRole('button', { name: '画像を表示', ...exact })).toBeFocused();
         if (touch) {

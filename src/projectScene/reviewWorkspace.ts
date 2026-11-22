@@ -262,6 +262,7 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
   const mediaGroup = (captionId: string): MediaPreviewGroup => {
     const caption = view.source.captions.find(c => c.id === captionId);
     return { scope: JSON.stringify([view.source.token, captionId]), label: caption?.title.kind === 'value' ? caption.title.value || '記録' : '記録',
+      showPin: display.pins.some(pin => pin.id === captionId) ? () => returnToPin(captionId) : undefined,
       items: view.attachments.filter(a => a.captionId === captionId).map(a => {
         const media = (view.inspection.review.snapshot.mediaResourcesById as Record<string, JsonObject & { label: string;mediaKind:'image'|'video'|'audio';portableDisplay?:JsonObject }>)[String(a.mediaResourceId)];
         const blob = view.images.get(String(a.mediaResourceId));
@@ -327,15 +328,19 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     requestedPin = { id: pinAction.id, fit: pinAction.label === '全体表示' }; paint();
     if (locate.hidden) canvas.focus({ preventScroll: true });
   });
-  returnTo3D.addEventListener('click', () => {
+  function returnToPin(id: string | null, fit = false) {
     if (searchBlocked() || content.inert) return;
-    const id = memory.selectedCaptionId;
-    if (id && display.pins.some(pin => pin.id === id)) requestedPin = { id, fit: pinAction?.id === id && pinAction.label === '全体表示' };
+    if (id && id !== memory.selectedCaptionId) {
+      memory = { ...memory, selectedCaptionId: id };
+      locationNotice = ''; render(); list.revealSelected();
+    }
+    if (id && display.pins.some(pin => pin.id === id)) requestedPin = { id, fit };
     requestStage();
     root.scrollIntoView?.({ block: 'start', behavior: 'auto' });
     canvas.focus({ preventScroll: true });
     paint();
-  });
+  }
+  returnTo3D.addEventListener('click', () => returnToPin(memory.selectedCaptionId, pinAction?.label === '全体表示'));
   let panelGallery: ReturnType<typeof gallery> | null = null, panelCaption: string | null = null;
   const sceneHeader = make('div'); sceneHeader.className = 'lv-review-scene-header';
   let sceneSelect: HTMLSelectElement | undefined;
@@ -482,9 +487,10 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
     const cameraBlocked = !cameraReady || composing || moving || !!observation?.dragging;
     let captured: unknown=observation?.camera; try { captured ??= runtime?.capture?.().camera; } catch { /* Camera preparation remains local. */ }
     const selectedPin = ready && display.pins.some(pin => pin.id === memory.selectedCaptionId) ? observation!.pins.find(pin => pin.id === memory.selectedCaptionId) : undefined;
+    const pinObscured = selectedPin && (!selectedPin.visible || windows.coversPin(selectedPin));
     if (ready) {
-      if (selectedPin?.visible) locationNotice = '';
-      pinAction = selectedPin && !selectedPin.visible && runtime?.revealPin
+      if (selectedPin && !pinObscured) locationNotice = '';
+      pinAction = selectedPin && pinObscured && runtime?.revealPin
         ? { id: selectedPin.id, label: selectedPin.depthVisible === false ? '全体表示' : 'この位置を表示' } : null;
     } else if (!mediaWork.active || pinAction?.id !== memory.selectedCaptionId) pinAction = null;
     const actionLabel = pinAction?.label;
@@ -537,14 +543,16 @@ export function createReviewWorkspace(document: Document, view: ReviewView, fact
       button.style.opacity = offscreen ? '0' : '';
       if (point) { button.style.left = `${point.x}px`; button.style.top = `${point.y}px`; }
     }
-    const bounds = canvas.getBoundingClientRect?.() ?? { width: 0, height: 0 }; windows.project({ ready, width: bounds.width, height: bounds.height,
+    const bounds = canvas.getBoundingClientRect?.() ?? { left: 0, top: 0, width: 0, height: 0 }; windows.project({ ready, width: bounds.width, height: bounds.height,
       sourceToken: display.token, sceneId: display.sceneId, pins: ready ? observation!.pins : [] });
     if (requestedPin) {
       if (requestedPin.id !== memory.selectedCaptionId || handoffBusy || content.inert || observation?.issue || observation?.dragging) {
         requestedPin = null;
       } else if (ready) {
         const request = requestedPin; requestedPin = null; locationNotice = '';
-        if (selectedPin && !selectedPin.visible && !cameraBlocked) {
+        // Hit-test only the requested location. Transparent gaps around the gizmo are usable canvas.
+        const cover = selectedPin?.visible && document.elementFromPoint?.(bounds.left + selectedPin.x, bounds.top + selectedPin.y);
+        if (selectedPin && !cameraBlocked && (pinObscured || cover && viewport.contains(cover) && cover.closest('.lv-project-camera, .lv-stage-search'))) {
           if (selectedPin.depthVisible === false) {
             if (request.fit) cameraAction(() => camera({ kind: 'fit' }));
             else { locationNotice = '選んだ部位は現在の視点から見えません。「全体表示」で位置を確認できます。'; paint(); }

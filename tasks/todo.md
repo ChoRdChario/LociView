@@ -1,6 +1,6 @@
 # LociView active work
 
-Updated2026-11-21. This is the single current plan and check record.
+Updated2026-11-22. This is the single current plan and check record.
 [Inventory](implementation-inventory.md) owns route-specific coverage;
 [map](../PROJECT_MAP.md) and [document index](../docs/README.md) route contracts/code.
 Git owns checkpoint identity. [Retained checkpoint evidence](../docs/history/development-through-2026-10-29/tasks/todo-before-daily-authoring.md)
@@ -8,7 +8,16 @@ and [earlier working records](../docs/history/development-through-2026-10-28/tas
 retain qualifications and failures. Their Current/Next headings are not an active
 queue or renewed approval requirements.
 
-## Current — 記録・写真と3Dの関係を視覚的に伝える
+## Current — 初めて共有ファイルを開く人が作成者と同じ部位を見つける
+
+- 作成側で位置を選び、本文と写真を付け、選んだシーンを実ファイルに出す。別の空の環境で、PCとタッチ双方の受信者が写真と元のピンを対応付けられるかを確認する。共同編集の往復は別工程。
+- Ki-84の画面を操作説明なしで独立に巡回し、合成データの実ファイルで作成側と受信側を照合。迷いを再現できた箇所を既存の操作内で改善し、現在の表示、保存・復旧の契約を保つ。初見の人間による確認と実機Safariの確認は区別して報告する。
+- 修正前のKi-84では、比較中の天蓋写真を閉じると選択は尾翼に残り、窓の下のピンを表示する入口も消えた。ピンの真上からのホイールでは機体を拡大できなかった。写真に「ピンを表示」を接続し、通常の閉じる操作と比較状態を保ち、操作に隠れたピンは必要な距離だけ平行移動する。ピンには位置を見分ける外周を加えた。
+- 点群とGS／配置用モデルで作成・受信を別環境に分け、確定前に読んだ座標と共有ファイル内の座標、作成者の原写真と受信者が実際に開いた写真のSHA-256、押し直したピンの識別情報を照合。Ki-84でも天蓋と尾翼を見比べ、閉じる・位置を示す・拡大する操作を区別して確認した。狭幅の初期倍率では機体上のおおよその位置が分かる一方、取付面の細部を判別するには拡大が必要。
+- 最終候補の独立タッチ巡回では、製品の手順やコードを見ていないAIが390×844画面から天蓋と垂直尾翼下方内部の写真・選択印を特定。指が届いた部位と再表示した記録を照合した。PCでは記録窓・検索ボタンの下から復帰し、奥行き範囲外では利用者が全体表示を選ぶまで64ピンの投影状態を保持。点群・GSの共有4経路と座標記録の再開1経路が通過。個人資料と実画像は私的な検証領域に保管。
+- 独立差分レビューを完了。最初の型チェックで見つかった画像要素の試験型指定を修正し、最終 `check:checkpoint` は160ファイル・3,723件成功、既存の想定失敗16件・保留21件、全ビルド・オフライン分離を通過。次は共同編集用ファイルで同じ記録に追記し、作成者に返すまでの通常画面をTEAM-FLOW-01と照合する。利用者の初見テストと実機iPhoneは別途まとめて確認する。
+
+## Previous — 記録・写真と3Dの関係を視覚的に伝える
 
 - 目的: 5944782を基準に、共有と編集の「ピン・一覧→記録→写真→元の部位」の対象を文字に頼らず追いやすくする。前面の窓と選択した記録は別々の状態として扱う。写真の開閉・フォーカス・保存と復旧の境界は現行のまま。
 - 現画面でKi-84の2窓を確認。選択ピンと一覧の対応、写真を開いた際の視覚的なつながりが弱い。320×365タッチでは保存後の通知が本文を覆う。選択と前面、通常と動きを減らす設定、PCとタッチ、狭い画面で比較する。
