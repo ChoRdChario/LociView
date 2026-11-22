@@ -113,6 +113,20 @@ describe('disconnected comparison window STATE, not a floating renderer', () => 
 });
 
 describe('window DOM ownership, not rendered GPU acceptance', () => {
+  it('keeps both photo pins reachable when opening the second comparison window', () => {
+    const controls = createCaptionWindowControls(new RecordedDocument().asDocument(), () => true, () => {});
+    const photos: CaptionListSource = { ...source, captions: source.captions.map(item => ({ ...item, mediaCount: value(1) })) };
+    const pins = [{ id: a, x: 500, y: 120, visible: true }, { id: b, x: 360, y: 350, visible: true }];
+    controls.project({ ready: true, width: 716, height: 735, sourceToken: photos.token, sceneId: sceneA, pins });
+    let memory = run(newCaptionWindowMemory(sceneA), a, { kind: 'open', captionId: a }, photos);
+    controls.render({ source: photos, memory, selectedId: a, moveBlock: null });
+    const first = controls.placement(a);
+    memory = run(memory, b, { kind: 'open', captionId: b }, photos);
+    controls.render({ source: photos, memory, selectedId: b, moveBlock: null });
+    expect(controls.placement(a)).toEqual(first);
+    expect(pins.map(pin => controls.coversPin(pin))).toEqual([false, false]);
+    controls.dispose();
+  });
   it('gives two new windows separate reachable positions and ignores parked windows on touch return', () => {
     const document = new RecordedDocument();
     const controls = createCaptionWindowControls(document.asDocument(), () => true, () => {});

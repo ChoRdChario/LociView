@@ -105,7 +105,16 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   help.append(resumeNotice, otherProject);
   const status = make('p'); status.setAttribute('role', 'status'); status.className = 'lv-operation-status';
   const retry = button('更新を再試行', () => { void runRetry(); }); header.append(status, retry);
-  const revise = button('入力を修正する', () => { if (!busy && ports.status().kind === 'idle') { pending = null; autosave?.clearFailure(); feedback = ''; render(); } }); header.append(revise);
+  const revise = button('入力を修正する', () => {
+    if (busy || ports.status().kind !== 'idle') return;
+    const tagTarget = pending?.owner === 'tag' ? organization?.tagDraftTarget() : undefined;
+    pending = null; autosave?.clearFailure(); feedback = '';
+    if (tagTarget && organization) {
+      if (locationCaptions.some(item => item.id === tagTarget)) selectCaption(tagTarget, { openWindow: false });
+      task = 'captions'; captionSurface = 'detail'; compactSurface = 'panel'; organization.tagsRoot.open = true;
+      render(); organization.focusTagDraft();
+    } else render();
+  }); header.append(revise);
   const body = make('div'); body.className = 'lv-project-body';
   const compactNavigation = make('nav'); compactNavigation.className = 'lv-compact-navigation'; compactNavigation.setAttribute('aria-label', '表示領域');
   let compactSurface: 'stage' | 'panel' = 'panel', captionSurface: 'list' | 'detail' = 'list';
@@ -113,7 +122,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const compactLayout = () => !!mobileLayout?.matches || !!document.defaultView?.matchMedia?.('(max-width: 760px)').matches;
   const inlinePreview = () => compactLayout() && compactSurface === 'panel' && (task === 'materials' || task === 'models');
   const stageVisible = () => compactSurface === 'stage' || !compactLayout() || inlinePreview();
-  const showStage = button('3D', () => { if(!viewBlocked()){cancelPhotoReturn(); compactSurface = 'stage'; render();} });
+  const showStage = button('3D', () => { if(!viewBlocked()){cancelPinReturn(); compactSurface = 'stage'; render();} });
   compactNavigation.append(showStage);
   const stage = make('section'), canvas = make('canvas'), markers = make('div');
   stage.className = 'lv-project-stage'; canvas.setAttribute('aria-label', '3Dモデルの表示'); canvas.tabIndex = 0;
@@ -621,6 +630,12 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   });
   const captionNavigation = make('nav'); captionNavigation.setAttribute('aria-label', '記録の前後移動');
   const detailHeading = make('h2'); detailHeading.tabIndex = -1;
+  const locatePin = button('この位置を表示', () => {
+    const id = memory().selectedCaptionId;
+    if (id && !locatePin.hidden && !locatePin.disabled && canLocatePin(id))
+      showPinLocation(id, false, locatePin.textContent === '全体表示');
+  });
+  locatePin.className = 'lv-caption-locate'; locatePin.hidden = true;
   const captionBack = button('一覧へ戻る', () => {
     captionSurface = 'list'; render(); list.focusSelection();
   });
@@ -633,7 +648,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   }
   function stepCaption(direction: 'previous' | 'next') {
     if (needsCaptionFlush() && canFlushCaption()) { void afterCaptionFlush(() => stepCaption(direction)); return; }
-    if (disposed || busy || pending || windowMoving || ports.otherPending() && !readDuringOutput()) return;
+    if (disposed || (busy || pending) && !readingDuringTagSave() || windowMoving || ports.otherPending() && !readDuringOutput()) return;
     const base = listContext(), windowState = windowMemory(), context = captionNavigationContext(base, windowState);
     const plan = planCaptionList(context, { kind: 'step', direction });
     if (plan.kind !== 'change' || !captionListPlanIsCurrent(plan, context) ||
@@ -668,7 +683,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       if (target) control.setAttribute('aria-describedby', windowTarget.id);
       else control.removeAttribute('aria-describedby');
     }
-    const blocked = (busy || !!navigation.pending) && !canFlushCaption() || ports.otherPending() && !readDuringOutput();
+    const blocked = (busy || !!navigation.pending) && !canFlushCaption() && !readingDuringTagSave() || ports.otherPending() && !readDuringOutput();
     const neighbors = list.neighbors(navigation.memory.selectedCaptionId);
     previousCaption.disabled = blocked || !neighbors.previous;
     nextCaption.disabled = blocked || !neighbors.next;
@@ -755,7 +770,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   document.addEventListener?.('focusin',closeRecordSheets);
   const captionContent=make('div');captionContent.className='lv-caption-content';
   const captionHeading=make('div');captionHeading.className='lv-caption-heading';captionHeading.append(detailHeading,captionNavigation);
-  detail.mediaSlot.append(media);captionContent.append(captionHeading);
+  detail.mediaSlot.append(media);captionContent.append(captionHeading, locatePin);
   for(const child of Array.from(detail.root.children))if(child!==detail.actions&&child!==detail.confirmation)captionContent.append(child);
   captionContent.append(conflicts);detail.root.append(captionContent,detail.actions,detail.confirmation);detailPane.append(detail.root);
   const sidebarToolbar=make('div');sidebarToolbar.className='lv-sidebar-toolbar';sidebarToolbar.append(sceneArea,taskTabs);
@@ -812,6 +827,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     captionPending: needsCaptionFlush, canFlushCaption, flushCaption,
     canContinueWrite: () => !externalBusy && !mutationBlock(),
     createdTagAssignment: () => pending?.owner === 'attachCreatedTag' ? busy ? 'saving' : 'retry' : undefined,
+    tagSaving: readingDuringTagSave,
     ports, source: () => ({ provider: provider(), sceneId, captionId: memory().selectedCaptionId }),
     localBlocked: () => busy || !!pending || ports.otherPending() || windowMoving || hasCaptionDraft(draft) || !!selectedMedia || !!draft?.composing ||
       composing || !!sceneEdit || includeMemory().composing || positionInput() || !!deletion || !!pickerScope ||
@@ -876,23 +892,30 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     for(const disclosure of [help,organization!.settingsRoot])if(disclosure.open&&!disclosure.contains(target))disclosure.open=false;
   };
   document.addEventListener?.('pointerdown',dismissHeaderSheets,true);document.addEventListener?.('focusin',dismissHeaderSheets);
-  let photoCaptions: readonly CaptionListItem[] = [];
-  let photoReturn: { token: string; sceneId: string; captionId: string; displayedPhoto: boolean } | undefined;
-  const cancelPhotoReturn = () => { photoReturn = undefined; };
+  let locationCaptions: readonly CaptionListItem[] = [];
+  let pinReturn: { token: string; sceneId: string; captionId: string; displayedPhoto: boolean; fit: boolean } | undefined;
+  const cancelPinReturn = () => { pinReturn = undefined; };
   // A new gesture takes precedence over an earlier request waiting for the model.
-  root.addEventListener('pointerdown', cancelPhotoReturn, true);
-  root.addEventListener('keydown', cancelPhotoReturn, true);
-  root.addEventListener('wheel', cancelPhotoReturn, { capture: true, passive: true });
+  root.addEventListener('pointerdown', cancelPinReturn, true);
+  root.addEventListener('keydown', cancelPinReturn, true);
+  root.addEventListener('wheel', cancelPinReturn, { capture: true, passive: true });
+  function locatableCaption(item: CaptionListItem | undefined) {
+    if (!item || item.pin !== 'visible' && item.pin !== 'needsReview') return false;
+    const color = captionColorKey(item.color), colors = memory().pinColors;
+    return color !== null && (!colors || colors.includes(color));
+  }
+  function canLocatePin(captionId: string, fromPhoto = false) {
+    if (!viewport.revealPin || viewBlocked() || dirty()) return false;
+    const item = locationCaptions.find(c => c.id === captionId);
+    return (!fromPhoto || item?.pin === 'visible') && locatableCaption(item);
+  }
+  function showPinLocation(captionId: string, displayedPhoto: boolean, fit = false) {
+    if (memory().selectedCaptionId !== captionId) selectCaption(captionId, { openWindow: false });
+    pinReturn = { captionId, sceneId, token: provider().token, displayedPhoto, fit };
+    compactSurface = 'stage'; render(); list.revealSelected(); canvas.focus({ preventScroll: true });
+  }
   mediaManager = createProjectMedia(document, panelHost, () => memory().selectedCaptionId, mediaViewer, captionId => {
-    if (!viewport.revealPin || viewBlocked() || dirty()) return;
-    const item = photoCaptions.find(c => c.id === captionId);
-    const colors = memory().pinColors;
-    if (item?.pin !== 'visible' || colors && !colors.includes(captionColorKey(item.color) ?? '')) return;
-    return displayedPhoto => {
-      if (memory().selectedCaptionId !== captionId) selectCaption(captionId, { openWindow: false });
-      photoReturn = { captionId, sceneId, token: provider().token, displayedPhoto };
-      compactSurface = 'stage'; render(); list.revealSelected(); canvas.focus({ preventScroll: true });
-    };
+    if (canLocatePin(captionId, true)) return displayedPhoto => showPinLocation(captionId, displayedPhoto);
   }); media.append(mediaManager.root);
   function recoveryBlock(group?: WorkspaceRecoveryGroup): string | null {
     const global = mutationBlock(); if (global) return global;
@@ -956,7 +979,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     const tab = button(label, () => {
       if (taskEntryBlocked(key) || (busy || pending) && !autosave?.saving || windowMoving ||
         ports.otherPending() && !(key === 'captions' && readDuringOutput()) || composingInput()) return;
-      cancelPhotoReturn();
+      cancelPinReturn();
       task = key; if (compactLayout()) compactSurface = 'panel'; feedback = ''; render();
     });
     tab.setAttribute('role', 'tab'); tab.setAttribute('aria-controls', `lv-project-${key}`); tab.id = `lv-project-tab-${key}`; tabButtons.set(key, tab); taskTabs.append(tab);
@@ -1107,7 +1130,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     if (mutationBlock()) return;
     const token = provider().token;
     const undo = organization?.beginAction(command) ?? null;
-    const owner = purpose ?? (command.kind === 'createTag' || command.kind === 'setCaptionTag' ? 'tag' : undefined);
+    const tagEdit = command.kind === 'createTag' || command.kind === 'editTag' || command.kind === 'deleteTag' || command.kind === 'setCaptionTag';
+    const owner = purpose ?? (tagEdit ? 'tag' : undefined);
     await perform(() => ports.dispatch(token, command), () => { organization?.recordAction(undo); complete(); }, owner, after);
   }
   async function retryPending() {
@@ -1386,6 +1410,12 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     node.addEventListener('pointerup', end); node.addEventListener('pointercancel', end); node.addEventListener('lostpointercapture', end);
   }
   const viewBlocked = () => cameraNavigationBlocked() || viewport.read().dragging;
+  function paintLocatePin(pin: WorkspaceViewportPresentation['pins'][number] | undefined, compactRecord: boolean) {
+    const show = !!viewport.revealPin && (compactRecord || !!pin && (!pin.visible || windows.coversPin(pin)));
+    if (locatePin.hidden === show) locatePin.hidden = !show;
+    const label = pin?.depthVisible === false ? '全体表示' : 'この位置を表示';
+    if (show && label !== locatePin.textContent) locatePin.textContent = label;
+  }
   function paintViewportPresentation(frame:WorkspaceViewportPresentation):boolean {
     const baseline=overlayBaseline;
     if(!mounted||disposed||rendering||!baseline?.ready||!baseline.cameraReady||frame.input!==installedViewportInput||frame.input!==baseline.input||
@@ -1393,10 +1423,10 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       frame.generation<=lastPresentationGeneration||![frame.width,frame.height].every(n=>Number.isFinite(n)&&n>0))return false;
     const moves:{node:HTMLButtonElement;x:number;y:number;visible:boolean}[]=[];
     const ids=new Set<string>();
-    let selectedPinVisible: boolean | undefined;
+    let selectedPin: WorkspaceViewportPresentation['pins'][number] | undefined;
     for(const pin of frame.pins){
       if(!Number.isFinite(pin.x)||!Number.isFinite(pin.y)||ids.has(pin.id))return false;ids.add(pin.id);
-      if (pin.id===baseline.selectedPinId) selectedPinVisible=pin.visible;
+      if (pin.id===baseline.selectedPinId) selectedPin=pin;
       const node=markerById.get(`${sceneId}:${pin.id}`);
       if(!node){if(pin.visible)return false;continue;}
       moves.push({node,x:pin.x,y:pin.y,visible:pin.visible});
@@ -1407,7 +1437,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       move.node.hidden=!move.visible&&!retained;move.node.style.left=`${move.x}px`;move.node.style.top=`${move.y}px`;move.node.style.opacity=move.visible?'':'0';
     }
     windows.project({ready:true,sourceToken:frame.input.token,sceneId:frame.input.sceneId,width:frame.width,height:frame.height,pins:frame.pins});
-    cameraGizmo.render({...baseline.gizmo,camera:frame.camera,axis:frame.axis,navigating:frame.navigating,selectedPinOffscreen:selectedPinVisible===false});
+    paintLocatePin(selectedPin, false);
+    cameraGizmo.render({...baseline.gizmo,camera:frame.camera,axis:frame.axis,navigating:frame.navigating,selectedPinOffscreen:selectedPin?.visible===false});
     lastPresentationGeneration=frame.generation;return true;
   }
   function viewAction(action: () => void) {
@@ -1473,19 +1504,22 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       fileStatus.dataset.state = summary.backup === 'verified' ? 'verified' : summary.backup === 'unavailable' || summary.backupOutdated ? 'attention' : 'unconfirmed';
       const nextGestureContext = JSON.stringify([p.token, sceneId, ports.readOnly, ports.imageScope(), ports.otherPending(), models?.hidden(), memory().pinColors]);
       if (gestureContext !== nextGestureContext) { gestureContext = nextGestureContext; gesture = null; gestureGeneration++; }
-      const operationStatus=ports.status();status.dataset.busy = String(busy);
+      const operationStatus=ports.status();
+      const localTagSave = readingDuringTagSave() && operationStatus.kind !== 'failed';
+      status.dataset.busy = String(busy);
+      status.hidden = localTagSave;
       let operationDiagnostic: string | undefined;
       if (storageFailure?.diagnostic===operationStatus.error && (operationStatus.kind==='failed' || feedback===storageFailure?.text)) operationDiagnostic=storageFailure?.details;
       else if (operationStatus.kind==='failed' && operationStatus.error) operationDiagnostic=failurePresentation(operationStatus.error,'変更を保存できません。入力を保持しています。再試行してください。').diagnostic;
       operationFailureDetails.render(operationDiagnostic);
-      const operationText = autosave && (pending?.owner === 'caption' || pending?.owner === 'media')
+      const operationText = localTagSave || autosave && (pending?.owner === 'caption' || pending?.owner === 'media')
         ? '' : operationStatus.kind === 'failed' ? failureMessage(operationStatus) || feedback : feedback;
       if (status.textContent !== operationText) status.textContent = operationText;
       // The detail is visually primary during apply; its inert parent cannot own live announcements.
       status.dataset.captionApplying = String(busy && !!applyingCaption && ports.status().kind !== 'failed');
       status.dataset.passive = String(!busy && !pending && ports.status().kind === 'idle' && feedback === passiveFeedback);
       retry.hidden = !pending; retry.disabled = busy || ports.readOnly || ports.otherPending() || ports.status().retryable === false;
-      if (autosave?.saving) retry.hidden = true;
+      if (autosave?.saving || localTagSave) retry.hidden = true;
       retry.textContent = pending?.owner === 'attachCreatedTag' ? 'タグの付与を再試行' :
         autosave && (pending?.owner === 'caption' || pending?.owner === 'media') ? '保存を再試行' : '更新を再試行';
       if (autosave?.failed && (pending?.owner === 'caption' || pending?.owner === 'media')) retry.hidden = true;
@@ -1505,7 +1539,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       sceneChoice.value = sceneId;
       sceneChoice.disabled = !activeScenes.size || (busy || dirty()) && !canFlushCaption() || ports.otherPending();
       const captions = projectCaptions(p, sceneId, models?.hidden());
-      photoCaptions = captions;
+      locationCaptions = captions;
       if (!draft) draft = beginCaptionDraft(detailContext(captions).source);
       if (autosave && draft && !hasCaptionDraft(draft) && !selectedMedia && !autosave.saving && !pending && ports.status().kind === 'idle' && captionToken !== p.token) {
         draft = reanchorCaptionAutosave(draft, detailContext(captions).source); captionToken = p.token;
@@ -1597,16 +1631,16 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       if (reviewToggle.textContent !== reviewLabel) reviewToggle.textContent = reviewLabel;
       reviewToggle.disabled = busy || composingInput() || ports.otherPending() || !!ports.presentation?.();
       organization!.render();
-      body.setAttribute('aria-busy', String(busy && !autosave?.saving)); body.inert = bodyInert();
+      body.setAttribute('aria-busy', String(busy && !autosave?.saving && !localTagSave)); body.inert = bodyInert();
       body.dataset.surface = compactSurface; body.dataset.inlinePreview = String(inlinePreview());
       body.dataset.drawingEditing = String(inlinePreview() && task === 'materials' && materials.hasChanges());
       const resolved = sceneId ? resolveScene(p.state, p.resources, sceneId) : null;
       const selectedCaption = selected ? captions.find(caption => caption.id === selected) : undefined;
-      const selectedPinId = selectedCaption?.pin === 'visible' ? selectedCaption.id : undefined;
+      const selectedPinId = locatableCaption(selectedCaption) ? selectedCaption?.id : undefined;
       const viewportInput:WorkspaceViewportState={ token: p.token, sceneId, selectedId: selected, pin, choosing,
-        ...(compactLayout() && task === 'captions' && ports.mode === 'edit' && document.hidden !== true && selectedPinId &&
+        ...(compactLayout() && task === 'captions' && ports.mode === 'edit' && document.hidden !== true && selectedCaption?.pin === 'visible' &&
           (fieldValue(selectedCaption?.mediaCount) ?? 0) > 0 ?
-          { photoContext: photoReturn?.displayedPhoto && photoReturn.token === p.token && photoReturn.sceneId === sceneId && photoReturn.captionId === selected ? 'return' : 'record' } : {}),
+          { photoContext: pinReturn?.displayedPhoto && pinReturn.token === p.token && pinReturn.sceneId === sceneId && pinReturn.captionId === selected ? 'return' : 'record' } : {}),
         pinColors: memory().pinColors, hiddenAssetIds: models!.hidden(), model: models!.proposal(), windowMoving,
         available: resolved?.kind === 'ready', visible: stageVisible() && document.hidden !== true && !mediaWork.active, readOnly: !!blocked || resolved?.kind !== 'ready', comparison: recovery!.comparison(), material: materials.proposal() };
       installedViewportInput=viewportInput;viewport.update(viewportInput);
@@ -1626,7 +1660,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       const tagInput = organization!.hasChanges() && organization!.inputOwner() === 'caption';
       const visibleTagInput = tagInput && task === 'captions' && !detailPane.hidden && organization!.tagsRoot.open &&
         (!compactLayout() || compactSurface === 'panel');
-      retainedEdit.hidden = retainedOwner === task && (!organization!.hasChanges() || visibleTagInput) && !hiddenCaptionDraft;
+      retainedEdit.hidden = localTagSave || retainedOwner === task && (!organization!.hasChanges() || visibleTagInput) && !hiddenCaptionDraft;
       retainedNote.textContent = `${tagInput?'タグ':settingsInput?'設定':retainedOwner==='views'?'カメラ位置':tabButtons.get(retainedOwner)?.textContent ?? '記録'}に未適用の変更があります。`;
       const previewTitle = textPreview()?.title;
       detailHeading.textContent = previewTitle === undefined ? selected ? fieldValue(p.resources.captions[selected]?.title) || '無題' : '記録' : previewTitle.trim() ? previewTitle : '無題';
@@ -1643,7 +1677,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       canvas.setAttribute('aria-busy', viewportStatus.dataset.busy);
       const viewportFailure = [viewportFeedback, seen.issue, ports.presentation?.()?.reason].filter(Boolean).map(error => failurePresentation(error, '3Dを表示できません。記録は保持しています。「3D表示を再試行」を選択してください。'));
       viewportFailureDetails.render([...new Set(viewportFailure.map(error => error.diagnostic).filter(Boolean))].join('\n') || undefined);
-      const preparingPin = photoReturn && photoReturn.token === p.token && photoReturn.sceneId === sceneId && photoReturn.captionId === selected && !seen.ready;
+      const preparingPin = pinReturn && pinReturn.token === p.token && pinReturn.sceneId === sceneId && pinReturn.captionId === selected && !seen.ready;
       const loadingText = preparingPin ? '選んだ部位を3Dに表示しています。' : seen.loading ? '3Dを準備しています。' : '';
       const viewportMessage = [mediaWork.active ? '画像のため3Dを休止しています。' : '', ...new Set(viewportFailure.map(error => error.message)), seen.notice,
         !mediaWork.active && !viewportFailure.length && loadingText, resolved?.kind !== 'ready' && 'シーンを選択し、表示状態を確認してください。'].filter(Boolean).join(' ');
@@ -1653,12 +1687,19 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       retryViewport.hidden = !seen.issue && !viewportFeedback&&!seen.retryAvailable; retryViewport.disabled = viewBlocked();
       let camera: unknown=seen.camera; try { camera ??= viewport.capture().camera; } catch { /* Preparation has no camera yet. */ }
       const selectedPin = seen.ready && seen.token === p.token && seen.sceneId === sceneId && viewportInput.available && viewportInput.visible !== false && selectedPinId ? seen.pins.find(pin => pin.id === selectedPinId) : undefined;
-      if (photoReturn) {
-        if (photoReturn.token !== p.token || photoReturn.sceneId !== sceneId || photoReturn.captionId !== selected || seen.issue) cancelPhotoReturn();
-        else if (selectedPin) {
-          cancelPhotoReturn();
+      const compactRecord = compactLayout() && compactSurface === 'panel' && !!selectedPinId && viewportInput.available;
+      paintLocatePin(selectedPin, compactRecord);
+      locatePin.disabled = viewBlocked() || dirty();
+      if (pinReturn) {
+        if (pinReturn.token !== p.token || pinReturn.sceneId !== sceneId || pinReturn.captionId !== selected || seen.issue) cancelPinReturn();
+        else if (!selectedPin && seen.ready && !seen.loading && seen.token === p.token && seen.sceneId === sceneId && viewportInput.visible && viewportInput.available) {
+          cancelPinReturn(); feedback = 'この部位のピンを表示できません。配置先とピンの表示を確認してください。'; renderAgain = true;
+        } else if (selectedPin) {
+          const fit = pinReturn.fit;
+          cancelPinReturn();
           if (selectedPin.depthVisible === false) {
-            feedback = '選んだ部位は現在の視点から見えません。「全体表示」で位置を確認できます。'; renderAgain = true;
+            if (fit) viewAction(() => viewport.camera('fit'));
+            else { feedback = '選んだ部位は現在の視点から見えません。「全体表示」で位置を確認できます。'; renderAgain = true; }
           } else {
             const destination = windows.pinDestination(selectedPin);
             if (!destination || (destination.x !== selectedPin.x || destination.y !== selectedPin.y || !selectedPin.visible) && !viewport.revealPin?.(selectedPin.id, destination)) {
@@ -1733,8 +1774,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       attempt(() => {
         reviewEntry.remove();
         document.removeEventListener?.('visibilitychange',render);document.removeEventListener?.('pointerdown',closeRecordSheets,true);document.removeEventListener?.('focusin',closeRecordSheets);document.removeEventListener?.('pointerdown',dismissHeaderSheets,true);document.removeEventListener?.('focusin',dismissHeaderSheets);
-        cancelPhotoReturn(); photoCaptions = [];
-        root.removeEventListener('pointerdown', cancelPhotoReturn, true); root.removeEventListener('keydown', cancelPhotoReturn, true); root.removeEventListener('wheel', cancelPhotoReturn, true);
+        cancelPinReturn(); locationCaptions = [];
+        root.removeEventListener('pointerdown', cancelPinReturn, true); root.removeEventListener('keydown', cancelPinReturn, true); root.removeEventListener('wheel', cancelPinReturn, true);
         otherProject.remove();document.defaultView?.clearTimeout(feedbackTimer);document.defaultView?.removeEventListener('resize',positionHeaderSheets);document.defaultView?.removeEventListener('resize',render);document.defaultView?.removeEventListener('resize',positionMobileEditor);visualViewport?.removeEventListener('resize',positionMobileEditor);root.removeEventListener('focusin',mobileFocusChanged);root.removeEventListener('focusout',mobileFocusChanged);
       });
       for (const stop of [finishMarkerNavigation, () => cameraGizmo.dispose(), stopHelp, () => stopPresentation?.(), cancelObservation]) attempt(stop);

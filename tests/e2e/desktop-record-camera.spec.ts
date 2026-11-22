@@ -83,6 +83,13 @@ test('record list, pin actions and direct camera navigation remain coherent thro
     await drag(gizmo.locator('.lv-camera-axes'),70,25);await expect(z).toHaveAttribute('aria-pressed','false');await expect(z).not.toHaveAttribute('style',initialAxis!);
     const marker=p.locator('.lv-project-marker').filter({hasText:'確認点A'}),oldLeft=await marker.getAttribute('style'),pan=gizmo.getByRole('button',{name:'平行移動',exact:true});await expect(pan).toBeEnabled();await drag(pan,35,-20);await expect(marker).not.toHaveAttribute('style',oldLeft!);await pan.press('ArrowRight');
     const projection=gizmo.getByLabel('投影方式',{exact:true});await projection.selectOption('orthographic');await expect(projection).toHaveValue('orthographic');await drag(gizmo.locator('.lv-camera-axes'),-30,15);await drag(pan,-15,15);await expect(projection).toHaveValue('orthographic');
+    for (let i = 0; i < 4 && await marker.isVisible(); i++) await drag(pan, -350, 0);
+    await expect(marker).toBeHidden();
+    const locate = detail.getByRole('button', { name: 'この位置を表示', exact: true });
+    await locate.focus();
+    await locate.press('Enter');
+    await expect(marker).toBeVisible();
+    await expect(projection).toHaveValue('orthographic');
     const after=await backup('after-camera');expect(after.identity).toEqual(before.identity);expect(after.changes).toEqual(before.changes);
     await revealCameraPositions(p);await p.getByRole('button',{name:'開始視点を記録',exact:true}).click();await ready('開始視点を記録しました。');await expect(p.getByRole('button',{name:'開始視点を更新',exact:true})).toBeEnabled();await expect(p.getByLabel('記録した視点',{exact:true})).toHaveCount(0);await p.locator('.lv-camera-positions > summary').click();
     await task('描画');const drawing=p.getByRole('region',{name:'材質',exact:true});await drawing.getByLabel('モデル',{exact:true}).selectOption({label:'模型A.glb'});const face=drawing.getByLabel('マテリアル',{exact:true});await face.selectOption((await face.locator('option').evaluateAll(nodes=>nodes.map(n=>(n as HTMLOptionElement).value).find(Boolean)))!);await expect(drawing.getByRole('button',{name:'設定を編集',exact:true})).toBeHidden();await drawing.getByLabel('照明',{exact:true}).selectOption('unlit');

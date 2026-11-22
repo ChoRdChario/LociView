@@ -105,7 +105,7 @@ export interface WorkspaceViewportPresentation {
   readonly input: WorkspaceViewportState; readonly generation: number;
   readonly width: number; readonly height: number; readonly camera: CameraOrientation;
   readonly axis: string | null; readonly navigating: boolean;
-  readonly pins: readonly { readonly id: string; readonly x: number; readonly y: number; readonly visible: boolean }[];
+  readonly pins: readonly { readonly id: string; readonly x: number; readonly y: number; readonly visible: boolean; readonly depthVisible?: boolean }[];
 }
 export interface WorkspaceFileInteraction {
   canFlushCaption?(): boolean;

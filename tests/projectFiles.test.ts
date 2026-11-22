@@ -7873,6 +7873,14 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     }).mockRejectedValueOnce(Error('fixture: failed assignment before write'));
     const finished = h.completed(() => button('作成してこの記録に付ける', tags).click());
     const other = rows().find(n => n.parent!.dataset.selected === 'false')!;
+    expect(h.status.textContent).toBe('');
+    expect(button('更新を再試行', editor).hidden).toBe(true);
+    expect(h.all(tags).find(n => n.textContent === 'タグを保存中…')?.hidden).toBe(false);
+    const step = [button('前の記録', editor), button('次の記録', editor)].find(n => !n.disabled);
+    expect(step).toBeDefined();
+    step!.click();
+    expect(other.parent!.dataset.selected).toBe('true');
+    expect(h.all(tags).some(n => !n.hidden && n.textContent === 'タグを保存中…')).toBe(false);
     other.click(); expect(other.parent!.dataset.selected).toBe('true');
     const search = named('検索', editor); search.fire('compositionstart');
     release(); await finished;
@@ -7882,6 +7890,30 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     search.fire('compositionend');
     await h.edited(() => button('タグの付与を再試行', editor).click());
     expect(h.dispatch.mock.calls.map(([, command]) => command)).toEqual([create, assign, assign]);
+    await h.ui.dispose();
+  });
+  it('returns to the original record and its tag draft after creation fails during navigation', async () => {
+    const h = await productWorkspaceFixture(true), { editor, button, named } = h;
+    const rows = () => h.all(named('記録一覧', editor)).filter(n => n.className === 'lv-caption-select');
+    rows()[0]!.click();
+    await h.edited(() => button('記録を複製', editor).click());
+    const original = rows().find(n => n.parent!.dataset.selected === 'true')!;
+    const tags = named('分類タグ', editor); tags.open = true;
+    button('新しいタグを付ける', tags).click();
+    const name = named('タグ名', tags); name.value = '要照合'; name.fire('input');
+    let fail!: () => void;
+    const gate = new Promise<void>(resolve => { fail = resolve; });
+    caseDisposals.push(fail);
+    h.dispatch.mockImplementationOnce(async () => { await gate; throw Error('fixture: failed before creating the tag'); });
+    const done = h.completed(() => button('作成してこの記録に付ける', tags).click());
+    rows().find(n => n !== original)!.click();
+    fail(); await done;
+    button('入力を修正する', editor).click();
+    expect(original.parent!.dataset.selected).toBe('true');
+    expect(name.value).toBe('要照合');
+    expect(name.disabled).toBe(false);
+    button('タグの入力を取り消す', tags).click();
+    expect(name.value).toBe('');
     await h.ui.dispose();
   });
   it('daily authoring organizes independent records and Scenes, guarded undo, tags, backup, Workspace and cold reopen', async () => {

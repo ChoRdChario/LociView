@@ -14,6 +14,7 @@ interface OrganizationHost {
   blocked(): string | null;
   run(command: MetadataEdit, complete: () => void, after?: () => Promise<void>, purpose?: 'attachCreatedTag'): void | Promise<void>;
   createdTagAssignment(): 'saving' | 'retry' | undefined;
+  tagSaving(): boolean;
   scene(id: string): void; caption(id: string): void; changed(): void; message(text: string): void;
   captionPending?(): boolean; canFlushCaption?(): boolean; flushCaption?(): Promise<boolean>;
 }
@@ -75,6 +76,9 @@ export function createProjectOrganization(document: Document, host: Organization
     if (disposed || host.blocked() || composing || !host.ports.authoring) return;
     try {
       const { provider } = host.source(), command = host.ports.authoring.prepare(provider.token, intent);
+      if (command.kind === 'createTag') assigningTo = captured?.attachTo;
+      if (command.kind === 'editTag' || command.kind === 'deleteTag') assigningTo = undefined;
+      if (command.kind === 'setCaptionTag') assigningTo = command.captionId;
       void host.run(command, () => complete(command), after && (() => after(command)));
     }
     catch (error) { host.message((error as Error).message); }
@@ -184,6 +188,8 @@ export function createProjectOrganization(document: Document, host: Organization
       if (tagForm.parentElement !== tagSettings) tagSettings.append(tagForm);
       if (captured || form?.kind.startsWith('tag')) tagSettings.open = true;
     }
+    const otherRecord = !!captured?.attachTo && captured.attachTo !== s.captionId;
+    tagForm.hidden = otherRecord && host.localBlocked();
     const savedName = host.ports.localSettings?.read() ?? ''; displayNameBadge.textContent = savedName; displayNameBadge.hidden = !savedName;
     if (!composing && displayName.value !== (settingsDraft?.value ?? host.ports.localSettings?.read() ?? '')) displayName.value = settingsDraft?.value ?? host.ports.localSettings?.read() ?? '';
     const localBlocked = host.localBlocked() || !!form || !!captured;
@@ -220,14 +226,17 @@ export function createProjectOrganization(document: Document, host: Organization
     createForRecord.hidden = !s.captionId || !!captured?.attachTo || host.ports.mode === 'view';
     createForRecord.disabled = blocked || owned;
     const assignment = assigningTo === s.captionId ? host.createdTagAssignment() : undefined;
-    assignmentStatus.textContent = assignment === 'saving' ? '作成したタグをこの記録に付けています。' :
-      assignment === 'retry' ? 'タグは作成済みです。記録への付与を再試行してください。' : '';
-    assignmentStatus.hidden = !assignment;
+    const savingHere = host.tagSaving() && (!assigningTo || assigningTo === s.captionId);
+    const tagProgress = assignment === 'retry' ? 'タグは作成済みです。記録への付与を再試行してください。' :
+      assignment === 'saving' ? '作成したタグをこの記録に付けています。' : savingHere ? 'タグを保存中…' : '';
+    if (assignmentStatus.textContent !== tagProgress) assignmentStatus.textContent = tagProgress;
+    assignmentStatus.hidden = !tagProgress;
     saveTag.textContent = captured?.attachTo ? '作成してこの記録に付ける' : captured?.tagId ? 'タグを更新' : 'タグを追加';
     saveTag.disabled = blocked || composing || !!stale || !captured || !tagName.value.trim() || !!captured.attachTo && captured.attachTo !== s.captionId;
     tagCancel.hidden = !captured && !form?.kind.startsWith('tag'); tagCancel.disabled = host.localBlocked() || composing;
     tagConfirm.hidden = form?.kind !== 'tagDelete'; tagConfirm.disabled = blocked || composing || !!stale;
     tagNote.textContent = stale ? '内容が更新されています。入力は保持しています。取り消して選び直してください。' : form?.kind === 'tagDelete' ? 'すべての記録からこのタグを外します。記録や添付は残ります。' : captured && !blocked ? 'タグを入力中' : '';
+    if (otherRecord && !tagForm.hidden) tagNote.textContent = '元の記録を開けません。タグの入力を取り消してください。';
     tagNote.hidden = !tagNote.textContent;
     tagName.disabled = tagColor.disabled = blocked || !!form && form.kind !== 'tagEdit';
     tagList.replaceChildren(); definitions.replaceChildren();
@@ -278,6 +287,8 @@ export function createProjectOrganization(document: Document, host: Organization
     tagsRoot.hidden = viewing && !tagList.children.length && !uncertainLinks && !form && !captured;
   }
   return { sceneRoot, captionRoot, tagsRoot, settingsRoot, displayNameBadge, render,
+    tagDraftTarget: () => captured?.attachTo,
+    focusTagDraft() { (captured?.attachTo === host.source().captionId ? tagName : tagCancel).focus(); },
     inputOwner: () => settingsDraft || editorDraft ? 'settings' as const : form?.kind === 'sceneCopy' || form?.kind === 'sceneDelete' ? 'scene' as const : 'caption' as const,
     hasChanges: () => !!form || !!captured || !!settingsDraft || !!editorDraft, composing: () => composing,
     beginAction(command: CaptionUndoInput) { const s = host.source(); return host.ports.authoring?.beginUndo(s.provider.token, command) ?? null; },

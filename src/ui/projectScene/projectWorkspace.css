@@ -358,6 +358,7 @@
 .lv-caption-content { flex: 1 1 0; min-height: 0; overflow: auto; scroll-padding-block: 12px; }
 .lv-caption-reading .lv-caption-detail > .lv-caption-content { margin: 0; }
 .lv-caption-content > .lv-caption-heading { display: flex; align-items: start; gap: 8px; margin: 0 0 8px; }
+.lv-caption-content > .lv-caption-locate { width: fit-content; max-width: 100%; margin-block-end: 6px; }
 .lv-caption-heading > h2 { flex: 1; min-width: 0; margin: 0; font-size: 23px; overflow-wrap: anywhere; }
 .lv-caption-task[data-selected="true"] .lv-caption-heading > h2 { border-inline-start: 3px solid var(--lv-action); padding-inline-start: 8px; }
 .lv-caption-heading > h2:focus-visible { outline: 2px solid var(--lv-ink); outline-offset: 2px; }

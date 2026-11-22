@@ -90,10 +90,16 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
     const width = 280, margin = 16;
     const cascade = { left: margin + slot * 32, top: margin + slot * 28, width, height };
     if (!hasExtent()) return cascade;
-    const blocks = occupied();
-    const pin = projection.ready && projection.sceneId === context?.source.sceneId && projection.sourceToken === context.source.token
-      ? projection.pins.find(p => p.id === id && p.visible) : undefined;
-    if (pin) blocks.push({ left: pin.x - 22, top: pin.y - 22, width: 44, height: 44 });
+    const shown = [...cards.values()], blocks = shown.map(card => card.rect);
+    const targets = controlsOnStage();
+    for (const card of shown) {
+      const header = card.title.parentElement?.getBoundingClientRect?.();
+      targets.push({ ...card.rect, height: Math.min(card.rect.height, header?.height || 44) });
+    }
+    const pins = projection.ready && projection.sceneId === context?.source.sceneId && projection.sourceToken === context.source.token
+      ? projection.pins.filter(p => p.visible && (p.id === id || cards.has(p.id))) : [];
+    for (const p of pins) targets.push({ left: p.x - 22, top: p.y - 22, width: 44, height: 44 });
+    const pin = pins.find(p => p.id === id);
     // An edge pin needs only a small offset. Keep room to resize the first
     // window instead of immediately moving it to the far side of the stage.
     const nearPin = pin && !cards.size ? [
@@ -102,12 +108,21 @@ export function createCaptionWindowControls(document: Document, onPlan: (plan: C
     ] : [];
     const candidates = [cascade, ...nearPin, ...[margin, Math.max(margin, projection.height - height - margin)].flatMap(top =>
       [margin, Math.max(margin, projection.width - width - margin)].map(left => ({ left, top, width, height })))];
-    let best = cascade, least = Infinity;
+    for (const block of blocks) {
+      candidates.push({ ...cascade, left: block.left + block.width + 8, top: block.top },
+        { ...cascade, left: block.left - width - 8, top: block.top },
+        { ...cascade, left: block.left, top: block.top + block.height + 8 },
+        { ...cascade, left: block.left, top: block.top - height - 8 });
+    }
+    let best = cascade, leastTarget = Infinity, leastBody = Infinity;
     for (const candidate of candidates) {
       const rect = displayedWindowRect(candidate, projection.width, projection.height);
-      const covered = blocks.reduce((area, block) => area + overlap(rect, block), 0);
-      if (covered < least) { best = candidate; least = covered; }
-      if (!covered) break;
+      const coveredTarget = targets.reduce((area, target) => area + overlap(rect, target), 0);
+      const coveredBody = blocks.reduce((area, block) => area + overlap(rect, block), 0);
+      if (coveredTarget < leastTarget || coveredTarget === leastTarget && coveredBody < leastBody) {
+        best = candidate; leastTarget = coveredTarget; leastBody = coveredBody;
+      }
+      if (!coveredTarget && !coveredBody) break;
     }
     return best;
   }
