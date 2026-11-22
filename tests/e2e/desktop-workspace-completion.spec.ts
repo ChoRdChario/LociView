@@ -134,7 +134,9 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await peer.getByRole('combobox', { name: 'シーン', exact: true }).selectOption({ label: '接合部' }); await peer.locator('.lv-caption-select').filter({ hasText: '柱の接合部' }).click();
     const peerDetail = peer.getByRole('region', { name: '記録の詳細', exact: true }); await peerDetail.getByLabel('本文', { exact: true }).fill(receivedBody); await finishCaptionEditing(peer, {});
     await peer.getByRole('button', { name: '共有', exact: true }).click(); const peerFiles = peer.getByRole('region', { name: 'ファイル', exact: true }); await selectShareOutput(peerFiles, 'contribution');
-    const base = peerFiles.getByLabel('元にする作業一式', { exact: true }), baseId = await base.locator('option').evaluateAll(ns => ns.map(n => (n as HTMLOptionElement).value).find(Boolean)); expect(baseId).toBeTruthy(); await base.selectOption(baseId!);
+    const base = peerFiles.getByLabel('元にする作業一式', { exact: true }), baseId = await base.locator('option').evaluateAll(ns => ns.map(n => (n as HTMLOptionElement).value).find(Boolean)); expect(baseId).toBeTruthy();
+    await expect(base).toHaveValue(baseId!);
+    await expect(peerFiles.getByText('相手と共有した作業一式を選択してください。')).toBeHidden();
     const [update] = await Promise.all([peer.waitForEvent('download'), peerFiles.locator('.lv-file-primary').click()]), updatePath = info.outputPath('returned-update.zip'); await update.saveAs(updatePath); expect(await update.failure()).toBeNull(); await peerContext.close();
     await revealProjectSelection(p); await p.getByRole('button', { name: 'プロジェクトを選ぶ', exact: true }).click();
     const preview = p.getByRole('region', { name: '取り込み先', exact: true });
@@ -146,11 +148,18 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     await preview.getByRole('button', { name: '選択を取り消す', exact: true }).click(); await expect(preview).toBeHidden();
     await selectUpdate(); const confirm = preview.getByRole('button', { name: '既存に取り込む', exact: true }); await expect(confirm).toBeFocused();
     await confirm.click(); await expect(p.getByText('更新を取り込みました。', { exact: true })).toBeVisible({ timeout: 90_000 });
-    await p.getByRole('combobox', { name: 'シーン', exact: true }).selectOption({ label: '接合部' }); await p.locator('.lv-caption-select').filter({ hasText: '柱の接合部' }).click();
-    const bodyGroup=detail.getByLabel('本文',{exact:true}).locator('..').locator('..');await bodyGroup.getByRole('button',{name:'状態を確認',exact:true}).click();
+    const review = p.getByRole('button', { name: '残す内容を選ぶ（1件）', exact: true });
+    await review.click();
     const conflict=p.getByRole('region',{name:'記録の競合',exact:true}).locator(':scope > ul > li').filter({hasText:receivedBody});await expect(conflict).toBeFocused();
-    const keep=conflict.getByRole('combobox'), choices=await keep.locator('option').evaluateAll((nodes,text)=>nodes.map(n=>n as HTMLOptionElement).filter(n=>n.textContent?.includes(text)).map(n=>n.value),receivedBody);expect(choices).toHaveLength(1);await keep.selectOption(choices[0]!);
-    await conflict.getByRole('button',{name:'競合を解消',exact:true}).click();await ready('競合を解消しました。');await expect(detail.getByLabel('本文', { exact: true })).toHaveValue(receivedBody);
+    await expect(conflict.getByRole('radio', { checked: true })).toHaveCount(0);
+    await conflict.getByRole('radio', { name: new RegExp(receivedBody) }).check();
+    await p.keyboard.press('Escape'); await expect(review).toBeFocused();
+    await p.keyboard.press('Enter'); await expect(conflict).toBeFocused();
+    await expect(conflict.getByRole('radio', { name: new RegExp(receivedBody) })).toBeChecked();
+    await conflict.getByRole('button',{name:'競合を解消',exact:true}).click();await ready('競合を解消しました。');
+    await expect(review).toBeHidden();
+    await p.getByRole('combobox', { name: 'シーン', exact: true }).selectOption({ label: '接合部' }); await p.locator('.lv-caption-select').filter({ hasText: '柱の接合部' }).click();
+    await expect(detail.getByLabel('本文', { exact: true })).toHaveValue(receivedBody);
     const mode = p.locator('.lv-workspace-actions > button[aria-busy]'); await mode.click();
     await expect(mode).toBeDisabled(); await expect(mode).toHaveText('切替中…'); await expect(mode).toHaveAttribute('aria-busy', 'true');
     // Opening the received history revalidates durable state; wait for the actual

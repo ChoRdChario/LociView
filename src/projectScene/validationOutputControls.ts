@@ -325,8 +325,10 @@ export function createValidationOutputControls(document: Document, host: ReturnT
       }
       base.value = chosen ? baseId : ''; base.disabled = choicesDisabled; label.append(base); actions.append(label);
       base.addEventListener('change', () => { if (!base.disabled) { baseId = base.value; autoBase = false; refreshChoice(base); } });
-      const help = document.createElement('p'); help.textContent = host.workspaceOutput.bases.length ?
-        '相手と共有した作業一式を選択してください。' : '先に作業一式を受け取るか、作成してください。'; actions.append(help);
+      if (!chosen) {
+        const help = document.createElement('p'); help.textContent = host.workspaceOutput.bases.length ?
+          '相手と共有した作業一式を選択してください。' : '先に作業一式を受け取るか、作成してください。'; actions.append(help);
+      }
     }
     const create = primary;
     create.textContent = purpose === 'clean' && !cleanConfirmed || purpose === 'review' && !reviewConfirmed ? '内容を確認' :

@@ -1,11 +1,12 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { writeCleanImportFixture } from './cleanImportFixture';
 import { desktopOrigin, desktopEntry } from './desktopEntry';
-import { finishCaptionEditing, chooseHomeFiles, chooseSharedScene, selectShareOutput,  closeFileSurface, revealCoordinateAdd, revealFileSurface } from './workspaceUi';
+import { finishCaptionEditing, chooseHomeFiles, chooseSharedScene, selectShareOutput, closeFileSurface, revealCaptionList, revealCoordinateAdd, revealFileSurface } from './workspaceUi';
 import { expect, chromium, type Page, type BrowserContext, type TestInfo } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import * as A from '@automerge/automerge';
-import { triangleGlb } from './fixtures';
+import { smallPng, triangleGlb } from './fixtures';
 import { gsFixture } from '../helpers/gsFixture';
 import { PackageArchive } from '../../src/projectPackage/zipArchive';
 import { BackupArchive } from '../../src/projectPackage/backupArchive';
@@ -19,7 +20,7 @@ const blob = async (path: string) => new Blob([Uint8Array.from(await readFile(pa
 const files = (p: Page) => p.getByRole('region', { name: 'ファイル', exact: true });
 const detail = (p: Page) => p.getByRole('region', { name: '記録の詳細', exact: true });
 async function settled(p: Page) { await expect(p.locator('main.lv-project-workspace > header > p.lv-operation-status')).toHaveAttribute('data-busy', 'false', { timeout: 90_000 }); }
-async function selected(p: Page) { await p.getByRole('list', { name: '記録一覧', exact: true }).locator('.lv-caption-select').first().click(); }
+async function selected(p: Page) { await revealCaptionList(p); await p.getByRole('list', { name: '記録一覧', exact: true }).locator('.lv-caption-select').first().click(); }
 async function editor(p: Page, name: string, enabled = true) {
   const settings = p.getByLabel('設定', { exact: true });
   if (!await settings.evaluate(n => (n as HTMLDetailsElement).open)) await settings.locator(':scope > summary').click();
@@ -52,14 +53,17 @@ async function output(p: Page, info: TestInfo, label: string, purpose: 'backup' 
   const path = info.outputPath(label + '.zip'); await download.saveAs(path); expect(await download.failure()).toBeNull();
   await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false', { timeout: 120_000 }); await closeFileSurface(p);return path;
 }
-async function receive(p: Page, path: string) {
+async function receive(p: Page, path: string, reviewText = false) {
   await revealFileSurface(p,'受信');
   const menu = p.locator('details.lv-project-files'); if (!await menu.evaluate(n => (n as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
   const area = p.getByRole('region', { name: '更新ファイル', exact: true });
   await area.getByLabel('更新ファイルを選択', { exact: true }).setInputFiles(path);
   await area.getByRole('button', { name: '更新を受け取る', exact: true }).click();
   await expect(area.getByText('更新を受け取りました。', { exact: true })).toBeVisible({ timeout: 90_000 }); await settled(p);
-  await closeFileSurface(p);
+  if (reviewText) {
+    await area.getByRole('button', { name: '残す内容を選ぶ（1件）', exact: true }).tap();
+    await expect(menu).not.toHaveAttribute('open');
+  } else await closeFileSurface(p);
 }
 async function records(path: string) {
   const backup = await BackupArchive.inspect(await blob(path), limits), inspected = await inspectProjectCandidates(backup.source.read(), limits);
@@ -88,8 +92,9 @@ test('08b editor names remain exact through collaboration, purpose privacy, rest
 
   const profiles = await Promise.all(['a', 'b', 'restore'].map(n => createBrowserProfile('editor-' + n)));
   const contexts = new Set<BrowserContext>(), errors: string[] = [];
-  const launch = async (profile: string) => {
-    const context = await chromium.launchPersistentContext(profile, { channel: 'chromium', headless: true, viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block', acceptDownloads: true }); contexts.add(context);
+  const launch = async (profile: string, touch = false) => {
+    const viewport = touch ? { width: 390, height: 844 } : { width: 1440, height: 1000 };
+    const context = await chromium.launchPersistentContext(profile, { channel: 'chromium', headless: true, viewport, hasTouch: touch, serviceWorkers: 'block', acceptDownloads: true }); contexts.add(context);
     await context.route('**/*', route => {
       const u = new URL(route.request().url());
       if (u.origin === desktopOrigin || ['blob:', 'data:'].includes(u.protocol)) return route.continue();
@@ -101,7 +106,7 @@ test('08b editor names remain exact through collaboration, purpose privacy, rest
   };
   const close = async (context: BrowserContext) => { await context.close(); contexts.delete(context); };
   try {
-    const a = await launch(profiles[0]!), b = await launch(profiles[1]!);
+    const a = await launch(profiles[0]!), b = await launch(profiles[1]!, true);
     await chooseHomeFiles(a.p, { name: 'model.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
     await a.p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill(title);
     await a.p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click(); await expect(a.p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 });
@@ -123,10 +128,14 @@ test('08b editor names remain exact through collaboration, purpose privacy, rest
     await expect(b.p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 }); await selected(b.p);
     const bs = b.p.getByLabel('設定', { exact: true }); await bs.locator(':scope > summary').click(); await expect(bs.getByRole('checkbox')).not.toBeChecked();
     await editor(b.p, nameB); await edit(b.p, '本文', 'Bの手元編集'); await edit(a.p, '本文', 'Aの変更');
-    await receive(b.p, await output(a.p, info, 'A-update', 'teamWorkspace')); await selected(b.p);
+    const photo = smallPng(), chooser = b.p.waitForEvent('filechooser');
+    await b.p.getByLabel('メディアを追加', { exact: true }).tap();
+    await (await chooser).setFiles({ name: '接合部.png', mimeType: 'image/png', buffer: photo });
+    await finishCaptionEditing(b.p, {}, 90_000); await settled(b.p);
+    await receive(b.p, await output(a.p, info, 'A-update', 'teamWorkspace'), true);
     const group = b.p.getByRole('region', { name: '記録の競合', exact: true }).getByRole('listitem', { name: `${caption}：本文`, exact: true });
     await expect(group).toContainText(nameA); await expect(group).toContainText(nameB);
-    await group.getByRole('combobox').selectOption('manual'); await group.getByRole('textbox').fill('AとBの確認済み本文');
+    await group.getByRole('radio', { name: '自分で書く' }).check(); await group.getByRole('textbox').fill('AとBの確認済み本文');
     await group.getByRole('button', { name: '競合を解消', exact: true }).click(); await expect(group).toBeHidden({ timeout: 90_000 });
     console.log('08b: both editor names displayed and conflict resolved');
     const shared = await output(b.p, info, 'resolved-workspace', 'teamWorkspace'), sharedArchive = await WorkspaceArchive.inspect(await blob(shared), limits);
@@ -138,6 +147,13 @@ test('08b editor names remain exact through collaboration, purpose privacy, rest
     for (const entry of d.control.manifest.changes) expect(A.decodeChange(await d.entryBytes(`changes/${String(entry.ordinal).padStart(8, '0')}.amchange`, limits.maxChangeBytes)).message ?? '').not.toContain('transaction:v2');
     await receive(a.p, delta); await selected(a.p); await expect(detail(a.p).getByLabel('本文', { exact: true })).toHaveValue('無記名の追記');
     const saved = await output(a.p, info, 'named-backup', 'backup'), before = await records(saved);
+    const attachments = Object.values(before.records.captionAttachmentsById as Record<string, { captionId: string; mediaResourceId: string }>);
+    expect(attachments).toHaveLength(1);
+    expect(before.records.captionsById).toMatchObject({ [attachments[0]!.captionId]:
+      { title: caption, body: '無記名の追記', anchor: { kind: 'asset', positionAsset: [0, .5, 0] } } });
+    const digest = createHash('sha256').update(photo).digest('hex');
+    expect(before.records.mediaResourcesById).toMatchObject({ [attachments[0]!.mediaResourceId]: { blob: { digest } } });
+    expect(Buffer.from(await before.backup.archive.entryBytes(`blobs/sha256/${digest}`, photo.length))).toEqual(photo);
     console.log('08b: anonymous delta received and full history backed up');
     expect(new Set(before.backup.source.editorDeclarations().map(v => v.declaration.editor.name))).toEqual(new Set([nameA, nameB]));
     const clean = await PackageArchive.inspect(await blob(await writeCleanImportFixture(saved, info.outputPath('clean.zip')))), review = await PackageArchive.inspect(await blob(await output(a.p, info, 'review', 'review')));

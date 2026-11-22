@@ -15,11 +15,50 @@ interface RecoveryHost {
   apply(token: string, command: () => MetadataEdit, complete: () => void): void;
   membership: (token: string, sceneId: string, captionId: string, ids: readonly string[], keep: string, choice: 'one' | 'both') => MetadataEdit;
 }
+
+function recoveryChoices(document: Document, group: WorkspaceRecoveryGroup, changed: () => void) {
+  const { make } = panelNodes(document), root = make('div');
+  const label = `${group.label}に残す内容`;
+  const attribution = (name: string | null | undefined) => name === undefined ? '' : name === null ? '編集者情報なし' : `編集者名：${name}`;
+  if (group.target.kind === 'text') {
+    root.className = 'lv-text-choices';
+    root.setAttribute('role', 'radiogroup'); root.setAttribute('aria-label', label);
+    const name = newProjectId('choice'), radios: HTMLInputElement[] = [];
+    function add(value: string, text: string, editor?: string | null) {
+      const row = make('label'), radio = make('input'), content = make('span', text);
+      radio.type = 'radio'; radio.name = name; radio.value = value;
+      const by = attribution(editor);
+      if (by) content.append(make('bdi', by));
+      row.append(radio, content); root.append(row); radios.push(radio);
+      editOnly(value === 'manual' ? row : radio);
+      radio.addEventListener('change', changed);
+    }
+    for (const candidate of group.choices) add(candidate.id, candidate.label, candidate.editorName);
+    if (group.manual) add('manual', '自分で書く');
+    return { root, get value() { return radios.find(r => r.checked)?.value ?? ''; },
+      disable(disabled: boolean, readOnly: boolean) { for (const radio of radios) radio.disabled = disabled || readOnly; } };
+  }
+
+  const values = make('ul'), select = make('select');
+  select.setAttribute('aria-label', label);
+  const option = (value: string, text: string) => { const o = make('option', text); o.value = value; select.append(o); };
+  option('', group.target.kind === 'membership' ? '元として残す登録を選択' : '選択してください');
+  for (const c of group.choices) {
+    const li = make('li', c.label), by = attribution(c.editorName);
+    li.style.whiteSpace = 'pre-wrap';
+    if (by) li.append(make('br'), make('bdi', by));
+    values.append(li); option(c.id, c.label + (by ? `（\u2068${by}\u2069）` : ''));
+  }
+  if (group.manual) option('manual', group.manual === 'name' ? '名前を入力' : '文言を入力');
+  if (group.target.kind !== 'field' || group.target.field !== 'anchor') editOnly(select);
+  select.addEventListener('change', changed); root.append(values, select);
+  return { root, get value() { return select.value; }, disable(disabled: boolean) { select.disabled = disabled; } };
+}
 /** Checked whole-Project decisions. Owns only local forms, never storage or history. */
 export function createProjectRecovery(document: Document, host: RecoveryHost) {
   const { make, button } = panelNodes(document), root = make('section'), list = make('ul');
   root.setAttribute('aria-label', '記録の競合'); root.append(list);
-  type Form = { root: HTMLLIElement; group: WorkspaceRecoveryGroup; token: string; select: HTMLSelectElement;
+  type Form = { root: HTMLLIElement; group: WorkspaceRecoveryGroup; token: string; select: ReturnType<typeof recoveryChoices>;
     text: HTMLTextAreaElement; decision: HTMLSelectElement; apply: HTMLButtonElement; cancel: HTMLButtonElement;
     message: HTMLParagraphElement; composing: boolean };
   const forms = new Map<string, Form>(); let disposed = false;
@@ -52,17 +91,12 @@ export function createProjectRecovery(document: Document, host: RecoveryHost) {
     for (const group of groups) {
       seen.add(group.key); let f = forms.get(group.key);
       if (!f || f.token !== host.token() && !dirty(f)) {
-        const item = make('li'), heading = make('h3', group.label), values = make('ul'), select = make('select'), text = make('textarea'), decision = make('select'), message = make('p');
-        item.setAttribute('aria-label', group.label); select.setAttribute('aria-label', `${group.label}に残す内容`);
+        const item = make('li'), heading = make('h3', group.label), text = make('textarea'), decision = make('select'), message = make('p');
+        const select = recoveryChoices(document, group, () => { if (!host.selectBlock() && !composing()) host.changed(); });
+        item.setAttribute('aria-label', group.label);
         text.setAttribute('aria-label', `${group.label}の入力`); decision.setAttribute('aria-label', `${group.label}の重複の扱い`);
         message.setAttribute('role', 'status');
         const option = (node: HTMLSelectElement, id: string, label: string) => { const o = make('option', label); o.value = id; node.append(o); };
-        option(select, '', group.target.kind === 'membership' ? '元として残す登録を選択' : '選択してください');
-        for (const c of group.choices) { const li = make('li', c.label); li.style.whiteSpace = 'pre-wrap';
-          const attribution = c.editorName === undefined ? '' : c.editorName === null ? '編集者情報なし' : `編集者名：${c.editorName}`;
-          if (attribution) { const note = make('bdi', attribution); li.append(make('br'), note); }
-          values.append(li); option(select, c.id, c.label + (attribution ? `（\u2068${attribution}\u2069）` : '')); }
-        if (group.manual) option(select, 'manual', group.manual === 'name' ? '名前を入力' : '文言を入力');
         option(decision, '', '重複の扱いを選択'); option(decision, 'one', '一つにまとめる'); option(decision, 'both', '別々の記録として両方残す'); decision.value = '';
         decision.hidden = group.target.kind !== 'membership';
         const apply = button('競合を解消', () => {
@@ -75,11 +109,10 @@ export function createProjectRecovery(document: Document, host: RecoveryHost) {
         const note = make('p', group.note ?? ''), details = make('ul'); note.hidden = !group.note;
         for (const line of group.details ?? []) details.append(make('li', line)); details.hidden = !details.children.length;
         editOnly(text, decision, apply);
-        if (group.target.kind !== 'field' || group.target.field !== 'anchor') editOnly(select, cancel);
-        item.append(heading, note, values, details, select, text, decision, apply, cancel, message);
+        if (group.target.kind !== 'field' || group.target.field !== 'anchor') editOnly(cancel);
+        item.append(heading, note, details, select.root, text, decision, apply, cancel, message);
         f = { root: item, group, token: host.token(), select, text, decision, apply, cancel, message, composing: false }; forms.set(group.key, f);
         const current = f;
-        select.addEventListener('change', () => { if (!host.selectBlock() && !composing()) host.changed(); });
         decision.addEventListener('change', () => { if (!host.selectBlock() && !composing()) host.changed(); });
         text.addEventListener('input', () => { if (!disposed) host.changed(); });
         text.addEventListener('compositionstart', () => { if (!disposed) { current.composing = true; host.changed(); } });
@@ -90,7 +123,7 @@ export function createProjectRecovery(document: Document, host: RecoveryHost) {
     for (const [key, f] of forms) {
       if (!seen.has(key)) { if (dirty(f)) nodes.push(f.root); else { forms.delete(key); continue; } }
       const stale = f.token !== host.token(), block = host.block(f.group);
-      f.select.disabled = !f.group.ready || host.selectBlock() || composing(); f.decision.disabled = f.select.disabled;
+      f.decision.disabled = !f.group.ready || host.selectBlock() || composing(); f.select.disable(f.decision.disabled, !!block);
       f.text.hidden = f.select.value !== 'manual'; f.text.readOnly = host.cancelBlock() && !f.composing;
       f.apply.disabled = !f.group.ready || !f.select.value || !!block || composing() || stale || !valid(f);
       f.cancel.hidden = !dirty(f); f.cancel.disabled = host.cancelBlock() || composing();
@@ -102,7 +135,7 @@ export function createProjectRecovery(document: Document, host: RecoveryHost) {
     nodes.forEach((node, i) => { if (list.children[i] !== node) list.insertBefore(node, list.children[i] ?? null); });
     root.hidden = !nodes.length;
   }
-  return { root, render, composing, hasChanges: () => [...forms.values()].some(dirty),
+  return { root, render, composing, count: () => forms.size, hasChanges: () => [...forms.values()].some(dirty),
     reveal(match: (group: WorkspaceRecoveryGroup) => boolean) {
       const form = [...forms.values()].find(f => match(f.group)); if (!form) return false;
       form.root.tabIndex = -1; form.root.focus?.({ preventScroll: true }); form.root.scrollIntoView?.({ block: 'nearest' }); return true;

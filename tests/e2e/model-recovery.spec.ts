@@ -1,4 +1,4 @@
-import { chooseHomeFiles, expectResumedProject, openAddOptions, revealCoordinateAdd, beginSceneCreation, revealModelManagement, lookAlongFront, revealCaptionList } from './workspaceUi';
+import { chooseHomeFiles, expectResumedProject, openAddOptions, revealCoordinateAdd, beginSceneCreation, revealModelManagement, lookAlongFront, revealCaptionList, expectSelectedCaptionPhotos } from './workspaceUi';
 import { test, expect, chromium, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir } from 'node:fs/promises';
@@ -40,11 +40,7 @@ async function image(page: Page, name: string, buffer: Buffer) {
   await (await picker).setFiles({ name, mimeType: 'image/png', buffer });
   await page.getByRole('region',{name:'記録の詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await expect(page.getByText('メディアを追加しました。', { exact: true })).toBeVisible({ timeout: actionTimeout });
 }
-async function checkImages(page: Page, count: number) {
-  const images = page.getByRole('region', { name: 'メディアの整理', exact: true }).locator('img');
-  await expect(images).toHaveCount(count);
-  for (const item of await images.all()) await expect.poll(() => item.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth)).toBe(2);
-}
+const checkImages = (page: Page, count: number) => expectSelectedCaptionPhotos(page, count, 2);
 async function download(page: Page, info: TestInfo, name: string, purpose: 'backup' | 'teamWorkspace' | 'contribution', base?: string) {
   const files = page.getByRole('region', { name: 'ファイル', exact: true });
   await files.getByRole('button', { name: purpose === 'backup' ? '保存' : '相手に渡す', exact: true }).click();
@@ -356,8 +352,8 @@ test('差し替えと受信の中断を元のファイルから復旧し、手�
       const outward = await download(a, info, 'A-二巡目の変更分', 'contribution', base.archive.control.manifest.packageId); await checkContribution(outward); await receive(b, outward);
       const recovery = b.getByRole('region', { name: '記録の競合', exact: true });
       const body = recovery.getByRole('listitem', { name: `${captionTitle}：本文`, exact: true });
-      await expect(body).toContainText(aBody); await expect(body).toContainText(bBody); await expect(body.getByRole('combobox')).toHaveValue('');
-      await body.getByRole('combobox').selectOption('manual'); await body.getByRole('textbox').fill(mergedBody);
+      await expect(body).toContainText(aBody); await expect(body).toContainText(bBody); await expect(body.getByRole('radio', { checked: true })).toHaveCount(0);
+      await body.getByRole('radio', { name: '自分で書く' }).check(); await body.getByRole('textbox').fill(mergedBody);
       await body.getByRole('button', { name: '競合を解消', exact: true }).click(); await expect(body).toBeHidden({ timeout: actionTimeout });
       const duplicate = recovery.getByRole('listitem', { name: `${secondScene}：${captionTitle}の重複登録`, exact: true });
       await expect(duplicate).toContainText(primaryScene); await expect(duplicate.getByRole('combobox').first()).toHaveValue('');

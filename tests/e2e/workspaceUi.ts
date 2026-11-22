@@ -1,5 +1,16 @@
 import { expect, type Page, type Locator } from '@playwright/test';
 
+export async function expectSelectedCaptionPhotos(page: Page, count: number, width: number) {
+  const attachments = page.getByRole('region', { name: 'メディアの整理', exact: true });
+  await expect(attachments.locator('figure')).toHaveCount(count);
+  const images = attachments.locator('img').or(page.locator('.lv-caption-window[data-selected="true"]:visible img'));
+  await expect(images).toHaveCount(count);
+  for (const photo of await images.all()) {
+    await expect(photo).toBeVisible();
+    await expect.poll(() => photo.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth)).toBe(width);
+  }
+}
+
 export async function chooseHomeFiles(page: Page, files: Parameters<Locator['setInputFiles']>[0]) {
   const [picker] = await Promise.all([
     page.waitForEvent('filechooser'),

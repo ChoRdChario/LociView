@@ -354,6 +354,32 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const mediaDraftNotice = make('p'); mediaDraftNotice.className = 'lv-record-media-draft'; mediaDraftNotice.setAttribute('role', 'status');
   editOnly(mediaDraftNotice); media.append(make('h2', 'メディア'), mediaDraftNotice, mediaLabel, cancelMedia, heicHelp);
   const conflicts = make('section');
+  const reviewEntry = make('div'), reviewPanel = make('section');
+  reviewEntry.className = 'lv-conflict-entry'; reviewPanel.className = 'lv-conflict-panel';
+  reviewPanel.id = id('review'); reviewPanel.setAttribute('aria-label', '残す内容の確認'); reviewPanel.hidden = true;
+  const reviewToggle = button('残す内容を選ぶ', () => {
+    if (!recovery || reviewToggle.disabled) return;
+    if (!reviewPanel.hidden) { closeReview(); return; }
+    if (ports.disclosureOpening?.() === false) return;
+    if (reviewEntry.parentElement !== identity) identity.append(reviewEntry);
+    reviewPanel.append(recovery.root); reviewPanel.hidden = false;
+    reviewToggle.setAttribute('aria-expanded', 'true'); recovery.reveal(() => true);
+  });
+  reviewToggle.setAttribute('aria-expanded', 'false'); reviewToggle.setAttribute('aria-controls', reviewPanel.id);
+  reviewEntry.append(reviewToggle, reviewPanel); identity.append(reviewEntry);
+  function closeReview() {
+    if (busy || recovery?.composing() || reviewPanel.hidden) return;
+    if (recovery) conflicts.append(recovery.root);
+    reviewPanel.hidden = true; reviewToggle.setAttribute('aria-expanded', 'false');
+    reviewEntry.hidden = !recovery?.count();
+    if (!reviewEntry.hidden) reviewToggle.focus({ preventScroll: true });
+    else { projectTitle.tabIndex = -1; projectTitle.focus({ preventScroll: true }); }
+  }
+  reviewPanel.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !event.isComposing && !event.defaultPrevented) {
+      event.preventDefault(); event.stopPropagation(); closeReview();
+    }
+  });
   const startup = ports.read().state, preferred = ports.initialSceneId;
   let sceneId = (preferred && fieldValue(startup.scenes[preferred]?.lifecycle)?.state === 'active' ? preferred : chooseStartupScene(startup).sceneId) ?? '',
     disposed = false, busy = false, composing = false, feedback = '';
@@ -367,7 +393,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   const addColors = new Map<string, string>(), addColorValue = () => addColors.get(sceneId) ?? '#a08045';
   let parentKey = '', parentScope = '';
   let deletion: { token: string; sceneId: string; captionId: string; title: string; impact: ReturnType<ProjectWorkspacePorts['captionDeletion']> } | null = null;
-  type EditOwner = 'media' | 'caption' | 'tag' | 'attachCreatedTag';
+  type EditOwner = 'media' | 'caption' | 'tag' | 'attachCreatedTag' | 'recovery';
   let rawPosition = ['', '', ''], pending: { action: () => Promise<unknown>; complete: () => void; owner?: EditOwner; after?: () => Promise<void> } | null = null;
   let applyingCaption: CaptionApplyPlan | null = null;
   let captionToken: string | null = null, captionEpoch = 0, dependentAction = false;
@@ -851,7 +877,17 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     changed: render, membership: ports.prepareCaptionMembership,
     apply(token, command, complete) {
       if (recoveryBlock() || token !== provider().token) return;
-      void perform(async () => ports.dispatch(token, command()), () => { complete(); feedback = '競合を解消しました。'; });
+      void perform(async () => ports.dispatch(token, command()), () => {
+        complete(); feedback = '競合を解消しました。';
+        queueMicrotask(() => {
+          if (disposed || busy) return;
+          if (recovery?.count()) {
+            if (!reviewPanel.hidden) recovery.reveal(() => true);
+          } else if (!reviewPanel.hidden) {
+            closeReview();
+          } else if (document.activeElement === document.body && !detailPane.hidden) detailHeading.focus({ preventScroll: true });
+        });
+      }, 'recovery');
     } });
   conflicts.append(recovery.root);
   const windowBlock = () => busy || pending || ports.otherPending() ? '現在の更新・ファイル操作を完了してください。' :
@@ -1021,6 +1057,12 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       // Keep the single user action visibly in progress between its separately
       // acknowledged phases; the internal guards have already fully settled.
       if (!disposed && !(succeeded && after)) render();
+      if (!disposed && !succeeded && owner === 'recovery' && !reviewPanel.hidden) {
+        closeReview();
+        const next = !retry.hidden && !retry.disabled ? retry : !revise.hidden && !revise.disabled ? revise : status;
+        if (next === status) status.tabIndex = -1;
+        next.focus({ preventScroll: false });
+      }
     }
     // Each acknowledged command owns its retry. Continue only after its guards
     // and pending state have settled; never nest a second perform in complete().
@@ -1513,6 +1555,11 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       mediaManager!.render(!readDuringOutput() && task === 'captions' && !detailPane.hidden &&
         (!compactLayout() || compactSurface === 'panel') && document.hidden !== true, !selectedWindowVisible);
       recovery!.render();
+      const reviewCount = recovery!.count();
+      reviewEntry.hidden = !reviewCount && reviewPanel.hidden;
+      const reviewLabel = `${ports.readOnly ? '変更の候補を確認' : '残す内容を選ぶ'}（${reviewCount}件）`;
+      if (reviewToggle.textContent !== reviewLabel) reviewToggle.textContent = reviewLabel;
+      reviewToggle.disabled = busy || composingInput() || ports.otherPending() || !!ports.presentation?.();
       organization!.render();
       body.setAttribute('aria-busy', String(busy && !autosave?.saving)); body.inert = bodyInert();
       body.dataset.surface = compactSurface; body.dataset.drawingPreview = String(drawingPreview());
@@ -1610,8 +1657,13 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     else if (reading.focus === 'detail' && memory().selectedCaptionId) detailHeading.focus({ preventScroll: true });
     else list.focusSearch();
   });
-  return { root, headerActions, fileStatus, projectNavigation: otherProject, utilityArea: settingsSheet, clearNotice(){if(!pending&&ports.status().kind==='idle')feedback='';}, dismissDisclosures(){help.open=false;organization!.settingsRoot.open=false;}, setExternalBusy: (active:boolean) => { const reading=readDuringOutput(), changed=externalBusy!==active||outputReading!==reading; externalBusy=active;outputReading=reading;if(changed)render();body.inert=bodyInert(); }, render, session: interaction, activeScene: () => sceneId, inputPending: () => dirty() || busy,
-    canFlushCaption, flushCaption,
+  return { root, headerActions, fileStatus, projectNavigation: otherProject, utilityArea: settingsSheet, clearNotice(){if(!pending&&ports.status().kind==='idle')feedback='';},
+    dismissDisclosures() {
+      if (!reviewPanel.hidden && (busy || recovery?.composing())) return false;
+      help.open = false; organization!.settingsRoot.open = false; closeReview(); return true;
+    },
+    setExternalBusy: (active:boolean) => { const reading=readDuringOutput(), changed=externalBusy!==active||outputReading!==reading; externalBusy=active;outputReading=reading;if(changed)render();body.inert=bodyInert(); }, render, session: interaction, activeScene: () => sceneId, inputPending: () => dirty() || busy,
+    canFlushCaption, flushCaption, reviewEntry, reviewHome: identity,
     hasChanges: () => dirty() || busy || !!pending,
     unmount() {
       if (retirement) return retirement;
@@ -1620,6 +1672,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       void retirement.catch(() => {}); disposed = true;
       const errors: unknown[] = [], attempt = <T>(action: () => T): T | undefined => { try { return action(); } catch (error) { errors.push(error); } };
       attempt(() => {
+        reviewEntry.remove();
         document.removeEventListener?.('visibilitychange',render);document.removeEventListener?.('pointerdown',closeRecordSheets,true);document.removeEventListener?.('focusin',closeRecordSheets);document.removeEventListener?.('pointerdown',dismissHeaderSheets,true);document.removeEventListener?.('focusin',dismissHeaderSheets);
         otherProject.remove();document.defaultView?.clearTimeout(feedbackTimer);document.defaultView?.removeEventListener('resize',positionHeaderSheets);document.defaultView?.removeEventListener('resize',render);document.defaultView?.removeEventListener('resize',positionMobileEditor);visualViewport?.removeEventListener('resize',positionMobileEditor);root.removeEventListener('focusin',mobileFocusChanged);root.removeEventListener('focusout',mobileFocusChanged);
       });

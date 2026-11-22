@@ -41,7 +41,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     fileContent.append(tools!.root); filePanel.append(fileHeader,fileNavigation,fileCloseNote,fileContent); fileMenu.append(summary,filePanel);
     if (navigation?.fileActionsRoot) filePanel.append(navigation.fileActionsRoot);
     summary.addEventListener('click', event => { if(fileMenu.open && tools!.hasChanges() && !readingOutput()) event.preventDefault();
-      else if(!fileMenu.open) { fileOrigin=summary;core?.dismissDisclosures(); } });
+      else if(!fileMenu.open) { if (core?.dismissDisclosures() === false) event.preventDefault(); else fileOrigin=summary; } });
   }
   let fileOrigin: HTMLElement | undefined;
   const positionFiles = () => {
@@ -76,7 +76,8 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
         }
       }
       fileNotice.dataset.compact='false';
-      core?.dismissDisclosures();fileMenu.open=true;if(b.getAttribute('role')!=='tab')filePanel.focus?.({preventScroll:true});})().catch(error=>{
+      if (core?.dismissDisclosures() === false) return;
+      fileMenu.open=true;if(b.getAttribute('role')!=='tab')filePanel.focus?.({preventScroll:true});})().catch(error=>{
         if(!disposed&&core===owner){const failure=failurePresentation(error,'ファイル処理を完了できません。保存済みの内容は保持しています。再試行してください。');outputNotice=failure.message;outputFailure={text:failure.message,diagnostic:failure.diagnostic};fileNotice.dataset.compact='false';changed();}
       });}); return b;
   };
@@ -145,6 +146,10 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     fileCloseNote.textContent=output ? '作成中も記録を読めます。' : tools?.closeReason() ?? ''; fileCloseNote.hidden=!fileCloseNote.textContent;
     restoreEntry.hidden=!host.backupRestore.enabled;
     const selectedSurface=tools?.currentSurface(); fileNavigation.hidden=host.mode!.current==='view';
+    if (core && tools && fileMenu) {
+      const home = fileMenu.open && selectedSurface === 'receive' ? tools.reviewSlot : core.reviewHome;
+      if (core.reviewEntry.parentElement !== home) home.append(core.reviewEntry);
+    }
     for(const b of [saveEntry,shareEntry,...fileTabs.values()])b.disabled=switching||!!navigation?.presentation?.()||!!core?.inputPending()&&!core.canFlushCaption()||!!tools?.hasChanges()||!!startup?.hasChanges();
     for(const [surface,tab] of fileTabs){tab.setAttribute('aria-selected',String(surface===selectedSurface));tab.tabIndex=surface===selectedSurface?0:-1;if(surface===selectedSurface)fileContent.setAttribute('aria-labelledby',tab.id);}
     if(host.mode!.current==='view'){fileContent.removeAttribute('aria-labelledby');fileContent.setAttribute('aria-label','作成したファイル');}else fileContent.removeAttribute('aria-label');

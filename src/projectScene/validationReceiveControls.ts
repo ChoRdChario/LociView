@@ -27,7 +27,8 @@ export function createValidationReceiveControls(document: Document, host: Return
   status.className = 'lv-operation-status';
   const failureDetails = createFailureDetails(document), restoreDetails = createFailureDetails(document);
   let failure: FeedbackFailure | undefined, restoreFailure: FeedbackFailure | undefined;
-  form.append(label, submit, clear); root.append(heading, help, form, status, failureDetails.root, jobs);
+  const reviewSlot = document.createElement('div');
+  form.append(label, submit, clear); root.append(heading, help, form, status, reviewSlot, failureDetails.root, jobs);
   let busy = false, disposed = false, feedback = '', selectedJob: string | null = null, selectedCopy: string | null = null,
     cancel: { id: string; stale: boolean; review?: boolean } | null = null;
   let activeOperation: 'receive' | 'restore' | null = null;
@@ -193,7 +194,7 @@ export function createValidationReceiveControls(document: Document, host: Return
   });
   render();
   const hasChanges = () => busy || output.hasChanges() || restoreChanges() || !!input.files?.length || !!selectedJob || !!selectedCopy || !!cancel;
-  return { root, render, busy: () => busy || output.busy(), hasChanges, latestHandoff: output.latestHandoff, hasHandedOff: output.hasHandedOff,
+  return { root, reviewSlot, render, busy: () => busy || output.busy(), hasChanges, latestHandoff: output.latestHandoff, hasHandedOff: output.hasHandedOff,
     requestSave: () => hasChanges() ? Promise.resolve('blocked' as const) : output.requestSave(),
     readingOutput: () => busy || restoreChanges() || input.files?.length || selectedJob || selectedCopy || cancel ? null : output.readingOutput(),
     outputFeedback: output.outputFeedback,

@@ -1,4 +1,4 @@
-import { chooseHomeFiles, revealCoordinateAdd, beginSceneCreation, revealCaptionList } from './workspaceUi';
+import { chooseHomeFiles, revealCoordinateAdd, beginSceneCreation, revealCaptionList, expectSelectedCaptionPhotos, expectResumedProject } from './workspaceUi';
 import { test, expect, chromium, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir } from 'node:fs/promises';
@@ -45,14 +45,7 @@ async function addImage(page: Page, name: string, buffer: Buffer) {
   await (await choosing).setFiles({ name, mimeType: 'image/png', buffer });
   await page.getByRole('region',{name:'記録の詳細',exact:true}).getByRole('button',{name:'変更を適用',exact:true}).click(); await expect(page.getByText('メディアを追加しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
 }
-async function checkImages(page: Page, count: number) {
-  const images = page.getByRole('region', { name: 'メディアの整理', exact: true }).locator('img');
-  await expect(images).toHaveCount(count);
-  for (const image of await images.all()) {
-    await expect(image).toBeVisible();
-    await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth)).toBe(2);
-  }
-}
+const checkImages = (page: Page, count: number) => expectSelectedCaptionPhotos(page, count, 2);
 async function download(page: Page, testInfo: TestInfo, name: string, purpose: 'teamWorkspace' | 'contribution' | 'backup', base?: string) {
   const area = files(page);
   await area.getByRole('button', { name: purpose === 'backup' ? '保存' : '相手に渡す', exact: true }).click();
@@ -206,9 +199,9 @@ test('独立した二人が実ファイルを二往復し、手元の画像と�
       const group = b.getByRole('region', { name: '記録の競合', exact: true }).getByRole('listitem', { name: `${captionName}：本文`, exact: true });
       await expect(group).toBeVisible(); await expect(group).toContainText(localBody); await expect(group).toContainText(remoteBody);
       await expect(detail(b).getByLabel('本文', { exact: true })).toHaveAttribute('readonly', '');
-      const choice = group.getByRole('combobox'); await expect(choice).toHaveValue('');
+      await expect(group.getByRole('radio', { checked: true })).toHaveCount(0);
       await expect(group.getByRole('button', { name: '競合を解消', exact: true })).toBeDisabled();
-      await choice.selectOption('manual'); await group.getByRole('textbox').fill(mergedBody);
+      await group.getByRole('radio', { name: '自分で書く' }).check(); await group.getByRole('textbox').fill(mergedBody);
       await group.getByRole('button', { name: '競合を解消', exact: true }).click();
       await expect(group).toBeHidden({ timeout: 90_000 });
       await expect(detail(b).getByLabel('本文', { exact: true })).toHaveValue(mergedBody);
@@ -261,7 +254,7 @@ test('独立した二人が実ファイルを二往復し、手元の画像と�
     await step('両ブラウザを完全終了して同じ各profileから再開する', async () => {
       await close('A'); await close('B'); a = await launch('A'); b = await launch('B');
       for (const [person, page] of [['A', a], ['B', b]] as const) {
-        await expect(page.getByText(`最後のプロジェクトを再開しました：${projectName}`, { exact: true })).toBeVisible({ timeout: 90_000 });
+        await expectResumedProject(page, projectName, 90_000);
         await selectCaption(page, finalTitle); await expect(detail(page).getByLabel('本文', { exact: true })).toHaveValue(finalBody); await checkImages(page, 2);
         await expect(page.getByLabel('3Dモデルの表示', { exact: true })).toBeVisible();
         await expect(page.locator('.lv-project-viewport-status')).toBeEmpty();
