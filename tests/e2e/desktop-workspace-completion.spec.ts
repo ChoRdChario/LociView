@@ -79,8 +79,10 @@ test('content-first workspace keeps editing, pin completion and file exits coher
     expect((await closeCaption.boundingBox())!.width).toBeGreaterThanOrEqual(44);
     await closeCaption.click({ trial: true });
     await revealWorkPanel(p); await tab('モデル').click();const modelTask=p.getByRole('tabpanel',{name:'モデル',exact:true});await modelTask.locator('.lv-model-select').filter({hasText:'建物.glb'}).click();
-    await expect(modelTask.getByLabel('モデル位置 X',{exact:true})).toBeHidden();await modelTask.getByRole('button',{name:'配置を調整',exact:true}).click();
-    const modes=modelTask.getByRole('group',{name:'配置の操作',exact:true});await expect(modes.getByRole('button',{name:'移動',exact:true})).toHaveAttribute('aria-pressed','true');
+    await expect(modelTask.getByRole('button',{name:'配置を調整',exact:true})).toBeEnabled();
+    await modelTask.locator('.lv-model-select').filter({hasText:'測量.ply'}).click();
+    await expect(modelTask.getByLabel('位置 X',{exact:true})).toBeHidden();await modelTask.getByRole('button',{name:'配置を調整',exact:true}).click();
+    const modes=modelTask.getByRole('group',{name:'ギズモ切り替え',exact:true});await expect(modes.getByRole('button',{name:'移動',exact:true})).toHaveAttribute('aria-pressed','true');
     await modes.getByRole('button',{name:'回転',exact:true}).click();await expect(modes.getByRole('button',{name:'回転',exact:true})).toHaveAttribute('aria-pressed','true');await modelTask.getByRole('button',{name:'配置を取り消す',exact:true}).click();
     await revealCameraPositions(p); const author = p.getByRole('region', { name: '視点の作業', exact: true });
     await expect(author.getByRole('button',{name:'編集',exact:true})).toBeHidden();await expect(author.getByText('その他の操作',{exact:true})).toBeHidden();await expect(p.locator('.lv-view-axes')).toHaveCount(0);

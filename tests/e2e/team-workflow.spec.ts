@@ -165,7 +165,7 @@ test('独立した二人が実ファイルを二往復し、手元の画像と�
       const options = await model.locator('option').evaluateAll(nodes => nodes.map(node => (node as HTMLOptionElement).value).filter(Boolean));
       expect(options).toHaveLength(1); await model.selectOption(options[0]!);
       await a.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
-      for (const [axis, value] of [['X', '0.2'], ['Y', '0.2'], ['Z', '0']] as const) await a.getByLabel(`位置 ${axis}`, { exact: true }).fill(value);
+      for (const [axis, value] of [['X', '0.2'], ['Y', '0.2'], ['Z', '0']] as const) await a.getByRole('region', { name: '位置の調整', exact: true }).getByLabel(`位置 ${axis}`, { exact: true }).fill(value);
       await a.getByRole('button', { name: 'ここに記録を作る', exact: true }).click();
       await expect(a.getByText('ピンの位置を確定しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
       await detail(a).getByLabel('タイトル', { exact: true }).fill(captionName); await edit(a, '本文', originalBody);

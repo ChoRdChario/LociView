@@ -1,6 +1,6 @@
 import { displayBlobRef } from '../domain/portableMedia';
 import { createProjectWorkspace } from '../ui/projectScene/projectWorkspace';
-import type { WorkspaceReadingSelection, WorkspaceSurface, WorkspaceViewport, WorkspaceViewportState } from '../ui/projectScene/projectWorkspacePorts';
+import { localModelEditIssue, type WorkspaceReadingSelection, type WorkspaceSurface, type WorkspaceViewport, type WorkspaceViewportState } from '../ui/projectScene/projectWorkspacePorts';
 import { projectDisplay, pointInProject, type EditableDisplay } from './viewportModel';
 import type { ViewportFactory,ProjectViewport } from './viewportPorts';
 import type { createValidationModeHost } from './validationModeHost';
@@ -10,6 +10,7 @@ import { readProjectCamera, readSolidBackground } from './viewDisplay';
 import { createModelCandidatePreview, modelCandidateDisplay, type ModelCandidateRenderer } from './modelCandidatePreview';
 import { createMetadataStartupControls } from './startupControls';
 import { chooseStartupScene } from '../scene/resolve';
+import { sceneMembers } from '../ui/projectScene/projectRead';
 import { value, type Material } from '../scene/types';
 import { validateMaterialIntent } from '../domain/materialIntent';
 import { materialView } from '../ui/projectScene/materialState';
@@ -182,9 +183,16 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
   };
   const mountCore = () => {
     if (disposed || retiringCore || core || startup?.busy() || startup?.recoveryPending() || host.hasPending() || !chooseStartupScene(read().state).sceneId) return;
+    const sources = productSources(host, navigation?.smoothDisplay);
+    const requireLocalModel = (token: string, input: { sceneId: string; assetId: string; expectedBindingId: string }) => {
+      const model = sources.modelDetails(input.sceneId, input.assetId);
+      if (!model || model.target.token !== token || model.target.bindingId !== input.expectedBindingId) throw Error('モデルが更新されています。選び直してください。');
+      const reason = localModelEditIssue(model.sceneCount, read().semanticProfile === 'map2');
+      if (reason) throw Error(reason);
+    };
     core = createProjectWorkspace(document, {
     captionAutosave: navigation?.captionAutosave,
-    ...productSources(host,navigation?.smoothDisplay),
+    ...sources,
     openProject: navigation?.openProject, projectNavigationBlocked: navigation?.projectNavigationBlocked, resumedLastProject: navigation?.resumedLastProject, storageEstimate: navigation?.storageEstimate,
     initialReading: navigation?.initialReading,
     initialSceneId: navigation?.initialSceneId,
@@ -226,13 +234,16 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     },
     dispatch: (token, command) => host.dispatch(token, command), retry: async () => host.authority.retry!(),
     addMedia: async (token, input) => host.authority.addMediaFile!(token, input),
-    prepareGsProxy: async(...a)=>host.authority.prepareGsProxy!(...a),
+    prepareGsProxy: async (token, target, file) => {
+      requireLocalModel(token, target);
+      return host.authority.prepareGsProxy!(token, read().semanticProfile === 'map2' ? { ...target, scope: 'scene' } : target, file);
+    },
     commitGsProxy: async(...a)=>host.authority.commitGsProxy!(...a),
     cancelGsProxy: ()=>host.authority.cancelGsProxy?.(),
     addModel: async (token, input) => host.authority.addModelFile!(token, input),
     modelSelectionNotice: file=>host.content.modelSelectionNotice(file),
-    replaceModel: async (token, input) => host.authority.replaceModelFile!(token, input),
-    transformModel: async (token, input) => host.authority.transformModel!(token, input),
+    replaceModel: async (token, input) => { requireLocalModel(token, input); return host.authority.replaceModelFile!(token, read().semanticProfile === 'map2' ? { ...input, scope: 'scene' } : input); },
+    transformModel: async (token, input) => { requireLocalModel(token, input); return host.authority.transformModel!(token, read().semanticProfile === 'map2' ? { ...input, scope: 'scene' } : input); },
     image: async record => new Blob([(await host.content.displayImage(record, true)).slice().buffer], { type: displayBlobRef(record).mediaType as string }),
     imageScope: () => host.imageScope(),
     rasterResources: host.content.rasterResources,
@@ -256,7 +267,8 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
       });
       const target = (assetId: string): WorkspaceSurface | null => {
         if (!state || rendered?.materialPreview || state.readOnly || state.token !== read().token) return null;
-        const snapshot = host.authority.read(), version = snapshot.modelVersions?.find(v => v.assetId === assetId);
+        const snapshot = host.authority.read(), binding = sceneMembers(snapshot, state.sceneId).bindings.get(assetId);
+        const version = binding && snapshot.modelVersions?.find(v => v.assetId === assetId && v.projection.bindingId === binding.bindingId);
         const seen = runtime.read(), display = seen.display;
         if (!state.available || state.visible === false || !seen.ready || seen.issue || rendered !== display || state.hiddenAssetIds?.includes(assetId) || snapshot.state.token !== state.token || !version || version.families.length !== 1 || !display || display.token !== state.token || display.sceneId !== state.sceneId || display.readOnly || !display.models.some(m => m.binding.assetId === assetId && m.binding.id === version.projection.bindingId)) return null;
         const family = version.families[0]!;
@@ -302,7 +314,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
         update(next) {
           if (closed) return; state = next; viewportScene = next.sceneId; refreshPreview?.();
           const snapshot = host.authority.read();
-          const anchor = next.photoContext && next.selectedId ? snapshot.resources.captions[next.selectedId]?.anchor : undefined;
+          const anchor = next.photoContext && next.selectedId ? sceneMembers(snapshot, next.sceneId).anchors.get(next.selectedId) : undefined;
           const photo = anchor?.kind === 'value' && anchor.value.kind === 'asset' && next.selectedId &&
             next.available && !next.readOnly && snapshot.state.token === next.token && host.mode?.current === 'edit'
             ? { token: next.token, sceneId: next.sceneId, captionId: next.selectedId, assetId: anchor.value.assetId,
@@ -352,7 +364,7 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
               display = { ...display, preview: position, pinEdit: { target: next.pin.target, position, enabled: !next.readOnly } };
             }
           }
-          if (next.comparison?.token === next.token) {
+          if (next.comparison?.token === next.token && (!next.comparison.sceneId || next.comparison.sceneId === next.sceneId)) {
             const anchor = next.comparison.anchor;
             if (anchor.kind === 'project' && anchor.projectFrameId === read().resources.projectFrameId) display = { ...display, preview: anchor.positionProject };
             else if (anchor.kind === 'asset') {

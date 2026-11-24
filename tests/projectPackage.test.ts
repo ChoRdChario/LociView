@@ -21,7 +21,7 @@ import { PackageArchive } from '../src/projectPackage/zipArchive';
 import { ZipCrc32 } from '../src/projectPackage/zipChecks';
 import * as taskYield from '../src/core/taskYield';
 import type { JsonObject } from '../src/domain/values';
-import type { OriginBlobStore } from '../src/projectMetadata/blobStore';
+import { OriginBlobStore } from '../src/projectMetadata/blobStore';
 import { protectedWorkspaceInventory } from '../src/projectPackage/protectedInventory';
 import { fixtureMedia } from '../src/harness/projectScene/mediaHistory';
 import { BackupSourceCapture } from '../src/projectPackage/backupSource';
@@ -31,8 +31,15 @@ import { CleanSourceCapture, inspectCleanSource } from '../src/projectPackage/cl
 import { CleanArchive, writeCleanArchive } from '../src/projectPackage/cleanArchive';
 import { selectCleanRecords, rebuildCleanRecords } from '../src/projectPackage/cleanRecords';
 import { prepareReviewSnapshot } from '../src/projectPackage/reviewSelection';
-import { inspectReviewSnapshot, readReviewSnapshot, prepareReviewEdit } from '../src/projectPackage/reviewSnapshot';
+import { inspectReviewSnapshot, readReviewSnapshot, prepareReviewEdit, reviewCapabilities, reviewSceneValues } from '../src/projectPackage/reviewSnapshot';
 import { ReviewSourceCapture } from '../src/projectPackage/reviewSource';
+import { planSceneAppend, validatePreparedSceneAppend, type SceneAppendInput } from '../src/projectPackage/sceneAppend';
+import { createFixtureModel } from '../src/harness/projectScene/modelClosure';
+import { glb, lockManager, TestFS } from './helpers/projectFileFixtures';
+import { prepareValidationProject } from '../src/projectFiles/initialProject';
+import { ValidationContent } from '../src/projectFiles/content';
+import { validationModelFacts, validationReceivedFacts } from '../src/projectFiles/modelFacts';
+import { underWriteLease } from '../src/projectMetadata/persistence';
 import { ReviewArchive, writeReviewArchive } from '../src/projectPackage/reviewArchive';
 
 type Mutable<T> = { -readonly [K in keyof T]: Mutable<T[K]> };
@@ -205,6 +212,124 @@ describe('selected-Scene review snapshot (not View activation or external saving
     await expect(ReviewArchive.inspect(fixedZip(entries), metadataLimits)).rejects.toThrow(/summary-or-closure/);
     await expect(inspectReviewSnapshot({ ...snapshot, schema: { kind: 'lociview-project-scene-review', version: '1' } }, metadataLimits)).rejects.toThrow();
     expect(f.source.encodeFullSource()).toEqual(original);
+  });
+  it('flattens one selected scene and preserves different placements and pins of a shared record across a multi-scene restore', async () => {
+    const records = fixture(); records.schema.minor = 1;
+    records.project.frame.unit = { kind: 'meters', metersPerProjectUnit: 1 };
+    const second = id('scn', 2), asset = id('ast'), caption = id('cap'), first = id('scn');
+    records.scenesById[second] = { ...records.scenesById[first], id: second, name: '側面', orderKey: 'B' };
+    delete records.scenesById[second].defaultViewId;
+    const binding = structuredClone(records.assetBindingsById[id('bnd')]);
+    binding.id = id('bnd', 2); binding.assetToProject.translation = [7, 8, 9];
+    binding.payloadDigest = await immutableDigest('asset-binding-revision', binding); records.assetBindingsById[binding.id] = binding;
+    records.sceneAssetMembershipsById[id('sam', 2)] = { ...records.sceneAssetMembershipsById[id('sam')], id: id('sam', 2), sceneId: second, bindingId: binding.id };
+    records.sceneCaptionMembershipsById[id('scm', 2)] = { ...records.sceneCaptionMembershipsById[id('scm')], id: id('scm', 2), sceneId: second,
+      anchor: { ...records.captionsById[caption].anchor, positionAsset: [1, 2, 3] } };
+    const source = ProjectMetadataSource.bootstrap(records.schema, records.identity, metadataLimits, { semanticProfile: 'map2' }).initialize(records);
+    const one = await prepareReviewSnapshot(source, metadataLimits, { sceneId: second });
+    const single = one.review.snapshot as Record<string, any>;
+    expect(reviewCapabilities(one.review)).toEqual([]); expect(Object.values<any>(single.assetsById)[0].assetToProject.translation).toEqual([7, 8, 9]);
+    expect(Object.values<any>(single.captionsById)[0].anchor.positionAsset).toEqual([1, 2, 3]);
+    const options = { sceneId: first, additionalSceneIds: [second] };
+    const multiple = await prepareReviewSnapshot(source, metadataLimits, options), snapshot = multiple.review.snapshot as Record<string, any>;
+    expect(reviewCapabilities(multiple.review)).toEqual(['scene-placement-v1']);
+    const lookup = (raw: string) => multiple.reconstruction.rekey.idMap.find(row => row.from === raw)!.to;
+    for (const [sceneId, xyz, pin] of [[first, [0, 0, 0], [0, 0, 0]], [second, [7, 8, 9], [1, 2, 3]]] as const) {
+      const values = reviewSceneValues(snapshot, lookup(sceneId));
+      expect((values.assets[lookup(asset)]!.assetToProject as JsonObject).translation).toEqual(xyz);
+      expect((values.captions[lookup(caption)]!.anchor as JsonObject).positionAsset).toEqual(pin);
+    }
+    expect(Object.keys(snapshot.captionsById)).toHaveLength(1); expect(Object.keys(snapshot.mediaResourcesById)).toHaveLength(1);
+    expect(Object.keys(snapshot.representationsById)).toHaveLength(1);
+    expect((await prepareReviewSnapshot(source, metadataLimits, options, multiple.reconstruction)).review.token).toBe(multiple.review.token);
+    const edit = await prepareReviewEdit(multiple.review, metadataLimits);
+    const rebuilt = edit.records as Record<string, any>, memberships = Object.values<any>(rebuilt.sceneAssetMembershipsById);
+    const override = memberships.find(m => m.bindingId)!; expect(rebuilt.assetBindingsById[override.bindingId].assetToProject.translation).toEqual([7, 8, 9]);
+    expect(Object.values<any>(rebuilt.sceneCaptionMembershipsById).find(m => m.anchor)!.anchor.positionAsset).toEqual([1, 2, 3]);
+    expect((await prepareReviewEdit(multiple.review, metadataLimits, edit.reconstruction)).records).toEqual(rebuilt);
+    const rep = records.representationsById[id('rep')];
+    const provider = await readProjectScene(source.read(), metadataLimits, developmentContentVerifier([
+      { variantFamilyId: rep.variantFamilyId, representationId: rep.id, payloadDigest: rep.payloadDigest },
+    ]));
+    const destination = map2Records(); destination.project.frame.unit = { kind: 'meters', metersPerProjectUnit: 1 };
+    const f = await workspaceFixture('map2', destination);
+    const capture = await ReviewSourceCapture.prepare({ read: async () => ({ state: 'ready', source, provider, publication: 'checked' }) }, source.token, options, f.store, metadataLimits);
+    const chunks: BlobPart[] = []; await writeReviewArchive(capture, f.store, new WritableStream({ write(chunk) { chunks.push(chunk.slice() as BlobPart); } }), f.options);
+    const archived = await ReviewArchive.inspect(new Blob(chunks), metadataLimits);
+    expect(archived.archive.control.manifest.requiredCapabilities).toEqual(['scene-placement-v1']);
+    expect(archived.archive.control.manifest.blobs).toHaveLength(2);
+    const op = 'a'.repeat(32), plan = await planSceneAppend(f.source, archived, metadataLimits, op);
+    expect(plan.sceneIds).toHaveLength(2); expect(plan.blobs).toHaveLength(2);
+    const input: SceneAppendInput = { schema: 'lociview-scene-append-2', id: op, proof: f.source.proof,
+      archive: plan.archive, snapshot: plan.snapshot, predecessor: 'b'.repeat(32), baseHeads: f.source.heads, sceneId: plan.sceneId, sceneIds: plan.sceneIds,
+      recipe: plan.reconstruction, records: plan.records, change: { sha256: packageByteHash(plan.bytes), byteLength: plan.bytes.byteLength }, blobs: plan.blobs, stagedBlobs: [] };
+    validatePreparedSceneAppend(f.source, plan.bytes, input, metadataLimits);
+    const resumed = await planSceneAppend(f.source, archived, metadataLimits, op, undefined, { input, bytes: plan.bytes });
+    expect(resumed.next.heads).toEqual(plan.next.heads); expect(resumed.sceneIds).toEqual(plan.sceneIds);
+    await expect(planSceneAppend(f.source, archived, metadataLimits, op, undefined, { input: { ...input, records: { ...input.records, sha256: '0'.repeat(64) } }, bytes: plan.bytes })).rejects.toThrow('scene-append-originals');
+    const forged = structuredClone(snapshot); Object.values<any>(forged.sceneAssetMembershipsById).find(m => m.bindingId)!.bindingId = id('bnd', 50);
+    await expect(inspectReviewSnapshot(forged, metadataLimits)).rejects.toThrow('review-foreign-scene-binding');
+  });
+  it('restores and appends two transforms of one GLB using the actual content verifier', async () => {
+    const budget = { maxFileBytes: 1_000_000, maxJsonBytes: 100_000, maxItems: 10_000, maxValues: 100_000, maxPixels: 10_000 };
+    const bytes = glb(), blob = new Blob([bytes.slice().buffer as ArrayBuffer]);
+    const project = await prepareValidationProject({ run: 'a'.repeat(32), title: '2つの配置', models: [{ label: '三角形', bytes }] }, budget);
+    const records = structuredClone(project.records);
+    const scenes = records.scenesById as Record<string, JsonObject>, first = Object.values(scenes)[0]!, second = id('scn', 2);
+    const bindings = records.assetBindingsById as Record<string, JsonObject>, original = Object.values(bindings)[0]!;
+    const other = { ...original, id: id('bnd', 2), assetToProject: { ...original.assetToProject as JsonObject, translation: [7, 8, 9] } };
+    bindings[other.id] = { ...other, payloadDigest: await immutableDigest('asset-binding-revision', other) };
+    scenes[second] = { ...first, id: second, orderKey: 'B', name: '側面' };
+    const members = records.sceneAssetMembershipsById as Record<string, JsonObject>;
+    members[id('sam', 2)] = { ...Object.values(members)[0]!, id: id('sam', 2), sceneId: second, bindingId: other.id };
+    const source = ProjectMetadataSource.bootstrap({ major: 2, minor: 1 }, records.identity, metadataLimits, { semanticProfile: 'map2' })
+      .initialize({ ...records, schema: { major: 2, minor: 1 } });
+    const fs = new TestFS(), store = new OriginBlobStore(fs, { maxBlobBytes: budget.maxFileBytes, maxChunkBytes: 1_000_000, maxChunks: 1000, metadata: metadataLimits }, lockManager());
+    const content = new ValidationContent(fs, store, budget), modelFacts = validationModelFacts(content);
+    const body = Object.values(records.representationsById as Record<string, JsonObject>)[0]!.blob as JsonObject;
+    const restore = async (source: ProjectMetadataSource) => {
+      const plan = await modelFacts.planRestored!(source, () => blob, [body]);
+      await underWriteLease(fs, () => plan.stage());
+      return readProjectScene(source.read(), metadataLimits, content.verifier(false));
+    };
+    const provider = await restore(source);
+    const selection = { sceneId: first.id as string, additionalSceneIds: [second] };
+    const capture = await ReviewSourceCapture.prepare({ read: async () => ({ state: 'ready', source, provider, publication: 'checked' }) }, source.token, selection, store, metadataLimits);
+    const chunks: BlobPart[] = [];
+    await writeReviewArchive(capture, store, new WritableStream({ write(chunk) { chunks.push(chunk.slice() as BlobPart); } }), { packageId: id('pkg'), createdByVersion: '0.0.1' });
+    const archived = await ReviewArchive.inspect(new Blob(chunks), metadataLimits);
+    const edit = await prepareReviewEdit(archived.review, metadataLimits);
+    const copy = ProjectMetadataSource.bootstrap(edit.records.schema as JsonObject, edit.records.identity as JsonObject, metadataLimits, { semanticProfile: 'map2' }).initialize(edit.records);
+    expect((await restore(copy)).kind).toBe('scene-provider');
+    expect(Object.keys(edit.records.assetRevisionsById as JsonObject)).toHaveLength(1);
+    expect(Object.keys(edit.records.assetBindingsById as JsonObject)).toHaveLength(2);
+    const appended = await planSceneAppend(source, archived, metadataLimits, 'b'.repeat(32));
+    const received = await validationReceivedFacts(content, source, appended.next, () => blob);
+    await underWriteLease(fs, () => received.stage());
+    expect(appended.sceneIds).toHaveLength(2);
+    expect(appended.blobs).toHaveLength(1);
+  });
+  it('exports only the selected replacement body and its material slots, and needs no capability for equal placements', async () => {
+    const records = fixture(); records.schema.minor = 1;
+    const first = id('scn'), second = id('scn', 2), old = records.representationsById[id('rep')];
+    const other = createFixtureModel({ asset: id('ast'), assetFrame: id('frm', 2), representationFrame: id('frm', 5), representation: id('rep', 2),
+      binding: id('bnd', 2), revision: id('rev', 2), family: id('fam', 2), compatibility: id('cmp', 2), layout: id('lay', 2), slot: id('slot', 2) }, 'updated',
+      { translation: [4, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1 });
+    for (const [map, value] of [['assetBindingsById', other.binding], ['assetRevisionsById', other.revision], ['representationsById', other.representation]] as const) records[map][value.id] = value;
+    records.scenesById[second] = { ...records.scenesById[first], id: second, name: '側面', orderKey: 'B' }; delete records.scenesById[second].defaultViewId;
+    const member = records.sceneAssetMembershipsById[id('sam', 2)] = { ...records.sceneAssetMembershipsById[id('sam')], id: id('sam', 2), sceneId: second, bindingId: other.binding.id };
+    const misplaced = records.materialOverridesById[id('ovr', 2)] = structuredClone(records.materialOverridesById[id('ovr')]); misplaced.id = id('ovr', 2); misplaced.routing.scope.sceneId = second;
+    const source = () => ProjectMetadataSource.bootstrap(records.schema, records.identity, metadataLimits, { semanticProfile: 'map2' }).initialize(records);
+    const one = (await prepareReviewSnapshot(source(), metadataLimits, { sceneId: second })).review;
+    expect(one.closure.entries.map(e => e.sha256)).toEqual([other.representation.blob.digest]); expect(Object.keys(one.snapshot.materialOverridesById as JsonObject)).toHaveLength(0);
+    const options = { sceneId: first, additionalSceneIds: [second] };
+    const both = (await prepareReviewSnapshot(source(), metadataLimits, options)).review;
+    expect(both.closure.entries.map(e => e.sha256)).toEqual([other.representation.blob.digest, old.blob.digest, fixtureMedia[0]!.record.blob.digest].sort());
+    expect(Object.keys(both.snapshot.materialOverridesById as JsonObject)).toHaveLength(1);
+    const equal = structuredClone(records.assetBindingsById[id('bnd')]); equal.id = id('bnd', 3); equal.payloadDigest = await immutableDigest('asset-binding-revision', equal);
+    records.assetBindingsById[equal.id] = equal; member.bindingId = equal.id;
+    const simple = (await prepareReviewSnapshot(source(), metadataLimits, options)).review;
+    expect(reviewCapabilities(simple)).toEqual([]); expect(Object.values(simple.snapshot.assetsById as JsonObject)).toHaveLength(1);
   });
   it('exports two checked scenes with one shared record, model and photo, excluding the third scene and private photo', async () => {
     const records = fixture();

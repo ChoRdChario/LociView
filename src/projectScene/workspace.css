@@ -428,8 +428,6 @@
 .lv-review-reading-content .lv-caption-search > label { font-size: 0; line-height: 0; }
 .lv-review-reading-content .lv-caption-search input { min-width: 100px; font-size: 16px; line-height: 1.5; }
 .lv-review-reading-content .lv-caption-count { margin: 0; }
-.lv-review-reading-content .lv-caption-color-menu[open] { flex-basis: 100%; }
-.lv-review-reading-content .lv-caption-color-menu > .lv-caption-colors { position: static; width: 100%; box-sizing: border-box; }
 .lv-review-render-status { position: absolute; z-index: 5; top: 8px; left: 8px; display: grid; gap: 4px; box-sizing: border-box; max-width: calc(100% - 136px); max-height: calc(100% - 16px); padding: 6px 8px; overflow: auto; overflow-wrap: anywhere; border: 1px solid var(--lv-line); background: var(--lv-action); color: var(--lv-field); pointer-events: none; }
 .lv-review-render-status :is(p, button) { pointer-events: auto; }
 .lv-review-scene-header { display: flex; flex: none; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; padding: 8px 12px; border-bottom: 1px solid var(--lv-rule); }

@@ -34,7 +34,9 @@ export const SUMMARY_FIELDS = Object.freeze({
   opaque: ['field'],
 } as const);
 for (const fields of Object.values(SUMMARY_FIELDS)) Object.freeze(fields);
-const SUMMARY_FIELDS2 = Object.freeze({ ...SUMMARY_FIELDS, assetsById: Object.freeze([...SUMMARY_FIELDS.assetsById, 'pinScale']) });
+const SUMMARY_FIELDS2 = Object.freeze({ ...SUMMARY_FIELDS, assetsById: Object.freeze([...SUMMARY_FIELDS.assetsById, 'pinScale']),
+  sceneAssetMembershipsById: Object.freeze([...SUMMARY_FIELDS.sceneAssetMembershipsById, 'bindingId']),
+  sceneCaptionMembershipsById: Object.freeze([...SUMMARY_FIELDS.sceneCaptionMembershipsById, 'anchor']) });
 export const summaryFieldsFor = (algorithm: SummaryAlgorithm) => algorithm === SUMMARY_ALGORITHM2 ? SUMMARY_FIELDS2 : SUMMARY_FIELDS;
 export type PackagePurpose = 'teamWorkspace' | 'contribution' | 'backup' | 'clean' | 'review';
 export interface Entry { readonly path: string; readonly sha256: string; readonly byteLength: number }

@@ -26,6 +26,8 @@ export function projectFieldPolicy(path: readonly string[], profile: ProjectSema
   if (field === 'id' || (map === 'assetsById' && field === 'assetFrameId') || (map === 'viewsById' && ['sceneId', 'projectFrameId'].includes(field!)) ||
     (map === 'sceneAssetMembershipsById' && ['sceneId', 'assetId'].includes(field!)) || (map === 'sceneCaptionMembershipsById' && ['sceneId', 'captionId'].includes(field!))) return 'immutable';
   if (field === 'lifecycle' || (map === 'assetsById' && field === 'status')) return 'existence';
+  if (profile === 'map2' && (map === 'sceneAssetMembershipsById' && field === 'bindingId' ||
+    map === 'sceneCaptionMembershipsById' && field === 'anchor')) return 'spatial';
   if (profile === 'map2' && map === 'assetsById' && field === 'pinScale') return 'scalar';
   if ((map === 'captionAttachmentsById' && ['captionId', 'mediaResourceId'].includes(field!)) || (map === 'captionTagMembershipsById' && ['captionId', 'tagId'].includes(field!)) || (map === 'materialOverridesById' && field === 'routing')) return 'parent';
   if (map === 'scenesById' && field === 'defaultViewId') return 'optional-default';

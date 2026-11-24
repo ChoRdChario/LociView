@@ -1,6 +1,7 @@
 export const EDITOR_CAPABILITY = 'editor-attribution-v1' as const;
 export const PORTABLE_MEDIA_CAPABILITY = 'portable-heic-display-v1' as const;
-const known = [EDITOR_CAPABILITY, PORTABLE_MEDIA_CAPABILITY] as const;
+export const SCENE_PLACEMENT_CAPABILITY = 'scene-placement-v1' as const;
+const known = [EDITOR_CAPABILITY, PORTABLE_MEDIA_CAPABILITY, SCENE_PLACEMENT_CAPABILITY] as const;
 export type ReaderCapability = typeof known[number];
 export type ReaderCapabilities = readonly ReaderCapability[];
 export class RequiredCapabilityError extends Error {
@@ -28,6 +29,7 @@ export function capabilityFields(values: ReaderCapabilities): { readonly require
 export const requiresCapability = (value: unknown, capability: ReaderCapability): boolean => readRequiredCapabilities(value).includes(capability);
 export const hasEditorCapability = (value: unknown): boolean => requiresCapability(value, EDITOR_CAPABILITY);
 export const hasPortableMediaCapability = (value: unknown): boolean => requiresCapability(value, PORTABLE_MEDIA_CAPABILITY);
+export const hasScenePlacementCapability = (value: unknown): boolean => requiresCapability(value, SCENE_PLACEMENT_CAPABILITY);
 export function checkRequiredCapabilities(value: unknown, expected: ReaderCapabilities): void {
   if (readRequiredCapabilities(value).join('|') !== capabilityUnion(expected).join('|')) throw new RequiredCapabilityError('capability-mismatch');
 }

@@ -1,5 +1,5 @@
 import { usePointAnchorProof, type PointAnchorProof } from './pointAnchorProof';
-import { EDITOR_CAPABILITY, PORTABLE_MEDIA_CAPABILITY, type ReaderCapabilities } from './requiredCapabilities';
+import { EDITOR_CAPABILITY, PORTABLE_MEDIA_CAPABILITY, SCENE_PLACEMENT_CAPABILITY, type ReaderCapabilities } from './requiredCapabilities';
 import { editorMessage, EditorAttributionError, type LocalEditorContext, type EditorDeclaration } from './editorAttribution';
 import * as A from '@automerge/automerge/slim';
 import { inspectProjectCandidates } from '../domain/projectCandidates';
@@ -29,7 +29,8 @@ function sameOriginalBytes(left: Uint8Array, right: Uint8Array): boolean {
 export class ProjectMetadataSource {
   private constructor(private readonly doc: PhysicalDoc, readonly proof: MetadataProof, private readonly limits: MetadataLimits,
     private readonly snapshot: ReturnType<typeof inspectPhysical>, private readonly portableChanges: ReadonlySet<string>,
-    private readonly originalMedia: readonly JsonObject[], private readonly declarations: readonly Readonly<{changeId: string; declaration: EditorDeclaration}>[]) {}
+    private readonly scenePlacementChanges: ReadonlySet<string>, private readonly originalMedia: readonly JsonObject[],
+    private readonly declarations: readonly Readonly<{changeId: string; declaration: EditorDeclaration}>[]) {}
 
   static bootstrap(schema: JsonObject, identity: JsonObject, requested: MetadataLimits, options?: { time?: 0; semanticProfile?: ProjectSemanticProfile }): ProjectMetadataSource {
     const profile = projectSemanticProfile(options?.semanticProfile);
@@ -67,7 +68,7 @@ export class ProjectMetadataSource {
 
   private static validated(doc: PhysicalDoc, proof: MetadataProof, limits: MetadataLimits): ProjectMetadataSource {
     const p = checkedProof(proof, limits), snapshot = inspectPhysicalSource(doc, p, limits);
-    return new ProjectMetadataSource(doc, p, limits, snapshot.input, snapshot.portableChanges, snapshot.mediaRecords, snapshot.declarations);
+    return new ProjectMetadataSource(doc, p, limits, snapshot.input, snapshot.portableChanges, snapshot.scenePlacementChanges, snapshot.mediaRecords, snapshot.declarations);
   }
 
   /** Complete pinned metadata encoding, not a package writer or durable save. */
@@ -211,11 +212,13 @@ export class ProjectMetadataSource {
   mediaRecords(): readonly JsonObject[] { return this.originalMedia.map(r => cloneCanonicalValue(r, this.limits) as JsonObject); }
   get requiredCapabilities(): ReaderCapabilities {
     return Object.freeze([...(this.includesDeclaredEditorNames ? [EDITOR_CAPABILITY] : []),
-      ...(this.portableChanges.size ? [PORTABLE_MEDIA_CAPABILITY] : [])]);
+      ...(this.portableChanges.size ? [PORTABLE_MEDIA_CAPABILITY] : []),
+      ...(this.scenePlacementChanges.size ? [SCENE_PLACEMENT_CAPABILITY] : [])]);
   }
   requiredCapabilitiesForChanges(hashes: ReadonlySet<string>): ReaderCapabilities {
     return Object.freeze([...(this.editorDeclarations().some(c => hashes.has(c.changeId)) ? [EDITOR_CAPABILITY] : []),
-      ...([...this.portableChanges].some(hash => hashes.has(hash)) ? [PORTABLE_MEDIA_CAPABILITY] : [])]);
+      ...([...this.portableChanges].some(hash => hashes.has(hash)) ? [PORTABLE_MEDIA_CAPABILITY] : []),
+      ...([...this.scenePlacementChanges].some(hash => hashes.has(hash)) ? [SCENE_PLACEMENT_CAPABILITY] : [])]);
   }
 
   /** Closed history-free export profile: one empty root and one population change.
@@ -285,6 +288,8 @@ export class ProjectMetadataSource {
       if (command.kind === 'resolveAttachmentLifecycle') delete draft.captionAttachmentsById[command.attachmentId].lifecycle;
       if (command.kind === 'resolveCaptionLifecycle' || command.kind === 'confirmCaptionLifecycle') delete draft.captionsById[command.captionId].lifecycle;
       if (command.kind === 'resolveAssetStatus') delete draft.assetsById[command.assetId].status;
+      if (command.kind === 'resolveScenePlacement') delete draft.sceneAssetMembershipsById[command.membershipId].bindingId;
+      if (command.kind === 'resolveScenePin') delete draft.sceneCaptionMembershipsById[command.membershipId].anchor;
       if (command.kind === 'resolveDefaultScene') delete draft.project.defaultSceneId;
       if (command.kind === 'resolveSceneName') delete draft.scenesById[command.sceneId].name;
       if (command.kind === 'resolveSceneOrder') delete draft.scenesById[command.sceneId].orderKey;
@@ -312,6 +317,19 @@ export class ProjectMetadataSource {
           // A bare delete would emit no operation and leave their causal conflict
           // unresolved. Write then delete in this SAME change; the adapter keeps
           // its final absent operation, never an intermediate displayed/saved value.
+          if (field === 'bindingId' && command.kind === 'resolveScenePlacement' || field === 'anchor' && command.kind === 'resolveScenePin') {
+            // The planner verified the inherited value before allowing this choice. Use it as the transient write.
+            const membership = object(object(provider.inspection.candidates.unambiguousRecords[edit.map])[edit.id]);
+            if (field === 'bindingId') {
+              const base = provider.resources.assets[String(membership.assetId)]?.projection;
+              if (base?.kind !== 'value') return fail('scene-placement-absence-witness');
+              draft[edit.map][edit.id][field] = scalar(base.value.bindingId, this.limits);
+            } else {
+              const base = provider.resources.captions[String(membership.captionId)]?.anchor;
+              if (base?.kind !== 'value') return fail('scene-placement-absence-witness');
+              draft[edit.map][edit.id][field] = scalar(base.value, this.limits);
+            }
+          }
           if (command.kind === 'resolveCaptionField' && field === 'colorSrgb')
             draft[edit.map][edit.id][field] = scalar([0, 0, 0], this.limits);
           if (command.kind === 'resolveAttachmentField' && field === 'altText')

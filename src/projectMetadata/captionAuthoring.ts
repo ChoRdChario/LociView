@@ -48,10 +48,10 @@ export function captionSnapshot(provider: Provider, captionId: string, limits: M
 }
 /** Shared by explicit Caption copy and Scene copy; the original is never edited. */
 export function appendCaptionCopy(provider: Provider, command: Extract<CaptionAuthoringCommand, { kind: 'duplicateCaption' }>,
-  limits: MetadataLimits, writer: ReturnType<typeof authoringWriter>) {
+  limits: MetadataLimits, writer: ReturnType<typeof authoringWriter>, sceneAnchor?: JsonValue) {
   const s = captionCopySource(provider, command.sourceId, limits), lifecycle = writer.lifecycle(command.eventId, 'active');
   writer.fresh(command.captionId, 'cap'); writer.fresh(command.membershipId, 'scm');
-  writer.create('captionsById', { ...s.caption, id: command.captionId, lifecycle });
+  writer.create('captionsById', { ...s.caption, ...(sceneAnchor !== undefined ? { anchor: sceneAnchor } : {}), id: command.captionId, lifecycle });
   writer.create('sceneCaptionMembershipsById', { id: command.membershipId, sceneId: command.sceneId, captionId: command.captionId, orderKey: command.orderKey, lifecycle });
   for (const [map, rows, ids, prefix] of [['captionAttachmentsById', s.attachments, command.attachments, 'att'], ['captionTagMembershipsById', s.tags, command.tags, 'tgm']] as const) {
     if (!equalAuthoringIds(ids.map(v => v.sourceId), rows.map(v => v.id as string))) fail('authoring-copy-children');
@@ -73,8 +73,9 @@ export function planCaptionAuthoring(provider: Provider, command: CaptionAuthori
       authoringShape(command, ['kind', 'sceneId', 'sourceId', 'captionId', 'membershipId', 'attachments', 'tags', 'orderKey', 'eventId']);
       r.active('scenesById', command.sceneId);
       const edges = r.related('sceneCaptionMembershipsById', { sceneId: command.sceneId, captionId: command.sourceId });
-      if (edges.length !== 1) fail('authoring-copy-membership'); r.complete('sceneCaptionMembershipsById', edges[0]!);
-      appendCaptionCopy(provider, command, limits, w); break;
+      if (edges.length !== 1) fail('authoring-copy-membership');
+      const membership = r.complete('sceneCaptionMembershipsById', edges[0]!);
+      appendCaptionCopy(provider, command, limits, w, membership.anchor); break;
     }
     case 'restoreCaptionFields': {
       authoringShape(command, ['kind', 'expected', 'values']);

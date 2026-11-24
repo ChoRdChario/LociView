@@ -5,7 +5,7 @@ import { DomainValidationError, normalizeSceneName } from '../domain/values';
 
 type EdgeKind = 'asset' | 'caption';
 /** Explicit parent intent shared by the pin editor and metadata service. */
-export interface PinParentCommand { kind: 'reparentPin'; sceneId: string; captionId: string; anchor: Anchor }
+export interface PinParentCommand { kind: 'reparentPin'; scope?: 'scene'; sceneId: string; captionId: string; anchor: Anchor }
 export interface AssetDeletionCommand { kind: 'deleteAsset'; assetId: string; eventId: string }
 export interface AssetDeletionImpact {
   assetId: string;

@@ -146,7 +146,7 @@ export function captionCopySource(provider: Provider, captionId: string, limits:
 /** A single explicit local command. No winner, source matching or generic duplication. */
 export function planCaptionMembershipResolution(provider: Provider, command: CaptionMembershipResolution, limits: MetadataLimits): MetadataRecordEdit[] {
   shape(command, ['kind', 'sceneId', 'captionId', 'observedMembershipIds', 'originalMembershipId', 'choice', 'eventId', 'copies']);
-  const r = candidateReader(provider, limits), guard = new ProjectRecordFields();
+  const r = candidateReader(provider, limits), guard = new ProjectRecordFields(provider.semanticProfile);
   guard.id(command.sceneId, 'scn', []); guard.id(command.captionId, 'cap', []); guard.id(command.eventId, 'evt', []);
   r.active('scenesById', command.sceneId); r.active('captionsById', command.captionId);
   const ids = r.related(edgeMap, { sceneId: command.sceneId, captionId: command.captionId });
@@ -172,8 +172,9 @@ export function planCaptionMembershipResolution(provider: Provider, command: Cap
   for (const copy of command.copies) {
     shape(copy, ['sourceMembershipId', 'captionId', 'membershipId', 'attachments', 'tags']);
     fresh(copy.captionId, 'cap'); fresh(copy.membershipId, 'scm');
-    create('captionsById', { ...source.caption, id: copy.captionId, lifecycle });
-    create(edgeMap, { ...edges.get(copy.sourceMembershipId)!, id: copy.membershipId, captionId: copy.captionId, lifecycle });
+    const { anchor, ...membership } = edges.get(copy.sourceMembershipId)!;
+    create('captionsById', { ...source.caption, ...(anchor !== undefined ? { anchor } : {}), id: copy.captionId, lifecycle });
+    create(edgeMap, { ...membership, id: copy.membershipId, captionId: copy.captionId, lifecycle });
     const children = (map: 'captionAttachmentsById' | 'captionTagMembershipsById', records: JsonObject[], copies: IdCopy[], prefix: string) => {
       r.charge(records.length + copies.length);
       if (!sameIds(copies.map(c => c.sourceId), records.map(r => r.id as string))) fail('membership-resolution-children');

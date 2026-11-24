@@ -15,7 +15,7 @@ import { createMediaViewer } from './mediaPreview';
 import { createMediaResidencyGate } from './mediaPreviewResources';
 import {createFailureDetails,failurePresentation} from './storageFeedback';
 import type { SceneUiMemory } from './navigationState';
-import { fieldValue, projectAttachments, projectCaptions, projectCaptionSceneCount, projectCaptionInventory, projectModels, projectIdentity } from './projectRead';
+import { fieldValue, projectAttachments, projectCaptions, projectCaptionSceneCount, projectCaptionInventory, projectModels, projectIdentity, sceneMembers } from './projectRead';
 import { surfaceAnchor, type ProjectWorkspacePorts, type WorkspaceFileInteraction, type WorkspacePinProposal, type WorkspaceSurface, type WorkspaceViewportState, type WorkspaceViewportPresentation, type Point3 } from './projectWorkspacePorts';
 import { createProjectModels } from './projectModels';
 import { createProjectPinScale } from './projectPinScale';
@@ -53,7 +53,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   help.setAttribute('aria-label', 'ヘルプ'); help.append(make('summary', 'ヘルプ'), introduction);
   for (const [title, text] of [
     ['はじめる', 'プロジェクトを選び、変更するときは「編集する」を選択します。シーンを切り替えても「開始シーン」は変わりません。'],
-    ['記録する', '「記録を追加」でピンを置く場所を選び、「ここに記録を作る」で確定します。点群では点を選びます。「座標で追加」ではモデル内の位置を入力できます。'],
+    ['記録する', '「新規ピンを追加」で場所を選び、矢印で調整して「ここに記録を作る」で確定します。表面が見つからない場合はモデルの原点から調整できます。'],
     ['保存と共有', 'ブラウザのデータを削除すると、再開データも失われます。「ファイルに保存」でバックアップを作れます。「共有」では全体か一部を選んで書き出せます。更新ファイルは同じプロジェクトへ取り込めます。保存先のファイルは、必要に応じてファイル欄から照合できます。'],
     ['困ったとき', '更新に失敗したら入力を保持したまま「更新を再試行」を選択します。競合は「状態を確認」から残す内容を選択します。3D表示だけに問題がある場合は「3D表示を再試行」を選択してください。'],
   ]) help.append(make('h3', title), make('p', text));
@@ -207,12 +207,18 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       pin = null; numericTarget = null; rawPosition = ['', '', '']; adjustment.open = false;
     }
     pinAction = { ...pinAction, assetId: placementModel.value || undefined };
-    invalidateGesture(); feedback = ''; render();
+    invalidateGesture(); feedback = '';
+    if (originNeedsOwner && pinAction.assetId) proposeAtOrigin(); else render();
   });
   pinArea.setAttribute('aria-label', 'ピンの操作');
-  const addPin = button('記録を追加', () => { const add = () => { if (guardInput()) { pinAction = { kind: 'add', token: provider().token, sceneId, captionId: null, assetId: visibleSelectedSurface(), color: addColorValue() }; choosing = true; placingCaption = null; render(); } };
+  const addPin = button('新規ピンを追加', () => { const add = () => { if (guardInput()) {
+    const candidates = [...candidateAssets()];
+    pinAction = { kind: 'add', token: provider().token, sceneId, captionId: null, assetId: visibleSelectedSurface() ?? (candidates.length === 1 ? candidates[0] : undefined), color: addColorValue() };
+    choosing = true; originNeedsOwner = false; placingCaption = null; render();
+  } };
     if (needsCaptionFlush()) void afterCaptionFlush(add); else add(); });
-  const addColorLabel = make('label', '追加色'), addColor = make('input'); addColor.type = 'color'; addColor.setAttribute('aria-label', '追加色'); addColorLabel.append(addColor);
+  const addColorLabel = make('label'), addColor = make('input'); addColor.type = 'color';
+  addColorLabel.className = 'lv-new-pin-color'; addColor.setAttribute('aria-label', '新しいピンの色'); addColor.title = '新しいピンの色'; addColorLabel.append(addColor);
   const numericAdd = make('details'), numericLabel = make('label', '追加先モデル'), numericModel = make('select'), beginNumeric = button('このモデルに追加', () => {
     if (!guardInput() || numericScope !== numericKey) return;
     beginSurfaceAction({ kind: 'add', token: provider().token, sceneId, captionId: null, assetId: numericModel.value, color: addColorValue() }, target => {
@@ -232,7 +238,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   });
   const movePin = button('位置を調整', () => {
     if (!guardInput()) return;
-    const caption = provider().resources.captions[memory().selectedCaptionId ?? ''], anchor = fieldValue(caption?.anchor);
+    const caption = provider().resources.captions[memory().selectedCaptionId ?? ''], anchor = fieldValue(sceneMembers(provider(), sceneId).anchors.get(caption?.id ?? ''));
     if (!caption || !anchor || fieldValue(caption.lifecycle)?.state !== 'active' || projectCaptionSceneCount(provider(), caption.id).kind !== 'value') return;
     if (anchor.kind === 'unplaced') { pinAction = { kind: 'place', token: provider().token, sceneId, captionId: caption.id, assetId: anchor.ownerAssetId }; choosing = true; placingCaption = caption.id; render(); return; }
     if (anchor.kind !== 'asset') return;
@@ -250,7 +256,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     const selected = memory().selectedCaptionId, assetId = parentTarget.value;
     if (!selected || parentIssue(assetId)) return;
     beginSurfaceAction({ kind: 'reparent', token: provider().token, sceneId, captionId: selected, assetId }, target => {
-      const position = ports.pinPositionInParent(provider().token, selected, target.assetId);
+      const position = ports.pinPositionInParent(provider().token, selected, target.assetId, sceneId);
       placingCaption = selected;
       if (position) setPin({ target, position, captionId: selected }); else choosing = true;
       feedback = position ? '現在の位置を保った仮表示です。確認して確定してください。' : '元の位置を確認できません。変更先モデルでピンを置く場所を選んでください。';
@@ -280,7 +286,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     if (!pin || !!numericTarget || choosing || mutationBlock() || composingInput() || viewport.read().dragging || !positionValid() || !pinCurrent()) return;
     const captured = pin, target = viewport.target(captured.target.assetId);
     if (!target || !sameTarget(target, captured.target)) { feedback = '表示が変わっています。場所を選び直してください。'; render(); return; }
-    const command: MetadataEdit = captured.captionId ? { kind: pinAction!.kind === 'move' ? 'movePin' : 'reparentPin', sceneId, captionId: captured.captionId, anchor: surfaceAnchor(captured) } :
+    const command: MetadataEdit = captured.captionId ? { kind: pinAction!.kind === 'move' ? 'movePin' : 'reparentPin', ...(provider().semanticProfile === 'map2' ? { scope: 'scene' as const } : {}), sceneId, captionId: captured.captionId, anchor: surfaceAnchor(captured) } :
       { kind: 'addPin', sceneId, captionId: id('cap'), membershipId: id('scm'), eventId: id('evt'), anchor: surfaceAnchor(captured), colorSrgb: colorBytes(pinAction!.color!) };
     const focusOrigin = document.activeElement;
     void run(command, () => {
@@ -298,7 +304,10 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     const origin = pinAction?.kind === 'add' ? addPin : pinAction?.kind === 'reparent' ? parentTitle : movePin;
     clearPin(); render(); origin.focus?.({preventScroll:true});
   });
-  const repick = button('場所を選び直す', () => { if (pin && !mutationBlock() && !composingInput() && pinCurrent()) { gesture = null; choosing = true; placingCaption = pin.captionId; render(); } });
+  const repick = button('場所を選び直す', () => { if (pin && !mutationBlock() && !composingInput() && pinCurrent()) { gesture = null; choosing = true; originProposal = false; placingCaption = pin.captionId; render(); } });
+  const startAtOrigin = button('原点から調整', () => {
+    if (choosing && pinCurrent() && !mutationBlock() && !composingInput()) proposeAtOrigin();
+  });
   const enterPosition = button('座標を入力', () => {
     if (!choosing || !pinAction?.assetId || !pinCurrent() || mutationBlock() || composingInput()) return;
     beginSurfaceAction(pinAction, target => { numericTarget = target; pin = null; rawPosition = ['', '', '']; choosing = false; adjustment.open = true; });
@@ -318,11 +327,14 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       task = 'captions'; compactSurface = 'stage';
     });
   });
-  const addSettings=make('details');addSettings.className='lv-caption-add-settings';addSettings.append(make('summary','追加方法'),addColorLabel,numericAdd);
-  const pinAddRow = make('div'); pinAddRow.className = 'lv-pin-add-row'; pinAddRow.append(addPin, addSettings);
+  const addSettings = make('details'); addSettings.className = 'lv-caption-advanced';
+  const advancedSummary = make('summary', '高度な編集'), advancedSheet = make('div');
+  advancedSheet.className = 'lv-record-sheet'; advancedSheet.append(numericAdd);
+  addSettings.append(advancedSummary, advancedSheet);
+  const pinAddRow = make('div'); pinAddRow.className = 'lv-pin-add-row'; pinAddRow.append(addPin, addColorLabel);
   pinArea.append(pinAddRow, movePin, parent);
   const pinTask = make('section'), pinTaskContent = make('div'), pinTaskActions = make('div'); pinTask.className = 'lv-pin-task'; pinTask.setAttribute('aria-label', '位置の調整');
-  pinTaskContent.className = 'lv-pin-task-content'; pinTaskContent.append(pinStatus, placementLabel, adjustment, enterPosition, addSurface);
+  pinTaskContent.className = 'lv-pin-task-content'; pinTaskContent.append(pinStatus, placementLabel, adjustment, startAtOrigin, enterPosition, addSurface);
   pinTaskActions.className = 'lv-pin-task-actions'; pinTaskActions.append(repick, finishPin, cancelPin); pinTask.append(pinTaskContent, pinTaskActions);
   const deletionArea = make('section'), deletionBox = make('section'), deletionTitle = make('p'), deletionEffects = make('ul'), deletionNote = make('p'), referenceIssues = make('section');
   deletionArea.setAttribute('aria-label', '記録の削除'); deletionBox.setAttribute('aria-label', '削除の確認'); deletionNote.setAttribute('role', 'status');
@@ -398,6 +410,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   let surfaceOpening: { action: PinAction; apply(target: WorkspaceSurface): void } | null = null;
   let surfaceFocus: PinAction | null = null;
   let numericTarget: WorkspaceSurface | null = null, numericKey = '', numericScope = '';
+  let originProposal = false, originNeedsOwner = false;
   let colorScope: { token: string; sceneId: string } | null = null;
   const addColors = new Map<string, string>(), addColorValue = () => addColors.get(sceneId) ?? '#a08045';
   let parentKey = '', parentScope = '';
@@ -573,10 +586,10 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       selectCaption(plan.captionId); feedback = '記録の競合・配置先・メディアの状態を確認してください。';
     }
     if (plan.kind === 'effect' && plan.action === 'showModel') {
-      const p = provider(), anchor = fieldValue(p.resources.captions[plan.captionId]?.anchor), source = projectModels(p, sceneId, projectIdentity(p), models!.hidden(), viewport.read());
+      const p = provider(), anchor = fieldValue(sceneMembers(p, sceneId).anchors.get(plan.captionId)), source = projectModels(p, sceneId, projectIdentity(p), models!.hidden(), viewport.read());
       const asset = anchor?.kind === 'asset' && source.kind === 'ready' ? source.items.find(a => a.id === anchor.assetId) : undefined;
       if (asset?.lifecycle.kind !== 'value' || asset.lifecycle.value !== 'active' || asset.membership.kind !== 'value' ||
-        p.resources.assets[asset.id]?.projection.kind !== 'value' || !projectCaptions(p, sceneId, models!.hidden()).some(c => c.id === plan.captionId && c.pin === 'ownerHidden')) { feedback = 'モデルの所属と状態を確認してください。'; render(); return; }
+        !projectCaptions(p, sceneId, models!.hidden()).some(c => c.id === plan.captionId && c.pin === 'ownerHidden')) { feedback = 'モデルの所属と状態を確認してください。'; render(); return; }
       if (asset.membership.value.kind === 'included') { models!.show(asset.id); feedback = 'モデルを表示しました。'; }
       else if (!mutationBlock()) { void run({ kind: 'include', sceneId, resourceKind: 'asset', resourceId: asset.id, membershipId: id('sam'), eventId: id('evt'), orderKey: ports.viewOrder(null, null) },
         () => { models!.show(asset.id); feedback = 'このシーンにモデルを追加して表示しました。'; }); return; }
@@ -731,21 +744,21 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     includeMemories.set(sceneId, select.memory);
     changeInclusion(planCaptionInclude(includeContext(), { kind: 'exclude' }), true);
   });
-  const recordTools=make('div');recordTools.className='lv-record-tools';recordTools.setAttribute('aria-label','選択した記録の操作');recordTools.append(movePin,parent,excludeSelected);
-  addSettings.insertBefore(inclusion.root, addColorLabel);
-  editOnly(excludeSelected, inclusion.root);
+  const recordTools=make('div');recordTools.className='lv-record-tools';recordTools.setAttribute('aria-label','選択した記録の操作');recordTools.append(movePin,addSettings);
+  advancedSheet.append(inclusion.root, parent, excludeSelected);
+  editOnly(addSettings, excludeSelected, inclusion.root);
   const captionToolbar=make('div');captionToolbar.className='lv-caption-toolbar';
   captionToolbar.append(pinArea,list.root.children[0]!);list.root.insertBefore(captionToolbar,list.root.children[0]??null);
-  list.tools.append(recordTools);addPin.className='lv-caption-add';addPin.setAttribute('aria-label','記録を追加');editOnly(movePin,parent);
+  list.tools.append(recordTools);addPin.className='lv-caption-add';editOnly(movePin,parent);
   captionPanel.className='lv-caption-task';
-  const recordSheets=new Map<HTMLDetailsElement,HTMLElement>();
-  function registerRecordSheet(disclosure: HTMLDetailsElement, existing?: HTMLElement) {
-    const sheet=existing??make('div');sheet.className='lv-record-sheet';if(!existing){for(const child of Array.from(disclosure.children).slice(1))sheet.append(child);disclosure.append(sheet);}recordSheets.set(disclosure,sheet);
-    disclosure.addEventListener('toggle',()=>{if(disclosure.open)for(const other of recordSheets.keys())if(other!==disclosure&&!other.contains(disclosure)&&!disclosure.contains(other)&&!composingInput())other.open=false;positionRecordSheets();});
-    disclosure.addEventListener('click',event=>{if((event.target as Element)?.closest?.('summary')&&composingInput())event.preventDefault();});
-    disclosure.addEventListener('keydown',event=>{if(event.key==='Escape'&&!event.isComposing&&!composingInput()&&!busy&&!pending&&!ports.otherPending()){event.preventDefault();disclosure.open=false;(disclosure.children[0] as HTMLElement).focus?.({preventScroll:true});}});
-  }
-  for (const disclosure of [addSettings, parent]) registerRecordSheet(disclosure);
+  addSettings.addEventListener('toggle', positionRecordSheets);
+  addSettings.addEventListener('click', event => {
+    if ((event.target as Element)?.closest?.('summary') && composingInput()) event.preventDefault();
+  });
+  addSettings.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || event.isComposing || composingInput() || busy || pending || ports.otherPending()) return;
+    event.preventDefault(); addSettings.open = false; advancedSummary.focus?.({ preventScroll: true });
+  });
   const refreshPicker = () => {
     if (addSettings.open && inclusion.root.open && !disposed) inclusion.render(includeContext());
   };
@@ -753,18 +766,17 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   inclusion.root.addEventListener('toggle', refreshPicker);
   addSettings.addEventListener('toggle', refreshPicker);
   function positionRecordSheets(){
-    const win=document.defaultView;if(!win)return;
-    for(const [owner,sheet] of recordSheets){if(!owner.open)continue;const rect=owner.getBoundingClientRect?.();if(!rect)continue;
+    const win=document.defaultView, sheet=advancedSheet; if(!win || !addSettings.open)return;
+    const rect=advancedSummary.getBoundingClientRect?.(); if(!rect)return;
       const width=Math.min(380,Math.max(120,win.innerWidth-24)),above=win.innerHeight-rect.bottom<180&&rect.top>win.innerHeight/2;
       const max=Math.max(100,Math.min(420,above?rect.top-20:win.innerHeight-rect.bottom-20));
       sheet.style.width=`${width}px`;sheet.style.left=`${Math.max(12,Math.min(win.innerWidth-width-12,rect.right-width))}px`;sheet.style.maxHeight=`${max}px`;
       sheet.style.top=above?'auto':`${rect.bottom+8}px`;sheet.style.bottom=above?`${win.innerHeight-rect.top+8}px`:'auto';
-    }
   }
   const closeRecordSheets=(event:Event)=>{
     if(composingInput())return;
     const target=event.target as Node|null;if(!target)return;
-    for(const owner of recordSheets.keys())if(owner.open&&!owner.contains(target))owner.open=false;
+    if(addSettings.open && !addSettings.contains(target))addSettings.open=false;
   };
   document.addEventListener?.('pointerdown',closeRecordSheets,true);
   document.addEventListener?.('focusin',closeRecordSheets);
@@ -957,7 +969,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   stageDisplay.append(windows.root);
   models = createProjectModels(document, panelHost); panels.set('models', models);
   pinScale = createProjectPinScale(document,panelHost); panels.set('captions',pinScale);
-  recordTools.append(pinScale.root); registerRecordSheet(pinScale.root,pinScale.body);
+  list.root.insertBefore(pinScale.root, list.list);
   const drawingNotice = make('p'); drawingNotice.className = 'lv-drawing-notice';
   const views=createProjectViews(document,panelHost), materials=createProjectMaterials(document,panelHost,drawingNotice);panels.set('views',views);panels.set('materials',materials);
   const cameraPositions=make('details'),cameraSheet=make('div');cameraPositions.className='lv-camera-positions';cameraPositions.setAttribute('aria-label','カメラ位置');
@@ -1009,8 +1021,21 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     if (openWindow) openCaptionWindow(captionId);
     captionSurface = 'detail';
   }
-  function setPin(next: WorkspacePinProposal) { pin = next; numericTarget = null; choosing = false; rawPosition = next.position.map(String);parent.open=false;numericAdd.open=false;addSettings.open=false; }
-  function clearPin() { compactSurface = 'panel'; gesture = null; gestureGeneration++; pin = null; numericTarget = null; pinAction = null; surfaceOpening = null; surfaceFocus = null; choosing = false; placingCaption = null; rawPosition = ['', '', '']; adjustment.open = false; }
+  function setPin(next: WorkspacePinProposal) { pin = next; originProposal = false; originNeedsOwner = false; numericTarget = null; choosing = false; rawPosition = next.position.map(String);parent.open=false;numericAdd.open=false;addSettings.open=false; }
+  function proposeAtOrigin() {
+    if (pinAction?.kind !== 'add') return;
+    const assets = [...candidateAssets()];
+    const assetId = pinAction.assetId ?? (assets.length === 1 ? assets[0] : undefined);
+    if (!assetId) {
+      originNeedsOwner = true;
+      feedback = '原点を使うモデルを選んでください。'; render(); placementModel.focus(); return;
+    }
+    originNeedsOwner = false;
+    beginSurfaceAction({ ...pinAction, assetId }, target => {
+      setPin({ target, position: [0, 0, 0], captionId: null }); originProposal = true;
+    });
+  }
+  function clearPin() { originNeedsOwner = false; originProposal = false; compactSurface = 'panel'; gesture = null; gestureGeneration++; pin = null; numericTarget = null; pinAction = null; surfaceOpening = null; surfaceFocus = null; choosing = false; placingCaption = null; rawPosition = ['', '', '']; adjustment.open = false; }
   function candidateAssets() {
     const p = provider(), resolved = resolveScene(p.state, p.resources, sceneId);
     return new Set(resolved.kind === 'ready' ? resolved.composition.assets.filter(a => !models?.hidden().includes(a.assetId)).map(a => a.assetId) : []);
@@ -1038,13 +1063,13 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   function pinCurrent() {
     if (!pinAction || pinAction.token !== provider().token || pinAction.sceneId !== sceneId || pinAction.captionId && pinAction.captionId !== memory().selectedCaptionId) return false;
     if (pinAction.captionId) { const caption = provider().resources.captions[pinAction.captionId];
-      if (fieldValue(caption?.lifecycle)?.state !== 'active' || caption?.anchor.kind !== 'value' || projectCaptionSceneCount(provider(), pinAction.captionId).kind !== 'value') return false;
+      if (fieldValue(caption?.lifecycle)?.state !== 'active' || sceneMembers(provider(), sceneId).anchors.get(pinAction.captionId)?.kind !== 'value' || projectCaptionSceneCount(provider(), pinAction.captionId).kind !== 'value') return false;
     }
     const target = pin?.target ?? numericTarget;
     return !target || (!pinAction.assetId || target.assetId === pinAction.assetId) && !!viewport.target(target.assetId) && sameTarget(viewport.target(target.assetId)!, target);
   }
   function parentIssue(assetId: string) {
-    const p = provider(), selected = memory().selectedCaptionId, caption = selected ? p.resources.captions[selected] : undefined, anchor = fieldValue(caption?.anchor);
+    const p = provider(), selected = memory().selectedCaptionId, caption = selected ? p.resources.captions[selected] : undefined, anchor = fieldValue(sceneMembers(p, sceneId).anchors.get(selected ?? ''));
     if (!caption || !anchor || fieldValue(caption.lifecycle)?.state !== 'active' || anchor.kind === 'unplaced') return 'ピンの状態を確認してください。';
     if (projectCaptionSceneCount(p, caption.id).kind !== 'value') return '影響するシーンを確認してください。';
     if (anchor.kind === 'asset' && anchor.assetId === assetId) return '別の配置先モデルを選択してください。';
@@ -1052,7 +1077,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     return candidateAssets().has(assetId) ? null : '変更先モデルをこのシーンに表示し、状態を確認してください。';
   }
   function renderCaptionActions() {
-    const p = provider(), selected = memory().selectedCaptionId, caption = selected ? p.resources.captions[selected] : undefined, anchor = fieldValue(caption?.anchor), blocked = mutationBlock();
+    const p = provider(), selected = memory().selectedCaptionId, caption = selected ? p.resources.captions[selected] : undefined, anchor = fieldValue(sceneMembers(p, sceneId).anchors.get(selected ?? '')), blocked = mutationBlock();
     const candidates = candidateAssets();
     const targets = Object.values(p.resources.assets).filter(a => fieldValue(a.lifecycle)?.state === 'active' && (anchor?.kind !== 'asset' || a.id !== anchor.assetId)).map(a => ({ id: a.id,
       label: fieldValue(p.details.mutable.assetsById[a.id]?.label) as string | undefined, target: candidates.has(a.id) }));
@@ -1319,7 +1344,14 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       if (!read.ready || read.dragging || read.token !== down.token || read.pickToken !== down.receipt || provider().token !== down.token ||
         rect.left !== down.left || rect.top !== down.top || rect.width !== down.width || rect.height !== down.height) return;
       try { const hit = viewport.pick(event.clientX - rect.left, event.clientY - rect.top, pinAction ? pinAction.assetId : visibleSelectedSurface(), direct);
-        if (!hit) { feedback = addSurface.hidden ? 'この場所にはピンを置けません。別の場所を選んでください。' : ''; render(); return; }
+        if (!hit) {
+          const after = viewport.read();
+          if (!after.ready || after.dragging || after.token !== down.token || after.pickToken !== down.receipt ||
+              provider().token !== down.token || sceneId !== down.sceneId) return;
+          if (!direct && pinAction?.kind === 'add') proposeAtOrigin();
+          else { feedback = 'この場所にはピンを置けません。別の場所を選んでください。'; render(); }
+          return;
+        }
         if (pinAction?.assetId && hit.target.assetId !== pinAction.assetId || hit.target.token !== provider().token || hit.target.sceneId !== sceneId || !hit.position.every(Number.isFinite)) return;
         if (direct) { pinAction = { kind: 'add', token: down.token, sceneId, captionId: null, color: down.color }; placingCaption = null; }
         setPin({ ...hit, point: pinAction?.kind === 'reparent' ? undefined : hit.point, captionId: placingCaption }); render();
@@ -1552,7 +1584,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
         textOnly: readDuringOutput(),
         cancelBlock: pending?.owner === 'media' && canCancelMedia() ? null :
           mutationBlock() || (pickerScope || panelInput() || mediaManager?.hasChanges() ? '現在の入力・操作を完了してください。' : null),
-        editorFields: memory().selectedCaptionId ? ports.captionEditors?.(memory().selectedCaptionId!) : undefined,
+        editorFields: memory().selectedCaptionId ? ports.captionEditors?.(memory().selectedCaptionId!, sceneId) : undefined,
       });
       updateCaptionNavigation(captionList);
       const windowsVisible = !mobileLayout?.matches && stageVisible() && !inlinePreview() && document.hidden !== true;
@@ -1562,7 +1594,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       addPin.disabled = (!!blocked || dirty()) && !canFlushCaption() || !sceneId;
       movePin.disabled = !!blocked || dirty() || !selected;movePin.hidden=!selected;
       excludeSelected.hidden = !selected; excludeSelected.disabled = !!blocked || dirty();
-      movePin.textContent = selected && fieldValue(p.resources.captions[selected]?.anchor)?.kind === 'unplaced' ? 'ピンを配置' : '位置を調整';
+      movePin.textContent = selected && fieldValue(sceneMembers(p, sceneId).anchors.get(selected))?.kind === 'unplaced' ? 'ピンを配置' : '位置を調整';
       const pinActive = !!pinAction || !!pin || !!numericTarget || choosing;
       if (pinTask.hidden && pinActive) {
         compactSurface = 'stage'; const opening = pinAction;
@@ -1588,18 +1620,21 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
         }
       }
       const shapes = [...placementShapes.values()], chosen = pinAction?.assetId;
-      placementLabel.hidden = !choosing || pinAction?.kind !== 'add' || !shapes.includes('gs') || (!!chosen && shapes.length === 1);
+      placementLabel.hidden = !choosing || pinAction?.kind !== 'add' || shapes.length < 2;
       placementModel.disabled = !!blocked || !pinCurrent(); placementModel.value = chosen ?? '';
+      startAtOrigin.hidden = !choosing || pinAction?.kind !== 'add';
+      startAtOrigin.disabled = !!blocked || !pinCurrent() || !chosen;
       const gsTarget = choosing && chosen ? ports.modelDetails(sceneId,chosen)?.gsProxyTarget : undefined;
       addSurface.hidden = !gsTarget || gsTarget.expectedProxyId !== null; enterPosition.hidden = addSurface.hidden;
       addSurface.disabled = enterPosition.disabled = !!blocked || !pinCurrent();
       const onlyPoints = chosen ? placementShapes.get(chosen) === 'point' : shapes.length > 0 && shapes.every(shape => shape === 'point');
-      const locationHint = !addSurface.hidden ? '画面から場所を選ぶには、ピン配置用モデルが必要です。' :
-        !chosen && !placementLabel.hidden ? (shapes.every(shape => shape === 'gs') ? '記録するモデルを選んでください。' : 'モデル上で場所を選んでください。GSに置く場合は先にモデルを選びます。') :
+      const locationHint = originNeedsOwner && !chosen ? '原点を使うモデルを選んでください。' :
+        !addSurface.hidden ? (pinAction?.kind === 'add' ? '場所を選ぶとモデルの原点に仮置きします。表面に置くにはピン配置用モデルを選んでください。' : '表面に置くにはピン配置用モデルを選んでください。') :
+        !chosen && !placementLabel.hidden && shapes.includes('gs') ? (shapes.every(shape => shape === 'gs') ? '記録するモデルを選んでください。' : 'モデル上で場所を選んでください。GSに置く場合は先にモデルを選びます。') :
         onlyPoints ? 'ピンを置きたい点を選んでください。' : 'モデル上で、ピンを置きたい場所を選んでください。';
-      pinStatus.textContent = [pinAction && !pinCurrent() ? '対象が更新されています。取り消して選び直してください。' : surfaceOpening ? 'モデルを準備しています。準備後に位置を表示します。' : choosing ? locationHint : pin ? 'ピンの位置を確認してください。' : numericTarget ? 'X・Y・Zを入力してください。' : '',
+      pinStatus.textContent = [pinAction && !pinCurrent() ? '対象が更新されています。取り消して選び直してください。' : surfaceOpening ? 'モデルを準備しています。準備後に位置を表示します。' : choosing ? locationHint : pin ? originProposal ? 'モデルの原点に仮置きしました。矢印で位置を調整できます。' : '矢印でピンの位置を調整できます。' : numericTarget ? 'X・Y・Zを入力してください。' : '',
         choosing ? viewport.read().placementNotice : null,
-        pinAction?.kind === 'reparent' && count?.kind === 'value' ? `${count.value}シーンに反映されます。変更先モデルがないシーンでは一覧のみになります。` : ''].filter(Boolean).join(' ');
+        pinAction?.kind === 'reparent' && count?.kind === 'value' && count.value > 1 ? (p.semanticProfile === 'map2' ? 'ピンの位置はこのシーンだけで変わります。' : `${count.value}シーンに反映されます。変更先モデルがないシーンでは一覧のみになります。`) : ''].filter(Boolean).join(' ');
       coordinateInputs.forEach((input, i) => { input.disabled = !!blocked || !pinCurrent(); if (!composing) input.value = rawPosition[i]!; });
       const focus = surfaceFocus; surfaceFocus = null;
       if (focus && pinAction === focus && pinCurrent() && document.activeElement === pinTask && !adjustment.hidden && !composingInput()) {
@@ -1712,6 +1747,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       cameraGizmo.render(cameraState);
       const focusedMarker = markerNodes.has(document.activeElement as HTMLButtonElement) ? document.activeElement as HTMLButtonElement : null;
       const activeMarkers = new Set<string>(), markerChildren: HTMLElement[] = [];
+      const previewPinScale = pinScale?.previewScale();
+      const previewAnchors = previewPinScale == null ? undefined : sceneMembers(p, sceneId).anchors;
       for (const projected of seen.pins) if (seen.ready && seen.token === p.token && seen.sceneId === sceneId &&
         (projected.visible || markerNavigation?.node === markerById.get(`${sceneId}:${projected.id}`)) && Number.isFinite(projected.x) && Number.isFinite(projected.y)) {
         const caption = p.resources.captions[projected.id]; if (!caption) continue;
@@ -1726,7 +1763,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
         marker.hidden=false;marker.className = 'lv-project-marker'; marker.style.left = `${projected.x}px`; marker.style.top = `${projected.y}px`;
         marker.style.opacity = projected.visible ? '' : '0';
         marker.style.transform = 'translate(-50%, -50%)';
-        marker.style.setProperty?.('--lv-pin-scale', String(projected.scale ?? 1));
+        const editingModelPin = fieldValue(previewAnchors?.get(projected.id))?.kind === 'asset';
+        marker.style.setProperty?.('--lv-pin-scale', String((editingModelPin ? previewPinScale : null) ?? projected.scale ?? 1));
         marker.setAttribute('data-review', String(projected.status === 'needsReview'));
         marker.style.setProperty?.('--lv-pin-color', projected.color ?? '#a08045');
         if (projected.status === 'needsReview') {

@@ -127,7 +127,7 @@ for (const touch of [false, true])
         await expect(canvas).toHaveAttribute('aria-busy', 'false');
         await lookAlongFront(page);
         await revealCaptionList(page);
-        await action(page, '記録を追加').click();
+        await action(page, '新規ピンを追加').click();
         const task = page.getByRole('region', { name: '位置の調整', ...exact });
         if (kind === 'GS') {
           const target = task.getByLabel('記録するモデル', exact);
@@ -140,7 +140,7 @@ for (const touch of [false, true])
           await expect(action(page, 'ここに記録を作る')).toBeEnabled();
           await task.getByRole('button', { name: '取り消す', ...exact }).click();
           await expect(page.locator('.lv-caption-select')).toHaveCount(0);
-          await action(page, '記録を追加').click();
+          await action(page, '新規ピンを追加').click();
           await target.selectOption({ label: '外板.ply' });
           const pick = page.waitForEvent('filechooser');
           await action(page, 'ピン配置用モデルを選ぶ').click();
@@ -246,7 +246,7 @@ for (const touch of [false, true])
         await existing.getByRole('button', { name: 'このシーンに追加', ...exact }).click();
         await status(page, 'このシーンに追加しました。');
         await expect(existing).toHaveJSProperty('open', false);
-        await expect(page.locator('.lv-caption-add-settings > summary')).toBeFocused();
+        await expect(page.locator('.lv-caption-advanced > summary')).toBeFocused();
         await selectRecord(page);
         await detail(page).getByLabel('本文', exact).fill(sharedBody);
         await finishCaptionEditing(page, {}, 15000);
@@ -587,7 +587,6 @@ for (const touch of [false, true])
         if (!touch && kind === '点群') {
           const filter = reader.locator('.lv-caption-colors');
           const color = filter.getByRole('button', { name: /のピン$/ }).first();
-          await reader.locator('.lv-caption-color-menu > summary').click();
           await color.click();
           await expect(reader.locator('.lv-caption-select')).toHaveCount(0);
           await scenes.selectOption({ label: 'シーン 1' });
@@ -595,7 +594,6 @@ for (const touch of [false, true])
           await scenes.selectOption({ label: reviewSceneName });
           await expect(reader).toBeVisible();
           await expect(reader.locator('.lv-caption-select')).toHaveCount(0);
-          await reader.locator('.lv-caption-color-menu > summary').click();
           await color.click();
           await expect(selectedPin).toHaveAccessibleName(sharedTitle);
         }
@@ -643,7 +641,7 @@ test('配置用モデルのないGSに座標で記録し、再開して元の位
   await chooseHomeFiles(page, { name: '外板.ply', mimeType: 'application/octet-stream', buffer: gs });
   await action(page, 'プロジェクトを作成').click();
   await expect(action(page, '閲覧する')).toBeEnabled({ timeout: 90000 });
-  await action(page, '記録を追加').click();
+  await action(page, '新規ピンを追加').click();
   const task = page.getByRole('region', { name: '位置の調整', ...exact });
   await task.getByLabel('記録するモデル', exact).selectOption({ label: '外板.ply' });
   await action(page, '座標を入力').click();

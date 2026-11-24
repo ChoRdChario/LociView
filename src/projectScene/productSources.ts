@@ -11,13 +11,13 @@ import { sceneNameCandidates } from '../projectMetadata/sceneAuthoring';
 import { defaultSceneCandidates } from '../projectMetadata/startupScene';
 import { captionFieldCandidates, attachmentFieldCandidates, attachmentLifecycleRecovery } from '../projectMetadata/captionCandidates';
 import { captionLifecycleRecovery, captionLifecycleConfirmation } from '../projectMetadata/captionDeletion';
-import { planMetadataEdit } from '../projectMetadata/commands';
+import { planMetadataEdit, scenePlacementChoices } from '../projectMetadata/commands';
 import { assetCopySource, prepareAssetMembershipCopy } from '../projectMetadata/modelMembership';
 import { entryViewCandidates, viewFieldCandidates } from '../projectMetadata/viewResolution';
 import { newId } from '../projectMetadata/persistence';
 import type { MaterialRecordPort, MaterialSource } from '../ui/projectScene/materialState';
 import type { ProjectWorkspacePorts, WorkspaceModelDetails, WorkspaceMaterialReview, WorkspaceRecoveryGroup } from '../ui/projectScene/projectWorkspacePorts';
-import { fieldValue, projectAttachments } from '../ui/projectScene/projectRead';
+import { fieldValue, projectAssetMembership, projectAttachments, sceneMembers } from '../ui/projectScene/projectRead';
 import { metadataViewData } from './metadataViews';
 import { entryKey, viewKey, orderBetween } from './viewDisplay';
 import { viewLabel, viewDescription } from './viewCandidateLabels';
@@ -105,10 +105,16 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
         planMetadataEdit(p, command, host.limits); return command;
       },
     },
-    captionEditors(captionId) {
+    captionEditors(captionId, sceneId) {
       const p = provider(), names = new Map(host.read().source?.editorDeclarations().map(d => [d.changeId, d.declaration.editor.name]));
-      return Object.entries({ title: 'タイトル', body: '本文', anchor: 'ピン位置', colorSrgb: 'ピンの色' }).map(([field, label]) => ({ label,
-        names: p.inspection.candidates.fields.find(f => f.path[0] === 'captionsById' && f.path[1] === captionId && f.path[2] === field)?.candidates.map(c => names.get(c.changeId) ?? null) ?? [null] }));
+      const membershipId = sceneMembers(p, sceneId).captionMembershipIds.get(captionId);
+      const editors = (map: string, id: string, field: string) => p.inspection.candidates.fields.find(f => f.path[0] === map && f.path[1] === id && f.path[2] === field)?.candidates;
+      return Object.entries({ title: 'タイトル', body: '本文', anchor: 'ピン位置', colorSrgb: 'ピンの色' }).map(([field, label]) => {
+        const shared = editors('captionsById', captionId, field);
+        const local = field === 'anchor' && membershipId ? editors('sceneCaptionMembershipsById', membershipId, field) : undefined;
+        const credits = (candidates: typeof shared) => candidates?.map(c => names.get(c.changeId) ?? null) ?? [null];
+        return { label, names: local?.length ? local.flatMap(c => c.value.kind === 'absent' ? credits(shared) : [names.get(c.changeId) ?? null]) : credits(shared) };
+      });
     },
     recovery() {
       const p = provider(), groups: WorkspaceRecoveryGroup[] = [];
@@ -149,6 +155,37 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
               label: `候補 ${i + 1}：${c.value.kind === 'value' && typeof c.value.value === 'string' ? sceneLabel(c.value.value) : '参照先を確認'}` })) });
         }
         if (field.path.length !== 3 || field.candidates.length < 2) continue;
+        if ((map === 'sceneAssetMembershipsById' && name === 'bindingId') || (map === 'sceneCaptionMembershipsById' && name === 'anchor')) {
+          const id = recordId!, row = p.details.mutable[map][id];
+          const scene = fieldValue(row?.sceneId), member = fieldValue(row?.[name === 'anchor' ? 'captionId' : 'assetId']);
+          const sceneId = typeof scene === 'string' ? scene : '', resourceId = typeof member === 'string' ? member : '';
+          let ready = false;
+          try { scenePlacementChoices(p, sceneId, id, name, host.limits); ready = true; } catch { /* An incomplete set stays visible and cannot be applied. */ }
+          const pin = name === 'anchor', label = pin ? captionLabel(resourceId) : String(fieldValue(p.details.mutable.assetsById[resourceId]?.label) ?? 'モデル');
+          groups.push({
+            key: `${map}/${id}/${name}`, label: `${sceneLabel(sceneId)}／${label}の${pin ? 'ピン位置' : 'モデル配置'}`, ready,
+            target: pin ? { kind: 'scenePin', sceneId, membershipId: id, captionId: resourceId } : { kind: 'scenePlacement', sceneId, membershipId: id },
+            note: 'このシーンに残す内容を選んでください。',
+            choices: field.candidates.map((candidate, index) => {
+              const raw = candidate.value.kind === 'value' ? candidate.value.value : undefined;
+              let description = '確認が必要な候補';
+              let anchor: import('../scene/types').Anchor | undefined;
+              if (ready && raw === undefined) description = '元の設定を継承';
+              else if (ready && pin && raw && typeof raw === 'object') {
+                anchor = raw as unknown as import('../scene/types').Anchor; description = describe('anchor', anchor);
+              } else if (ready && !pin && typeof raw === 'string') {
+                const binding = fieldValue(p.details.immutable.assetBindingsById[raw]);
+                if (binding) {
+                  const placement = binding.assetToProject as unknown as WorkspaceModelDetails['placement'];
+                  const revision = String(binding.assetRevisionId).slice(-8);
+                  description = `位置 ${placement.translation.join(' / ')}、回転 ${rotationDegrees(placement.rotationXYZW).join(' / ')}°、倍率 ${placement.uniformScale}（版 ${revision}）`;
+                }
+              }
+              return { id: candidate.operationId, label: `候補 ${index + 1}：${description}`, ...(anchor ? { anchor } : {}), editorName: editorNames.get(candidate.changeId) ?? null };
+            })
+          });
+          continue;
+        }
         if (map === 'captionAttachmentsById' && (name === 'altText' || name === 'orderKey')) {
           const attachmentId = recordId!, row = p.details.mutable.captionAttachmentsById[attachmentId], owner = fieldValue(row?.captionId);
           const captionId = typeof owner === 'string' ? owner : ''; let ready = false;
@@ -230,16 +267,19 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
     },
     mediaDescription: normalizeAlt,
     captionDeletion: (token, captionId) => host.authority.captionDeletionImpact!(token, captionId),
-    pinPositionInParent(token, captionId, assetId) {
+    pinPositionInParent(token, captionId, assetId, sceneId) {
       const p = provider(), snapshot = host.authority.read();
       if (p.token !== token || snapshot.state.token !== token) throw Error('対象が更新されています。取り消して選び直してください。');
       if (!snapshot.modelVersions?.length || !snapshot.modelVersions.some(v => v.assetId === assetId && isSavedModel(v.closure))) return null;
-      return pinPositionInParent(snapshot, captionId, assetId);
+      return pinPositionInParent(snapshot, captionId, assetId, sceneId, id => {
+        if (!sceneId || p.issues.some(issue => issue.code === 'concurrent-delete-edit' && issue.path[0] === 'assetsById' && issue.path[1] === id)) return;
+        return fieldValue(projectAssetMembership(p, sceneId, id))?.kind;
+      });
     },
     modelDetails(sceneId, assetId) {
       const p = provider(), snapshot = host.authority.read(); if (p.token !== snapshot.state.token) return null;
-      const asset = p.resources.assets[assetId], projection = asset?.projection;
-      const version = projection?.kind === 'value' ? snapshot.modelVersions?.find(v => v.assetId === assetId && v.projection.bindingId === projection.value.bindingId) : undefined;
+      const binding = sceneMembers(p, sceneId).bindings.get(assetId);
+      const version = binding && snapshot.modelVersions?.find(v => v.assetId === assetId && v.projection.bindingId === binding.bindingId);
       if (!version || !isSavedModel(version.closure)) return null;
       let original = version.closure.binding as JsonObject, importedPlacement: WorkspaceModelDetails['importedPlacement'];
       const visited = new Set<string>();
@@ -250,9 +290,11 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
       }
       if (!original.parentBindingId && original.method === 'import') importedPlacement = original.assetToProject as unknown as WorkspaceModelDetails['placement'];
       const ids = new Set<string>(); let uncertain = false;
-      for (const fields of Object.values(p.details.mutable.sceneAssetMembershipsById)) {
-        if ((fieldValue(fields.lifecycle) as JsonObject | undefined)?.state === 'deleted') continue;
+      const deletedWhileEdited = new Set(p.issues.filter(i => i.code === 'concurrent-delete-edit' && i.path[0] === 'sceneAssetMembershipsById').map(i => i.path[1]));
+      for (const [edgeId, fields] of Object.entries(p.details.mutable.sceneAssetMembershipsById)) {
         const owner = fieldValue(fields.assetId); if (typeof owner === 'string' && owner !== assetId) continue;
+        if (deletedWhileEdited.has(edgeId)) uncertain = true;
+        if ((fieldValue(fields.lifecycle) as JsonObject | undefined)?.state === 'deleted') continue;
         const scene = fieldValue(fields.sceneId);
         if (owner !== assetId || typeof scene !== 'string' || (fieldValue(fields.lifecycle) as JsonObject | undefined)?.state !== 'active' || ids.has(scene)) uncertain = true;
         else ids.add(scene);
@@ -280,7 +322,7 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
       return { statuses, memberships: assetMembershipGroups(p, host.limits).filter(g => g.sceneId === sceneId).map(group => {
         const name = String(fieldValue(p.details.mutable.assetsById[group.assetId]?.label) ?? '名称を確認するモデル');
         const scene = fieldValue(p.state.scenes[sceneId]?.name) ?? '名称を確認するシーン';
-        let copyReady = false; try { assetCopySource(p, sceneId, group.assetId, host.limits); copyReady = true; } catch { /* Keep-one does not require a complete copy. */ }
+        let copyReady = false; try { for (const id of group.edgeIds) assetCopySource(p, sceneId, group.assetId, host.limits, id); copyReady = true; } catch { /* Keep-one does not require a complete copy. */ }
         return { ...group, label: `${scene}：${name}の重複登録`, copyReady,
           note: `同じモデルへの登録が${group.edgeIds.length}件あります。選んだ登録が元のモデルを引き継ぎます。` + (copyReady ?
             '「両方残す」では、他方をこのシーンだけの独立したモデルにします。現在の配置・材質を引き継ぎ、別々に変更できます。既存の記録は元のモデルに残ります。' :
@@ -294,8 +336,9 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
       const base = { kind: 'resolveAssetMembership' as const, sceneId, assetId, observedMembershipIds: [...observedIds], originalMembershipId: keepId, choice, eventId: `evt_${newId()}` };
       planAssetMembershipResolution(p, { ...base, choice: 'one' }, host.limits);
       if (choice === 'one') return base;
-      const source = assetCopySource(p, sceneId, assetId, host.limits);
-      return { ...base, copies: await Promise.all(observedIds.filter(id => id !== keepId).map(id => prepareAssetMembershipCopy(source, id, prefix => `${prefix}_${newId()}`))) };
+      const copies = await Promise.all(observedIds.filter(id => id !== keepId).map(id =>
+        prepareAssetMembershipCopy(assetCopySource(p, sceneId, assetId, host.limits, id), id, prefix => `${prefix}_${newId()}`)));
+      return { ...base, copies };
     },
     viewOrder: orderBetween,
     viewReview(sceneId) {
@@ -333,8 +376,8 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
       const base = { token: p.token, sceneId, projectId: snapshot.projectId!, semanticProfile: p.semanticProfile, limits: materialLimits };
       const source: MaterialSource = snapshot.state.token !== p.token ? { ...base, kind: 'unavailable', reason: '表示の更新を再試行してください。' } :
         { ...base, kind: 'ready', models: Object.values(p.resources.assets).filter(a => !(a.lifecycle.kind === 'value' && a.lifecycle.value.state === 'deleted')).map(asset => {
-          const projection = asset.projection;
-          const version = projection.kind === 'value' ? snapshot.modelVersions?.find(v => v.assetId === asset.id && v.projection.bindingId === projection.value.bindingId) : undefined;
+          const binding = sceneMembers(p, sceneId).bindings.get(asset.id);
+          const version = binding && snapshot.modelVersions?.find(v => v.assetId === asset.id && v.projection.bindingId === binding.bindingId);
           const name = p.details.mutable.assetsById[asset.id]!.label as Field<string>;
           if (!version || !isSavedModel(version.closure)) return { assetId: asset.id, name, surfaces: { kind: 'unresolved', reason: 'conflict' }, reason: 'モデルの状態を確認してください。' };
           return { assetId: asset.id, name, reason: null, surfaces: value(validationMaterialSlots(version.closure).map(slot => ({
@@ -354,7 +397,8 @@ export function productSources(host: ReturnType<typeof createValidationModeHost>
           const bucket = canonicalDisplay(context.routing), duplicate = !seen.has(bucket); seen.add(bucket);
           if (appearance.length < 2 && compositing.length < 2 && (!duplicate || context.ids.length < 2)) continue;
           const describe = (field: 'appearance' | 'compositing', value: JsonObject) => describeMaterialCandidate(field, canonicalDisplay(value), snapshot);
-          const target = context.routing.target as JsonObject, version = snapshot.modelVersions?.find(v => v.assetId === target.assetId);
+          const target = context.routing.target as JsonObject, binding = sceneMembers(p, sceneId).bindings.get(String(target.assetId));
+          const version = binding && snapshot.modelVersions?.find(v => v.assetId === target.assetId && v.projection.bindingId === binding.bindingId);
           const slot = version && isSavedModel(version.closure) ? validationMaterialSlots(version.closure).find(s => canonicalDisplay(s.target) === canonicalDisplay(target))?.name : undefined;
           review.push({ key: `${bucket}/${id}`, token: p.token, sceneId, overrideId: id, label: `${snapshot.modelNames[target.assetId as string] ?? 'モデル'}／${slot ?? '面を確認してください'}／${(context.routing.scope as JsonObject).kind === 'scene' ? 'このシーンだけ' : 'プロジェクト共通'}`,
             appearance: appearance.map(a => ({ operationId: a.operationId, label: describe('appearance', a.value) })),

@@ -261,6 +261,21 @@ describe('explicit metadata semantic profiles', () => {
     expect(dep.kind).toBe('scene-provider'); if (dep.kind !== 'scene-provider') throw Error('provider');
     expect(dep.issues.some(i => i.code === 'concurrent-delete-edit' && i.path[0] === 'assetsById' && i.path[1] === id('ast'))).toBe(true);
     expect(() => deleteEdit.prepareEdit(deleteEdit.token, edit, dep, tx)).toThrow();
+    const all = { kind: 'setProjectPinScale' as const, pinScale: 2 };
+    expect(() => conflict.prepareEdit(conflict.token, all, cp, tx)).toThrow();
+    expect(() => deleteEdit.prepareEdit(deleteEdit.token, all, dep, tx)).toThrow();
+    expect(() => old.prepareEdit(old.token, all, op, tx)).toThrow(/pin-scale-profile/);
+    const multi = structuredClone(records);
+    for (const n of [2, 3]) multi.assetsById[id('ast', n)] = {
+      ...multi.assetsById[id('ast')], id: id('ast', n), assetFrameId: id('frm', n + 3), pinScale: n === 2 ? 3 : 0.03,
+      status: { kind: 'unresolved', reason: 'missingSource' },
+      ...(n === 3 ? { lifecycle: { state: 'deleted', eventId: id('evt', n), reason: 'userDelete' } } : {})
+    };
+    const multiple = ProjectMetadataSource.bootstrap(multi.schema, multi.identity, limits, { semanticProfile: 'map2' }).initialize(multi);
+    const batch = multiple.prepareEdit(multiple.token, all, await provider(multiple), tx);
+    expect(batch.read().history.changes.length).toBe(multiple.read().history.changes.length + 1);
+    expect(batch.read().history.changes.at(-1)!.writes.map(w => w.path)).toEqual(
+      [id('ast'), id('ast', 2)].map(assetId => ['assetsById', assetId, 'pinScale']));
   });
   it('binds map2 to its bootstrap and rejects envelope relabelling or later header changes', () => {
     const records = fixture(); records.schema.minor = 1;

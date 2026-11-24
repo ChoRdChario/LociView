@@ -1,7 +1,7 @@
 import { issuePointAnchorProof, type PointAnchorProof } from './pointAnchorProof';
 import { recordBlobRefs } from '../domain/portableMedia';
 import { captureEditor, type LocalEditorContext } from './editorAttribution';
-import { capabilityFields, capabilityUnion, readRequiredCapabilities, checkRequiredCapabilities, EDITOR_CAPABILITY, PORTABLE_MEDIA_CAPABILITY, hasEditorCapability, hasPortableMediaCapability, type ReaderCapabilities } from './requiredCapabilities';
+import { capabilityFields, capabilityUnion, readRequiredCapabilities, checkRequiredCapabilities, EDITOR_CAPABILITY, PORTABLE_MEDIA_CAPABILITY, SCENE_PLACEMENT_CAPABILITY, hasEditorCapability, hasPortableMediaCapability, hasScenePlacementCapability, type ReaderCapabilities } from './requiredCapabilities';
 import { reactivatedCaptionMedia } from './captionReactivation';
 import type { Anchor } from '../scene/types';
 import * as A from '@automerge/automerge/slim';
@@ -87,7 +87,7 @@ export type BackupPresentationObserver = (read: MetadataSessionRead, output?: Co
 /** One actual completed Backup, for same-command display only. No persisted capability. */
 export interface CompletedBackupDisplay {
   readonly id: string; readonly purpose: 'backup'; readonly state: 'generated'; readonly token: string; readonly label?: string;
-  readonly includesDeclaredEditorNames?: boolean; readonly requiresEditorAttributionReader?: boolean; readonly requiresPortableMediaReader?: boolean;
+  readonly includesDeclaredEditorNames?: boolean; readonly requiresEditorAttributionReader?: boolean; readonly requiresPortableMediaReader?: boolean; readonly requiresScenePlacementReader?: boolean;
 }
 
 /** Local elapsed-time diagnostics only; no source values, evidence or authority. */
@@ -130,9 +130,9 @@ export function metadataProviderReady(provider: ProjectProviderRead, limits: Met
       issue.path[0] === 'representationsById' && issue.path[2] === 'formatProfile' && !active.has(issue.path[1]!)) return false;
     if (issue.kind === 'unverified' && issue.code === 'verified-media-bytes-required' && issue.path.length === 3 &&
       issue.path[0] === 'mediaResourcesById' && issue.path[2] === 'blob' && media.has(issue.path[1]!)) return false;
-    if (issue.kind === 'unverified' && issue.path.length === 3 && issue.path[0] === 'captionsById' && issue.path[2] === 'anchor' &&
+    if (issue.kind === 'unverified' && issue.path.length === 3 && (issue.path[0] === 'captionsById' || issue.path[0] === 'sceneCaptionMembershipsById') && issue.path[2] === 'anchor' &&
       ['source-index-unverified', 'verified-source-index-range-required'].includes(issue.code)) {
-      const anchor = provider.resources.captions[issue.path[1]!]?.anchor;
+      const anchor = issue.path[0] === 'captionsById' ? provider.resources.captions[issue.path[1]!]?.anchor : provider.state.captionMemberships[issue.path[1]!]?.anchor;
       if (anchor?.kind === 'value' && anchor.value.kind === 'asset' && anchor.value.hitEvidence?.source?.surfaceRef &&
         !active.has(anchor.value.hitEvidence.source.representationId)) return false;
     }
@@ -893,7 +893,8 @@ export class MetadataProjectSession {
     const output: CompletedBackupDisplay = Object.freeze({ id: job.id, purpose: 'backup', state: 'generated', token: job.source.token,
       ...(job.label !== undefined ? { label: job.label } : {}),
       ...(names ? { includesDeclaredEditorNames: true, requiresEditorAttributionReader: true } : {}),
-      ...(hasPortableMediaCapability(manifest.requiredCapabilities) ? { requiresPortableMediaReader: true } : {}) });
+      ...(hasPortableMediaCapability(manifest.requiredCapabilities) ? { requiresPortableMediaReader: true } : {}),
+      ...(hasScenePlacementCapability(manifest.requiredCapabilities) ? { requiresScenePlacementReader: true } : {}) });
     return { id: job.id, read: current, output, file };
   }
   async createManualCheckpoint(expectedToken: string, label: string | undefined, store: OriginBlobStore, version: string, signal?: AbortSignal, timing?: BackupOutputTiming,
@@ -986,6 +987,7 @@ export class MetadataProjectSession {
     selection = structuredClone(selection);
     const read = await this.outputReady(); if (read.source!.token !== expectedToken) return fail('output-stale');
     const { review, omittedEntryView } = await prepareReviewSnapshot(read.source!, this.limits, selection);
+    const capabilities = reviewCapabilities(review);
     const count = (name: string) => Object.keys(review.snapshot[name] as JsonObject).length;
     const scenes = reviewScenes(review.snapshot);
     // Display names come from this exact validated selection, never a second UI read.
@@ -1002,7 +1004,8 @@ export class MetadataProjectSession {
     return { contents, token: expectedToken, sceneId: selection.sceneId, selectionKey: json(selection), name: scenes.length === 1 ? scenes[0]!.name as string : `シーン ${scenes.length}件`,
       models: Object.values(review.snapshot.assetsById as JsonObject).filter(a => (a as JsonObject).kind === 'visual').length,
       captions: count('captionsById'), media: count('mediaResourcesById'), ...review.editEffect, omittedEntryView,
-      ...(reviewCapabilities(review).includes(PORTABLE_MEDIA_CAPABILITY) ? { requiresPortableMediaReader: true } : {}) };
+      ...(capabilities.includes(PORTABLE_MEDIA_CAPABILITY) ? { requiresPortableMediaReader: true } : {}),
+      ...(capabilities.includes(SCENE_PLACEMENT_CAPABILITY) ? { requiresScenePlacementReader: true } : {}) };
   }
   async createReviewOutput(expectedToken: string, selection: ReviewSelectionOptions, store: OriginBlobStore, version: string, signal?: AbortSignal) {
     const owned = structuredClone(selection);

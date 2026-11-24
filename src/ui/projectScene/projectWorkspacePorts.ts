@@ -32,6 +32,8 @@ export interface WorkspaceRecoveryGroup {
   readonly manual?: 'name' | 'title' | 'body';
   readonly copyReady?: boolean;
   readonly target: { kind: 'name'; sceneId: string } | { kind: 'startup' } |
+    { kind: 'scenePlacement'; sceneId: string; membershipId: string } |
+    { kind: 'scenePin'; sceneId: string; membershipId: string; captionId: string } |
     { kind: 'text'; captionId: string; field: 'title' | 'body' } |
     { kind: 'field'; captionId: string; field: 'anchor' | 'colorSrgb' } |
     { kind: 'attachmentField'; captionId: string; attachmentId: string; field: 'altText' | 'orderKey' } |
@@ -48,6 +50,12 @@ export interface WorkspaceModelProposal { readonly target: WorkspaceModelTarget;
 export interface WorkspaceModelDetails { readonly target: WorkspaceModelTarget; readonly placement: WorkspacePlacement;
   readonly boundsAsset?: { readonly min: Point3; readonly max: Point3 }; readonly importedPlacement?: WorkspacePlacement;
   readonly gsProxyTarget?: {readonly sceneId:string;readonly assetId:string;readonly expectedBindingId:string;readonly gsRepresentationId:string;readonly gsPayloadDigest:string;readonly gsFamilyId:string;readonly expectedProxyId:string|null}; readonly replacementAvailable?: boolean; readonly pointCloud?: boolean; readonly rotationDegrees: readonly [string, string, string]; readonly sceneCount: Field<number> }
+export function localModelEditIssue(count: Field<number>, localBinding = false): string | null {
+  if (count.kind !== 'value') return 'このモデルを使うシーンを確認できません。モデルの状態を確認してください。';
+  if (count.value === 1 || localBinding && count.value > 1) return null;
+  if (count.value === 0) return 'このモデルをシーンに表示してください。';
+  return `このモデルは${count.value}シーンで使用中です。このシーン用のモデルは「モデルを管理」の「3Dモデルを追加」で別に登録できます。既存のピンは元のモデルに残ります。`;
+}
 export interface WorkspaceViewPayload { readonly camera: JsonObject; readonly background: { readonly kind: 'solid'; readonly colorSrgb: Point3 } }
 export interface WorkspaceMaterialProposal {
   readonly token: string; readonly projectId: string; readonly sceneId: string; readonly target: MaterialTarget;
@@ -74,7 +82,7 @@ export interface WorkspaceViewportState {
   readonly hiddenAssetIds?: readonly string[]; readonly model?: WorkspaceModelProposal | null;
   readonly material?: WorkspaceMaterialProposal | null;
   readonly windowMoving?: boolean;
-  readonly comparison?: { token: string; captionId: string; anchor: Anchor } | null;
+  readonly comparison?: { token: string; captionId: string; anchor: Anchor; sceneId?: string } | null;
 }
 export interface WorkspaceViewport {
   /** Visual output of the exact installed state; contains no command/capture proof. */
@@ -149,7 +157,7 @@ export interface ProjectWorkspacePorts {
   storageEstimate?(): Promise<Readonly<{ usage?: number; quota?: number }>>;
   localSettings?: { read(): string; save(displayName: string): boolean };
   editorSettings?: { read(): Readonly<{ enabled: boolean; name: string }>; save(value: Readonly<{ enabled: boolean; name: string }>): boolean };
-  captionEditors?(captionId: string): readonly { label: string; names: readonly (string | null)[] }[];
+  captionEditors?(captionId: string, sceneId: string): readonly { label: string; names: readonly (string | null)[] }[];
   readonly readOnly: boolean;
   presentation?(): { readonly busy: boolean; readonly reason: string } | null;
   /** Actual UI mode, distinct from temporary presentation/write guards. */
@@ -163,7 +171,7 @@ export interface ProjectWorkspacePorts {
   imageScope(): string;
   mediaDescription(text: string): string;
   captionDeletion(token: string, captionId: string): CaptionDeletionImpact;
-  pinPositionInParent(token: string, captionId: string, assetId: string): Point3 | null;
+  pinPositionInParent(token: string, captionId: string, assetId: string, sceneId: string): Point3 | null;
   recovery(): readonly WorkspaceRecoveryGroup[];
   prepareCaptionMembership(token: string, sceneId: string, captionId: string, observedIds: readonly string[], keepId: string, choice: 'one' | 'both'): MetadataEdit;
   modelDetails(sceneId: string, assetId: string): WorkspaceModelDetails | null;

@@ -66,7 +66,7 @@ function candidateFields(candidates: Content['candidates'], issues: readonly Can
   };
   const blocking = (i: CandidateIssue): boolean => {
     if (i.code === 'unknown-field-policy' || i.code === 'opaque-data-protection-required') return false;
-    if (i.path[0] === 'captionsById' && ['anchor-class-not-current', 'source-index-unverified', 'verified-source-index-range-required'].includes(i.code)) return false;
+    if ((i.path[0] === 'captionsById' || semanticProfile === 'map2' && i.path[0] === 'sceneCaptionMembershipsById') && ['anchor-class-not-current', 'source-index-unverified', 'verified-source-index-range-required'].includes(i.code)) return false;
     if (i.path[0] === 'assetRevisionsById' && ['partial-material-map', 'ambiguous-material-maps'].includes(i.code)) return false;
     return true;
   };
@@ -124,6 +124,18 @@ function project(inspection: Content, limits: HistoryReadLimits): ProjectProvide
   }
   for (const [id, reason] of unavailable) { const map = immutableById.get(id)!.map; immutable[map][id] = absent(reason); }
   const immutableValue = (map: keyof typeof immutableKinds, id: string) => fieldValue(immutable[map][id] ?? absent('missing'));
+  const projectionFor = (assetId: string, bindingId: string): Field<AssetProjection> => {
+    const frame = field<string>('assetsById', assetId, 'assetFrameId');
+    if (frame.kind !== 'value') return frame;
+    const binding = immutableValue('assetBindingsById', bindingId);
+    const revision = binding && immutableValue('assetRevisionsById', string(binding.assetRevisionId));
+    if (!binding || !revision) return absent(unavailable.get(bindingId) ?? 'missing');
+    if (binding.assetId !== assetId || revision.assetId !== assetId) return absent('invalid');
+    return value({ assetFrameId: frame.value, bindingId, revisionId: string(revision.id),
+      representationIds: list(revision.representationIds).map(string),
+      anchorCompatibilityIds: list(revision.anchorCompatibilityClasses).map(c => string(object(c).id)) });
+  };
+  const scopedModels = new Map<string, Map<string, AssetProjection>>();
   const scenes: Record<string, Scene> = {}, assetMemberships: Record<string, Membership> = {}, captionMemberships: Record<string, Membership> = {};
   for (const id of Object.keys(mutable.scenesById)) {
     const defaultView = field<string | undefined>('scenesById', id, 'defaultViewId');
@@ -136,19 +148,29 @@ function project(inspection: Content, limits: HistoryReadLimits): ProjectProvide
       // There is no invented string endpoint. All source candidates and their
       // peer reservations remain in inspection/details, including omitted edges.
       if (sceneId.kind !== 'value' || resourceId.kind !== 'value') continue;
-      output[id] = { id, sceneId: sceneId.value, resourceId: resourceId.value, orderKey: field(map, id, 'orderKey'), lifecycle: lifecycle(map, id) };
+      const edge = { id, sceneId: sceneId.value, resourceId: resourceId.value, orderKey: field<string>(map, id, 'orderKey'), lifecycle: lifecycle(map, id) };
+      output[id] = edge;
+      if (semanticProfile !== 'map2') continue;
+      if (map === 'sceneAssetMembershipsById') {
+        const binding = field<string | undefined>(map, id, 'bindingId');
+        if (binding.kind === 'value' && binding.value === undefined) continue;
+        const projection = binding.kind === 'unresolved' ? binding : projectionFor(resourceId.value, binding.value!);
+        output[id] = { ...edge, projection };
+        if (edge.lifecycle.kind !== 'value' || edge.lifecycle.value.state !== 'active') continue;
+        const byScene = scopedModels.get(resourceId.value) ?? new Map<string, AssetProjection>();
+        if (projection.kind === 'value') byScene.set(sceneId.value, projection.value);
+        scopedModels.set(resourceId.value, byScene);
+      } else {
+        const anchor = field<import('./types').Anchor | undefined>(map, id, 'anchor');
+        if (anchor.kind === 'unresolved') output[id] = { ...edge, anchor };
+        else if (anchor.value !== undefined) output[id] = { ...edge, anchor: value(anchor.value) };
+      }
     }
   const assets: Record<string, Asset> = {}, captions: Record<string, Caption> = {}, views: Record<string, View> = {}, materials: Record<string, Material> = {};
   for (const id of Object.keys(mutable.assetsById)) {
-    const status = field<JsonObject>('assetsById', id, 'status'), assetFrame = field<string>('assetsById', id, 'assetFrameId');
-    let projection: Field<AssetProjection> = status.kind === 'unresolved' ? status : assetFrame.kind === 'unresolved' ? assetFrame : absent('missing');
-    if (status.kind === 'value' && status.value.kind === 'ready' && assetFrame.kind === 'value') {
-      const bindingId = string(status.value.activeBindingId), binding = immutableValue('assetBindingsById', bindingId);
-      const revision = binding && immutableValue('assetRevisionsById', string(binding.assetRevisionId));
-      if (binding && revision && binding.assetId === id && revision.assetId === id) projection = value({ assetFrameId: assetFrame.value, bindingId,
-        revisionId: string(revision.id), representationIds: list(revision.representationIds).map(string), anchorCompatibilityIds: list(revision.anchorCompatibilityClasses).map(c => string(object(c).id)) });
-      else projection = absent(unavailable.get(bindingId) ?? 'missing');
-    }
+    const status = field<JsonObject>('assetsById', id, 'status');
+    const projection = status.kind === 'unresolved' ? status : status.value.kind === 'ready'
+      ? projectionFor(id, string(status.value.activeBindingId)) : absent('missing');
     assets[id] = { id, lifecycle: lifecycle('assetsById', id), projection,
       ...(semanticProfile === 'map2' ? { pinScale: field<number | undefined>('assetsById', id, 'pinScale') } : {}) };
   }
@@ -163,16 +185,27 @@ function project(inspection: Content, limits: HistoryReadLimits): ProjectProvide
     const map = 'materialOverridesById', routing = field<JsonObject>(map, id, 'routing'), appearance = field<JsonObject>(map, id, 'appearance');
     let compositing = field<JsonObject>(map, id, 'compositing');
     const optics = new Set<JsonValue>();
+    let applicableBindingIds: string[] | undefined;
     if (routing.kind === 'value') {
-      const target = object(routing.value.target), asset = assets[string(target.assetId)]?.projection;
-      if (asset?.kind === 'value') for (const repId of asset.value.representationIds) {
+      const target = object(routing.value.target), assetId = string(target.assetId), base = assets[assetId]?.projection;
+      const scope = object(routing.value.scope), byScene = scopedModels.get(assetId);
+      const selected = scope.kind === 'scene' ? byScene?.get(string(scope.sceneId)) : undefined;
+      const projections = new Map<string, AssetProjection>();
+      if (base?.kind === 'value' && !selected) projections.set(base.value.bindingId, base.value);
+      if (selected) projections.set(selected.bindingId, selected);
+      else if (scope.kind === 'project' && byScene) for (const local of byScene.values()) projections.set(local.bindingId, local);
+      const applicable = new Set<string>();
+      for (const projection of projections.values()) for (const repId of projection.representationIds) {
         charge(); const rep = immutableValue('representationsById', repId);
         if (!rep || rep.variantFamilyId !== target.variantFamilyId || !rep.materialCatalog) continue;
         const catalog = object(rep.materialCatalog); if (catalog.layoutId !== target.materialLayoutId) continue;
         for (const slot of list(catalog.slots).map(object)) {
-          charge(); if (slot.logicalMaterialSlotId === target.logicalMaterialSlotId) optics.add(object(slot.sourceSemantics).optics!);
+          charge(); if (slot.logicalMaterialSlotId === target.logicalMaterialSlotId) {
+            optics.add(object(slot.sourceSemantics).optics!); applicable.add(projection.bindingId);
+          }
         }
       }
+      if (byScene) applicableBindingIds = [...applicable];
       // Inspect all current checked compositing candidates, not just one resolved
       // value. A surface source cannot supply invented transmission parameters.
       if (optics.size === 1 && optics.has('surface')) {
@@ -185,6 +218,7 @@ function project(inspection: Content, limits: HistoryReadLimits): ProjectProvide
       }
     }
     materials[id] = { id, lifecycle: lifecycle(map, id), routing: routing as Material['routing'],
+      ...(applicableBindingIds ? { applicableBindingIds } : {}),
       intent: optics.size !== 1 ? absent('missing') : appearance.kind === 'value' && compositing.kind === 'value' ? value({ appearance: appearance.value, compositing: compositing.value }) :
         appearance.kind === 'unresolved' ? appearance : compositing };
   }

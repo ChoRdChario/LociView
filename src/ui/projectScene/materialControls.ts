@@ -155,6 +155,47 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
   const advanced=make('details'), advancedFields=make('div'); advanced.className='lv-material-advanced'; advancedFields.className='lv-material-advanced-fields'; advanced.append(make('summary','色の透過と詳細'), advancedFields);
   for(const field of ['chroma','keyColor','tolerance','softness','cutoff'] as const) advancedFields.append(controls.get(field)!.group);
   for(const field of ['chroma','keyColor'] as const) controls.get(field)!.group.className='lv-material-wide';
+  const keyControl = controls.get('keyColor')!, keyInput = keyControl.input as HTMLInputElement;
+  const colorTools = make('div'), paletteLabel = make('label', '色を選択'), palette = make('input');
+  colorTools.className = 'lv-material-color-tools'; palette.type = 'color'; palette.setAttribute('aria-label', '色を選択');
+  const sampleColor = button('スポイト'), sampleError = make('p');
+  sampleError.setAttribute('role', 'status'); sampleError.hidden = true;
+  paletteLabel.append(palette); colorTools.append(paletteLabel, sampleColor, sampleError);
+  advancedFields.insertBefore(colorTools, controls.get('tolerance')!.group);
+  type ScreenSampler = new () => { open(options: { signal: AbortSignal }): Promise<{ sRGBHex: string }> };
+  const EyeDropper = (browser as (Window & { EyeDropper?: ScreenSampler }) | null)?.EyeDropper;
+  sampleColor.hidden = typeof EyeDropper !== 'function';
+  let pick: { context: MaterialContext; abort: AbortController } | null = null;
+  const sameColorTarget = (opening: MaterialContext, current: MaterialContext) =>
+    opening.source.projectId === current.source.projectId && opening.source.sceneId === current.source.sceneId &&
+    opening.source.token === current.source.token && opening.draft === current.draft &&
+    materialSelectionKey(opening.selection) === materialSelectionKey(current.selection);
+  const endPick = () => { pick?.abort.abort(); pick = null; };
+  const startPick = () => {
+    endPick(); sampleError.hidden = true;
+    if (!context || disposed || colorTools.hidden || keyInput.readOnly || keyInput.disabled) return null;
+    return pick = { context, abort: new AbortController() };
+  };
+  const applyPickedColor = (owner: NonNullable<typeof pick>, hex: string) => {
+    if (pick !== owner || !context || !sameColorTarget(owner.context, context) || disposed || colorTools.hidden ||
+        keyInput.disabled || keyInput.readOnly || root.closest?.('[hidden]') || !/^#[0-9a-f]{6}$/i.test(hex)) return;
+    pick = null; keyInput.value = hex.toLowerCase(); updateDraft('keyColor', keyInput);
+  };
+  listen(palette, 'click', startPick);
+  listen(palette, 'change', () => { if (pick) applyPickedColor(pick, palette.value); });
+  listen(sampleColor, 'click', async () => {
+    if (!EyeDropper || sampleColor.disabled) return;
+    const owner = startPick(); if (!owner) return;
+    try {
+      const result = await new EyeDropper().open({ signal: owner.abort.signal });
+      applyPickedColor(owner, result.sRGBHex);
+    } catch (error) {
+      if (pick === owner && !owner.abort.signal.aborted && (error as { name?: string } | null)?.name !== 'AbortError') {
+        sampleError.textContent = '画面の色を取得できませんでした。色見本から選択できます。';
+        sampleError.hidden = false;
+      }
+    } finally { if (pick === owner) pick = null; }
+  });
   controls.get('coverage')!.heading.append(coverageHelp);controls.get('opacity')!.heading.append(numericHelp);
   editor.append(advanced);
   const actions = make('div'), apply = button('変更を適用'), cancel = button('取り消す'), remove = button('この範囲の設定を解除'), retry = button('再試行'), review = button('状態を確認');
@@ -250,6 +291,10 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
         field === 'cutoff' && materialInput(view.base.appearance, 'coverage', next.source.semanticProfile, view.base.compositing) !== 'mask');
       current.group.hidden = !view.base || !!inactive && !reason;
     }
+    colorTools.hidden = keyControl.group.hidden || editor.hidden || !!presentation?.viewing;
+    sampleColor.disabled = palette.disabled = keyInput.readOnly || keyInput.disabled;
+    if (/^#[0-9a-f]{6}$/i.test(keyInput.value) && palette.value.toLowerCase() !== keyInput.value.toLowerCase()) palette.value = keyInput.value;
+    if (pick && (colorTools.hidden || palette.disabled || !sameColorTarget(pick.context, next))) endPick();
     const applyIssue = materialApplyIssue(next); apply.disabled = applyIssue !== null || !!scrub; apply.hidden = !d;
     cancel.hidden = !d; cancel.disabled = !d || Boolean(composing || d.composing) || inFlight;
     remove.disabled = planMaterial(next, { kind: 'remove' }).kind !== 'remove'; remove.hidden = !view.record || !!d;
@@ -279,5 +324,5 @@ export function createMaterialControls(document: Document, onPlan: (plan: Materi
     if (document.activeElement !== origin) return () => {};
     rememberFocus(origin); const focus = returnFocus; if (focus) focus.waiting = true;
     return () => { if (focus && returnFocus === focus) focus.waiting = false; };
-  }, isComposing: () => composing !== null, dispose: () => { disposed = true; endScrub(false); cleanups.forEach(fn => fn()); root.remove(); } };
+  }, isComposing: () => composing !== null, dispose: () => { disposed = true; endPick(); endScrub(false); cleanups.forEach(fn => fn()); root.remove(); } };
 }

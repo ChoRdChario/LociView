@@ -5,7 +5,7 @@ import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { checkProjectRecord } from '../domain/projectRecords';
 import { list, object, same } from '../domain/projectGraphSupport';
 import { validateMaterialIntent } from '../domain/materialIntent';
-import { projectMaterialRoutes } from '../scene/projectMaterialRoutes';
+import { projectMaterialRoutes, sceneMaterialProjection } from '../scene/projectMaterialRoutes';
 import { planSceneCommand, type SceneAuthoringCommand } from '../scene/commands';
 import { resolveScene } from '../scene/resolve';
 import { value, type Anchor, type Field, type Membership } from '../scene/types';
@@ -51,20 +51,22 @@ export type MetadataEdit =
   | MaterialResolution
   | CaptionMembershipResolution
   | AssetMembershipResolution
+  | { kind: 'resolveScenePlacement' | 'resolveScenePin'; sceneId: string; membershipId: string; operationId: string }
   | { kind: 'resolveAssetStatus'; assetId: string; operationId: string }
   | { kind: 'resolveDefaultScene'; operationId: string }
+  | { kind: 'setProjectPinScale'; pinScale: number }
   | { kind: 'setAssetPinScale'; assetId: string; pinScale: number }
   | { kind: 'resolveCaptionField'; captionId: string; field: CaptionChoiceField; operationId: string }
   | { kind: 'resolveAttachmentField'; captionId: string; attachmentId: string; field: 'altText' | 'orderKey'; operationId: string }
-  | { kind: 'activatePreparedRevision'; sceneId: string; assetId: string; expectedBindingId: string; revisionId: string; binding: JsonObject }
-  | { kind: 'moveAsset'; sceneId: string; assetId: string; expectedBindingId: string; binding: JsonObject }
-  | { kind: 'transformAsset'; sceneId: string; assetId: string; expectedBindingId: string; binding: JsonObject }
-  | { kind: 'fitAssetBounds'; sceneId: string; assetId: string; expectedBindingId: string; binding: JsonObject; referenceAssetId: string; expectedReferenceBindingId: string }
+  | { kind: 'activatePreparedRevision'; scope?: 'scene'; sceneId: string; assetId: string; expectedBindingId: string; revisionId: string; binding: JsonObject }
+  | { kind: 'moveAsset'; scope?: 'scene'; sceneId: string; assetId: string; expectedBindingId: string; binding: JsonObject }
+  | { kind: 'transformAsset'; scope?: 'scene'; sceneId: string; assetId: string; expectedBindingId: string; binding: JsonObject }
+  | { kind: 'fitAssetBounds'; scope?: 'scene'; sceneId: string; assetId: string; expectedBindingId: string; binding: JsonObject; referenceAssetId: string; expectedReferenceBindingId: string }
   | { kind: 'editCaption'; captionId: string; edits: { title?: string; body?: string; colorSrgb?: readonly number[] } }
   | { kind: 'resolveCaptionText'; captionId: string; field: 'title' | 'body';
       choice: { kind: 'candidate'; operationId: string } | { kind: 'manual'; text: string } }
   | { kind: 'addPin'; sceneId: string; captionId: string; membershipId: string; eventId: string; anchor: Anchor; colorSrgb?: readonly number[] }
-  | { kind: 'movePin'; sceneId: string; captionId: string; anchor: Anchor }
+  | { kind: 'movePin'; scope?: 'scene'; sceneId: string; captionId: string; anchor: Anchor }
   | PinParentCommand
   | { kind: 'include'; sceneId: string; resourceKind: 'asset' | 'caption'; resourceId: string; membershipId: string; orderKey: string; eventId: string }
   | { kind: 'exclude'; resourceKind: 'asset' | 'caption'; membershipId: string; eventId: string }
@@ -80,7 +82,7 @@ export type MetadataEdit =
   | { kind: 'createAttachment'; sceneId: string; captionId: string; attachmentId: string; media: JsonObject; orderKey: string; altText: string; eventId: string }
   | { kind: 'editAttachment'; sceneId: string; captionId: string; attachmentId: string; field: 'altText' | 'orderKey'; value: string }
   | { kind: 'deleteAttachment'; sceneId: string; captionId: string; attachmentId: string; eventId: string };
-export interface MetadataRecordEdit { map: MutableRecordMap | 'mediaResourcesById' | 'assetBindingsById' | 'assetRevisionsById' | 'representationsById'; id: string; create: boolean; fields: JsonObject; remove?: readonly ('defaultViewId' | 'colorSrgb' | 'altText')[] }
+export interface MetadataRecordEdit { map: MutableRecordMap | 'mediaResourcesById' | 'assetBindingsById' | 'assetRevisionsById' | 'representationsById'; id: string; create: boolean; fields: JsonObject; remove?: readonly ('defaultViewId' | 'colorSrgb' | 'altText' | 'bindingId' | 'anchor')[] }
 export type MetadataWrite = MetadataRecordEdit | { map: 'project'; id: 'defaultSceneId'; create: false; fields: { defaultSceneId: string } };
 type Provider = Extract<ProjectProviderRead, { kind: 'scene-provider' }>;
 const exact = <T>(field: Field<T> | undefined): T => field?.kind === 'value' ? field.value : fail('command-unresolved');
@@ -98,14 +100,76 @@ export function canonicalMetadataEdit(input: MetadataEdit, limits: MetadataLimit
   return cloneCanonicalValue(input, limits) as unknown as MetadataEdit;
 }
 
+/** Resolve only a complete set of known candidates on one explicitly identified, active Scene membership. */
+export function scenePlacementChoices(provider: Provider, sceneId: string, membershipId: string, field: 'bindingId' | 'anchor', limits: MetadataLimits) {
+  if (provider.semanticProfile !== 'map2') return fail('scene-placement-profile');
+  const model = field === 'bindingId', map = model ? 'sceneAssetMembershipsById' : 'sceneCaptionMembershipsById';
+  const ownerField = model ? 'assetId' : 'captionId', reader = candidateReader(provider, limits);
+  reader.active('scenesById', sceneId); reader.active(map, membershipId);
+  const owner = reader.exact(map, membershipId, ownerField);
+  if (typeof owner !== 'string' || reader.exact(map, membershipId, 'sceneId') !== sceneId ||
+    !reader.related(map, { sceneId, [ownerField]: owner }).includes(membershipId)) return fail('scene-placement-membership');
+  reader.active(model ? 'assetsById' : 'captionsById', owner);
+  const candidates = reader.records.get(map)?.get(membershipId)?.get(field);
+  if (!candidates?.valid || candidates.hasUnknownFields || candidates.candidates.length < 2) return fail('scene-placement-candidates');
+  // Admission has already checked every competing value, including owner/frame, source indices and immutable provenance.
+  for (const issue of provider.issues) {
+    reader.charge();
+    if (issue.path[0] !== map || issue.path[1] !== membershipId || issue.path[2] && issue.path[2] !== field) continue;
+    // This command changes one field of one known edge. A duplicate registration remains reserved for its own resolution.
+    if (!issue.path[2] && (issue.code === 'duplicate-semantic-key' || issue.code === 'candidate-semantic-key-reserved')) continue;
+    if (issue.code !== 'atomic-field-conflict') return fail('scene-placement-candidates');
+  }
+  const immutable = metadataImmutableReader(provider, limits);
+  const valid = new Set(candidates.validOperationIds);
+  return candidates.candidates.map(candidate => {
+    reader.charge();
+    if (!valid.has(candidate.operationId)) return fail('scene-placement-candidates');
+    const v = candidate.value;
+    if (v.kind === 'absent') {
+      if (model) exact(provider.resources.assets[owner]?.projection);
+      else exact(provider.resources.captions[owner]?.anchor);
+    } else if (model) {
+      const bindingId = String(v.value);
+      exact(provider.details.immutable.assetBindingsById[bindingId]);
+      const binding = immutable('assetBindingsById', bindingId);
+      const revision = immutable('assetRevisionsById', String(binding.assetRevisionId));
+      if (binding.assetId !== owner || revision.assetId !== owner) return fail('scene-placement-owner');
+      for (const id of list(revision.representationIds)) {
+        reader.charge();
+        if (immutable('representationsById', String(id)).assetId !== owner) return fail('scene-placement-owner');
+      }
+    } else {
+      const anchor = object(v.value);
+      const assetId = anchor.kind === 'asset' ? anchor.assetId : anchor.ownerAssetId;
+      if (typeof assetId === 'string') reader.active('assetsById', assetId);
+    }
+    return { operationId: candidate.operationId, value: v };
+  });
+}
+
 /** Plan only from the Session's fresh verified provider. Not a generic patch/import API. */
 export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits: MetadataLimits, checkedPointAnchor = false): readonly MetadataWrite[] {
   const command = canonicalMetadataEdit(input, limits), raw = command as unknown as JsonObject;
+  const scoped = raw.scope === 'scene';
+  if (scoped && provider.semanticProfile !== 'map2') fail('scene-placement-profile');
+  const scopeField = scoped ? ['scope'] : [];
   if (command.kind === 'compensateCaptionAction') return planCaptionUndo(provider, command, limits);
   if (['duplicateCaption', 'restoreCaptionFields', 'createTag', 'editTag', 'deleteTag', 'setCaptionTag', 'resolveTagField', 'resolveTagLifecycle'].includes(command.kind))
     return planCaptionAuthoring(provider, command as CaptionAuthoringCommand, limits);
   if (['duplicateScene', 'deleteSceneContents', 'reorderScene', 'resolveSceneOrder', 'restoreScene'].includes(command.kind))
     return planSceneOrganization(provider, command as SceneOrganizationCommand, limits);
+  if (command.kind === 'setProjectPinScale') {
+    shape(raw, ['kind', 'pinScale']);
+    if (provider.semanticProfile !== 'map2') fail('pin-scale-profile');
+    checkMutableField(new ProjectRecordFields(provider.semanticProfile), 'assetsById', 'pinScale', command.pinScale);
+    const reader = candidateReader(provider, limits);
+    // Resolve every active target and its current value before producing a single edit.
+    const changed = reader.related('assetsById', {}).filter(id =>
+      (reader.exact('assetsById', id, 'pinScale') ?? 1) !== command.pinScale);
+    if (!changed.length) fail('pin-scale-unchanged');
+    return changed.map(id => ({ map: 'assetsById', id, create: false, fields: { pinScale: command.pinScale } }));
+  }
   if (command.kind === 'setAssetPinScale') {
     shape(raw, ['kind', 'assetId', 'pinScale']);
     if (provider.semanticProfile !== 'map2') fail('pin-scale-profile');
@@ -197,7 +261,7 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
     const scope = object(routing.scope), target = object(routing.target);
     if (scope.kind === 'scene' && scope.sceneId !== sceneId) fail('material-scene');
     const assetId = target.assetId as string; row('assetsById', assetId);
-    const projection = exact(provider.resources.assets[assetId]?.projection);
+    const projection = exact(sceneMaterialProjection(provider, sceneId, assetId));
     let found = false,source:MeshMaterialSource|undefined;
     for (const repId of projection.representationIds) {
       const rep = exact(provider.details.immutable.representationsById[repId]);
@@ -230,6 +294,16 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       intent.compositing.coverage.policy === 'inherit' && (intent.appearance.opacity ?? 1) < 1)) fail('material-unsupported');
   };
   switch (command.kind) {
+    case 'resolveScenePlacement': case 'resolveScenePin': {
+      shape(raw, ['kind', 'sceneId', 'membershipId', 'operationId']);
+      const model = command.kind === 'resolveScenePlacement', field = model ? 'bindingId' : 'anchor';
+      const choice = scenePlacementChoices(provider, command.sceneId, command.membershipId, field, limits)
+        .find(c => c.operationId === command.operationId);
+      if (!choice) return fail('scene-placement-choice');
+      result.push({ map: model ? 'sceneAssetMembershipsById' : 'sceneCaptionMembershipsById', id: command.membershipId, create: false,
+        fields: choice.value.kind === 'value' ? { [field]: choice.value.value } : {},
+        ...(choice.value.kind === 'absent' ? { remove: [field] } : {}) }); break;
+    }
     case 'resolveAttachmentField': {
       shape(raw, ['kind', 'captionId', 'attachmentId', 'field', 'operationId']);
       const selected = attachmentFieldCandidates(provider, command.captionId, command.attachmentId, command.field, limits).find(c => c.operationId === command.operationId);
@@ -257,11 +331,13 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
     case 'resolveCaptionMembership': return planCaptionMembershipResolution(provider, command, limits);
     case 'resolveAssetMembership': return command.choice === 'both' ? planAssetMembershipCopies(provider, command, limits) : planAssetMembershipResolution(provider, command, limits);
     case 'activatePreparedRevision': {
-      shape(raw, ['kind', 'sceneId', 'assetId', 'expectedBindingId', 'revisionId', 'binding']);
+      shape(raw, ['kind', 'sceneId', 'assetId', 'expectedBindingId', 'revisionId', 'binding', ...scopeField]);
       row('scenesById', command.sceneId); row('assetsById', command.assetId);
       memberships('asset', command.sceneId, command.assetId);
       const resolved = resolveScene(provider.state, provider.resources, command.sceneId);
-      const projection = resolved.kind === 'ready' ? resolved.composition.assets.find(a => a.assetId === command.assetId)?.projection : undefined;
+      const member = resolved.kind === 'ready' ? resolved.composition.assets.find(a => a.assetId === command.assetId) : undefined;
+      const base = provider.resources.assets[command.assetId]?.projection;
+      const projection = member && (scoped ? member.projection : base?.kind === 'value' ? base.value : undefined);
       if (!projection || projection.bindingId !== command.expectedBindingId || projection.revisionId === command.revisionId) fail('revision-stale');
       const old = exact(provider.details.immutable.assetBindingsById[command.expectedBindingId]), next = command.binding;
       const readImmutable = metadataImmutableReader(provider, limits);
@@ -283,14 +359,17 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       // Target content/family facts are rechecked by Session before any journal.
       // Caption authored coordinates/classes remain untouched and may need review.
       result.push({ map: 'assetBindingsById', id: next.id as string, create: true, fields: next });
-      add('assetsById', command.assetId, { status: { kind: 'ready', activeBindingId: next.id! } }); break;
+      if (scoped) add('sceneAssetMembershipsById', member!.membershipId, { bindingId: next.id! });
+      else add('assetsById', command.assetId, { status: { kind: 'ready', activeBindingId: next.id! } }); break;
     }
     case 'moveAsset': case 'transformAsset': case 'fitAssetBounds': {
-      shape(raw, ['kind', 'sceneId', 'assetId', 'expectedBindingId', 'binding', ...(command.kind === 'fitAssetBounds' ? ['referenceAssetId', 'expectedReferenceBindingId'] : [])]);
+      shape(raw, ['kind', 'sceneId', 'assetId', 'expectedBindingId', 'binding', ...scopeField, ...(command.kind === 'fitAssetBounds' ? ['referenceAssetId', 'expectedReferenceBindingId'] : [])]);
       row('scenesById', command.sceneId); row('assetsById', command.assetId);
       memberships('asset', command.sceneId, command.assetId);
       const resolved = resolveScene(provider.state, provider.resources, command.sceneId);
-      const projection = resolved.kind === 'ready' ? resolved.composition.assets.find(a => a.assetId === command.assetId)?.projection : undefined;
+      const member = resolved.kind === 'ready' ? resolved.composition.assets.find(a => a.assetId === command.assetId) : undefined;
+      const base = provider.resources.assets[command.assetId]?.projection;
+      const projection = member && (scoped ? member.projection : base?.kind === 'value' ? base.value : undefined);
       if (!projection || projection.bindingId !== command.expectedBindingId) fail('placement-stale');
       const old = exact(provider.details.immutable.assetBindingsById[command.expectedBindingId]), next = command.binding;
       checkProjectRecord(c, 'assetBindingsById', old); checkProjectRecord(c, 'assetBindingsById', next);
@@ -320,7 +399,8 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       shape(old, ['id', 'assetId', 'assetRevisionId', 'assetToProject', 'method', 'payloadDigest', ...(old.parentBindingId ? ['parentBindingId'] : [])]);
       shape(next, ['id', 'assetId', 'assetRevisionId', 'assetToProject', 'method', 'payloadDigest', 'parentBindingId']);
       result.push({ map: 'assetBindingsById', id: next.id as string, create: true, fields: next });
-      add('assetsById', command.assetId, { status: { kind: 'ready', activeBindingId: next.id! } });
+      if (scoped) add('sceneAssetMembershipsById', member!.membershipId, { bindingId: next.id! });
+      else add('assetsById', command.assetId, { status: { kind: 'ready', activeBindingId: next.id! } });
       break;
     }
     case 'createAttachment': case 'editAttachment': case 'deleteAttachment': {
@@ -390,33 +470,42 @@ export function planMetadataEdit(provider: Provider, input: MetadataEdit, limits
       // token and this complete candidate set bind the user's chosen context.
       result.push({ map: 'captionsById', id: command.captionId, create: false, fields: { [command.field]: text } }); break;
     }
-    case 'reparentPin': {
-      shape(raw, ['kind', 'sceneId', 'captionId', 'anchor']);
-      const before = exact(provider.resources.captions[command.captionId]?.anchor), after = command.anchor;
-        if (after.kind !== 'asset' || before.kind === 'asset' && before.assetId === after.assetId) fail('pin-parent-unchanged');
-        if (before.kind === 'unplaced' && before.ownerAssetId !== undefined && after.kind === 'asset' && before.ownerAssetId !== after.assetId) fail('pin-owner-changed');
+    case 'reparentPin': case 'movePin': {
+      shape(raw, ['kind', 'sceneId', 'captionId', 'anchor', ...scopeField]);
+      const after = command.anchor;
+      const checkedSource = (before: Anchor) => {
+        if (command.kind === 'reparentPin') {
+          if (after.kind !== 'asset' || before.kind === 'asset' && before.assetId === after.assetId) fail('pin-parent-unchanged');
+          if (before.kind === 'unplaced' && before.ownerAssetId !== undefined && after.kind === 'asset' && before.ownerAssetId !== after.assetId)
+            fail('pin-owner-changed');
+        } else {
+          if (before.kind !== 'asset' || after.kind !== 'asset' || before.assetId !== after.assetId || before.assetFrameId !== after.assetFrameId)
+            fail('pin-owner-changed');
+          const oldCheck = new ProjectRecordFields(provider.semanticProfile); oldCheck.anchor(json(before), []);
+          if (oldCheck.unknown) fail('pin-unknown-anchor');
+        }
+        return before;
+      };
+      // Historical commands check the original owner before the proposed target.
+      // A scene-local command gets its source from the verified membership.
+      const inherited = scoped ? undefined : checkedSource(exact(provider.resources.captions[command.captionId]?.anchor));
       memberships('caption', command.sceneId, command.captionId);
-      if (!pin(command.sceneId, after).captions.some(caption => caption.captionId === command.captionId)) fail('pin-not-in-scene');
-      // Replace the whole anchor, not a spread of old-parent evidence/coordinates.
-      // add() also refuses unresolved or unknown old fields instead of losing them.
-      add('captionsById', command.captionId, { anchor: json(after) }); break;
-    }
-    case 'movePin': {
-      shape(raw, ['kind', 'sceneId', 'captionId', 'anchor']);
-      const before = exact(provider.resources.captions[command.captionId]?.anchor), after = command.anchor;
-      if (before.kind !== 'asset' || after.kind !== 'asset' || before.assetId !== after.assetId || before.assetFrameId !== after.assetFrameId)
-        fail('pin-owner-changed');
-      const oldCheck = new ProjectRecordFields(provider.semanticProfile); oldCheck.anchor(json(before), []);
-      if (oldCheck.unknown) fail('pin-unknown-anchor');
-      memberships('caption', command.sceneId, command.captionId);
-      if (!pin(command.sceneId, after, true).captions.some(c => c.captionId === command.captionId)) fail('pin-not-in-scene');
-      const merged = { ...object(json(before)), ...object(json(after)) };
-      // Manual placement explicitly replaces known hit evidence and normal. Do
-      // not silently erase unknown anchor/evidence subtrees from an old source.
-      const oldEvidence = object(json(before)).hitEvidence;
-      if (oldEvidence && Object.keys(object(oldEvidence)).some(k => !['method', 'confidence', 'source'].includes(k))) fail('pin-unknown-evidence');
-      delete merged.normalAsset;
-      add('captionsById', command.captionId, { anchor: merged }); break;
+      const selected = pin(command.sceneId, after, command.kind === 'movePin').captions.find(c => c.captionId === command.captionId);
+      if (!selected) return fail('pin-not-in-scene');
+      const before = inherited ?? checkedSource(exact(selected.anchor));
+      let anchor = json(after);
+      if (command.kind === 'movePin') {
+        // Same-owner movement keeps unrelated data and replaces known hit evidence.
+        const oldEvidence = object(json(before)).hitEvidence;
+        if (oldEvidence && Object.keys(object(oldEvidence)).some(k => !['method', 'confidence', 'source'].includes(k))) fail('pin-unknown-evidence');
+        const merged = { ...object(json(before)), ...object(anchor) };
+        delete merged.normalAsset;
+        anchor = merged;
+      }
+      // Reparenting replaces the complete anchor without carrying old-parent evidence.
+      if (scoped) add('sceneCaptionMembershipsById', selected.membershipId, { anchor });
+      else add('captionsById', command.captionId, { anchor });
+      break;
     }
     case 'addPin': {
       shape(raw, ['kind', 'sceneId', 'captionId', 'membershipId', 'eventId', 'anchor', ...('colorSrgb' in raw ? ['colorSrgb'] : [])]);

@@ -5,7 +5,7 @@ import { portableDisplay } from './portableMedia';
 const knownUnavailable = (r: JsonObject | undefined) => !r || (r.lifecycle !== undefined && !active(r));
 
 /** Current records only. Candidate reservation and causal delete/edit still gate the provider. */
-export function inspectResourceGraph(g: GraphInspection): void {
+export function inspectResourceGraph(g: GraphInspection, sceneOverrides = false): void {
   const project = object(g.records.project), frameId = object(project.frame ?? {}).id, scenes = g.table('scenesById');
   const defaultId = string(project.defaultSceneId); g.roots.add('project');
   if (defaultId !== undefined) { g.edge('project', defaultId, 'defaultSceneId');
@@ -41,7 +41,17 @@ export function inspectResourceGraph(g: GraphInspection): void {
     if (active(scene) && (!active(view) || view!.sceneId !== scene.id || view!.projectFrameId !== frameId))
       g.issue('scenesById', string(scene.id), 'defaultViewId', 'unavailable-entry-view', 'needs-review');
   }
-  inspectAnchors(g);
+  const bindingsByAsset = new Map<string, Map<string, string>>();
+  if (sceneOverrides) for (const membership of g.all('sceneAssetMembershipsById')) {
+    if (!active(membership) || membership.bindingId === undefined) continue;
+    const binding = g.ref('sceneAssetMembershipsById', membership, 'bindingId', 'assetBindingsById');
+    const assetId = string(membership.assetId);
+    if (binding && membership.assetId !== undefined && binding.assetId !== assetId)
+      g.issue('sceneAssetMembershipsById', string(membership.id), 'bindingId', 'foreign-binding-owner');
+    const byScene = bindingsByAsset.get(assetId) ?? new Map<string, string>();
+    byScene.set(string(membership.sceneId), string(membership.bindingId)); bindingsByAsset.set(assetId, byScene);
+  }
+  inspectAnchors(g, g.all('captionsById'), sceneOverrides ? g.all('sceneCaptionMembershipsById') : []);
   const materials = g.all('materialOverridesById');
   for (const m of materials) {
     if (m.routing === undefined) continue;
@@ -52,11 +62,19 @@ export function inspectResourceGraph(g: GraphInspection): void {
     if (!active(m)) continue;
     if (!active(asset)) { g.issue('materialOverridesById', id, 'routing', knownUnavailable(asset) ? 'unavailable-endpoint' : 'pending-orphan-reference', knownUnavailable(asset) ? 'orphan' : 'needs-review'); continue; }
     if (asset!.status === undefined) continue;
-    const status = object(asset!.status), binding = status.kind === 'ready' ? g.table('assetBindingsById')[string(status.activeBindingId)] : undefined;
-    const revision = binding && binding.assetId === asset!.id ? g.table('assetRevisionsById')[string(binding.assetRevisionId)] : undefined;
-    const current = revision && revision.assetId === asset!.id ? list(revision.representationIds).map(repId => g.table('representationsById')[string(repId)]).filter((r): r is JsonObject => !!r && r.assetId === asset!.id) : [];
-    if (!current.some(r => r.variantFamilyId === target.variantFamilyId && r.materialCatalog && object(r.materialCatalog).layoutId === target.materialLayoutId &&
-      list(object(r.materialCatalog).slots).some(s => object(s).logicalMaterialSlotId === target.logicalMaterialSlotId)))
+    const status = object(asset!.status), initial = status.kind === 'ready' ? [string(status.activeBindingId)] : [];
+    const byScene = bindingsByAsset.get(string(asset!.id)), scoped = scope.kind === 'scene' && byScene?.get(string(scope.sceneId));
+    const ids = scoped ? [scoped] : scope.kind === 'project' && byScene ? [...new Set([...initial, ...byScene.values()])] : initial;
+    if (!ids.some(id => {
+      const binding = g.table('assetBindingsById')[id];
+      const revision = binding && binding.assetId === asset!.id ? g.table('assetRevisionsById')[string(binding.assetRevisionId)] : undefined;
+      return revision?.assetId === asset!.id && list(revision!.representationIds).some(repId => {
+        const rep = g.table('representationsById')[string(repId)];
+        return rep && rep.assetId === asset!.id && rep.variantFamilyId === target.variantFamilyId && rep.materialCatalog &&
+          object(rep.materialCatalog).layoutId === target.materialLayoutId &&
+          list(object(rep.materialCatalog).slots).some(slot => object(slot).logicalMaterialSlotId === target.logicalMaterialSlotId);
+      });
+    }))
       g.issue('materialOverridesById', id, 'routing', 'target-not-in-current-catalog', 'needs-review');
   }
   duplicates(g, 'materialOverridesById', m => { if (m.routing === undefined) return undefined; const r = object(m.routing), s = object(r.scope), t = object(r.target);
@@ -70,7 +88,9 @@ function duplicates(g: GraphInspection, map: ProjectRecordMap, key: (r: JsonObje
 }
 
 /** Also accepts all checked anchor candidates, with no scalar/candidate winner. */
-export function inspectAnchors(g: GraphInspection, captions: readonly JsonObject[] = g.all('captionsById')) {
+export function inspectAnchors(g: GraphInspection, baseCaptions: readonly JsonObject[], sceneCaptions: readonly JsonObject[] = []) {
+  const captions = sceneCaptions.length ? [...baseCaptions, ...sceneCaptions] : baseCaptions;
+  const sceneAnchors = new Set(sceneCaptions);
   const owners = new Map<string, Set<string>>();
   const register = (id: string, owner: string) => { const ids = owners.get(id) ?? new Set<string>(); ids.add(owner); owners.set(id, ids); };
   for (const r of g.all('assetRevisionsById')) for (const c of list(r.anchorCompatibilityClasses)) register(string(object(c).id), string(r.assetId));
@@ -80,7 +100,7 @@ export function inspectAnchors(g: GraphInspection, captions: readonly JsonObject
   const invalidRevisions = new Set(g.issues.filter(i => i.kind === 'invalid' && i.map === 'assetRevisionsById').map(i => i.id));
   for (const c of captions) {
     if (c.anchor === undefined) continue;
-    const id = string(c.id), a = object(c.anchor), issue = (code: string, kind: 'invalid' | 'orphan' | 'needs-review' | 'unverified' = 'invalid') => g.issue('captionsById', id, 'anchor', code, kind);
+    const id = string(c.id), a = object(c.anchor), issue = (code: string, kind: 'invalid' | 'orphan' | 'needs-review' | 'unverified' = 'invalid') => g.issue(sceneAnchors.has(c) ? 'sceneCaptionMembershipsById' : 'captionsById', id, 'anchor', code, kind);
     if (a.kind === 'unplaced') {
       if (a.ownerAssetId !== undefined) {
         g.edge(id, string(a.ownerAssetId), 'anchor.ownerAssetId');
@@ -113,7 +133,8 @@ export function inspectAnchors(g: GraphInspection, captions: readonly JsonObject
       if (source!.surfaceRef) issue('verified-source-index-range-required', 'unverified');
     }
     // Absent weak history/source is not a reason to drop the canonical position.
-    if (asset?.status !== undefined && active(asset) && active(c)) {
+    // A scene override is compared with its effective revision by resolveScene.
+    if (!sceneAnchors.has(c) && asset?.status !== undefined && active(asset) && active(c)) {
       const status = object(asset.status), binding = status.kind === 'ready' ? g.table('assetBindingsById')[string(status.activeBindingId)] : undefined;
       const current = binding && binding.assetId === asset.id ? g.table('assetRevisionsById')[string(binding.assetRevisionId)] : undefined;
       if (current && current.assetId === asset.id) {

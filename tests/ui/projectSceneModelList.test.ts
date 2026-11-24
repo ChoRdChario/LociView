@@ -48,7 +48,7 @@ describe('disconnected Project model inventory (pure/DOM contracts, not browser 
     const h = host(withItems({ ...fixture(), mutationBlock: '閲覧専用' }, [one, two]));
     const source = h.context.source;
     h.list.children[0]!.children[0]!.fire('click'); const memory = h.context.memory;
-    const visibility = h.root.children[8]!.children[2]!, hide = visibility.children[1]!, isolate = visibility.children[2]!;
+    const visibility = h.root.children[8]!.children[1]!, hide = visibility.children[1]!, isolate = visibility.children[2]!;
     expect(h.list.children[0]!.children[1]!.children[0]!.disabled).toBe(true);
     expect(hide.disabled).toBe(false); hide.fire('click');
     expect(h.context.memory).toEqual({ ...memory, hiddenAssetIds: [a] }); expect(hide.textContent).toBe('表示');
@@ -195,7 +195,7 @@ describe('disconnected Project model inventory (pure/DOM contracts, not browser 
 
   it('preserves IME, selection, keyed nodes and own scroll; refuses a cross-Scene render while input is pending', () => {
     const h = host(), first = h.list.children[0]!; first.children[0]!.fire('click');
-    expect(h.root.children[8]!.children[1]!.textContent).toContain('すべてのシーンで共通');
+    expect(h.root.children[8]!.children[0]!.textContent).toBe('Engine');
     h.search.focus(); h.search.fire('compositionstart'); h.search.value = '脚'; h.search.fire('input');
     h.render({ ...h.context }); expect(h.search.value).toBe('脚'); expect(h.context.memory.query).toBe('脚');
     expect(h.controls.render({ ...h.context, source: { ...h.context.source, sceneId: otherScene } })).toBe(false);

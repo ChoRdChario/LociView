@@ -67,14 +67,15 @@ export function chooseStartupScene(state: Readonly<{ defaultSceneId: Field<strin
 
 const targetKey = (target: MaterialTarget) => JSON.stringify([target.assetId, target.variantFamilyId,
   target.materialLayoutId, target.logicalMaterialSlotId]);
-function resolveMaterials(resources: SceneResources, sceneId: string, assetIds: Set<string>, issues: Issue[]) {
+function resolveMaterials(resources: SceneResources, sceneId: string, bindings: ReadonlyMap<string, string>, issues: Issue[]) {
   const groups = new Map<string, { target: MaterialTarget; project: Material[]; scene: Material[] }>();
   for (const [id, material] of Object.entries(resources.materials).sort(([a], [b]) => compare(a, b))) {
     if (isDeleted(material)) continue;
     const routing = read(material.routing, id, 'routing', issues);
     if (!routing) continue;
     if (routing.scope.kind === 'scene' && routing.scope.sceneId !== sceneId) continue;
-    if (!assetIds.has(routing.target.assetId)) continue;
+    const binding = bindings.get(routing.target.assetId);
+    if (!binding || material.applicableBindingIds && !material.applicableBindingIds.includes(binding)) continue;
     const key = targetKey(routing.target);
     const group = groups.get(key) ?? { target: routing.target, project: [], scene: [] };
     // Lifecycle conflicts reserve the key too; don't let another record win.
@@ -108,17 +109,21 @@ export function resolveScene(state: SceneState, resources: SceneResources, scene
   const scene = state.scenes[sceneId];
   if (!active(scene, sceneId, issues)) return { kind: 'blocked', issues };
   const assets: { assetId: string; membershipId: string; projection: import('./types').AssetProjection }[] = [];
+  const sceneProjections = new Map<string, Asset['projection']>();
   for (const edge of memberships(state, state.assetMemberships, sceneId, resources.assets, issues)) {
     const asset = resources.assets[edge.resourceId]!;
-    const projection = read(asset.projection, asset.id, 'activeBinding', issues);
+    const selected = edge.projection ?? asset.projection;
+    sceneProjections.set(asset.id, selected);
+    const projection = read(selected, edge.projection ? edge.id : asset.id, edge.projection ? 'bindingId' : 'activeBinding', issues);
     if (projection) assets.push({ assetId: asset.id, membershipId: edge.id, projection });
   }
-  const assetIds = new Set(assets.map(a => a.assetId));
+  const bindings = new Map(assets.map(a => [a.assetId, a.projection.bindingId]));
   const captions: CaptionProjection[] = [];
   for (const edge of memberships(state, state.captionMemberships, sceneId, resources.captions, issues)) {
     const caption = resources.captions[edge.resourceId]!;
     read(caption.title, caption.id, 'title', issues); read(caption.body, caption.id, 'body', issues);
-    const anchor = read(caption.anchor, caption.id, 'anchor', issues);
+    const selectedAnchor = edge.anchor ?? caption.anchor;
+    const anchor = read(selectedAnchor, edge.anchor ? edge.id : caption.id, 'anchor', issues);
     let marker: CaptionProjection['marker'] = 'suppressed';
     if (anchor?.kind === 'unplaced') {
       if (anchor.ownerAssetId === undefined || active(resources.assets[anchor.ownerAssetId], anchor.ownerAssetId, issues)) marker = 'unplaced';
@@ -131,18 +136,18 @@ export function resolveScene(state: SceneState, resources: SceneResources, scene
       const owner = resources.assets[anchor.assetId];
       if (!active(owner, anchor.assetId, issues)) issue(issues, 'orphan', caption.id, 'anchor');
       else {
-        const projection = read(owner!.projection, owner!.id, 'activeBinding', issues);
+        const projection = read(sceneProjections.get(anchor.assetId) ?? owner!.projection, owner!.id, 'activeBinding', issues);
         if (projection && projection.assetFrameId !== anchor.assetFrameId) issue(issues, 'invalid', caption.id, 'assetFrameId');
         else if (projection) {
           const compatible = projection.anchorCompatibilityIds.includes(anchor.authoredAnchorCompatibilityId);
           if (!compatible) issue(issues, 'needs-review', caption.id, 'anchor', 'review-anchor');
-          if (assetIds.has(anchor.assetId)) marker = compatible ? 'visible' : 'needsReview';
+          if (bindings.has(anchor.assetId)) marker = compatible ? 'visible' : 'needsReview';
           else issue(issues, 'hidden-owner', caption.id, 'anchor', 'show-model');
         }
       }
     }
     captions.push({ captionId: caption.id, membershipId: edge.id, title: caption.title,
-      body: caption.body, anchor: caption.anchor, marker });
+      body: caption.body, anchor: selectedAnchor, marker });
   }
   read(scene!.name, sceneId, 'name', issues);
   const defaultView = read(scene!.defaultViewId, sceneId, 'defaultViewId', issues);
@@ -159,5 +164,5 @@ export function resolveScene(state: SceneState, resources: SceneResources, scene
     }
   }
   return { kind: 'ready', composition: { sceneId, name: scene!.name, assets, captions,
-    materials: resolveMaterials(resources, sceneId, assetIds, issues), ...(entryView ? { entryView } : {}) }, issues };
+    materials: resolveMaterials(resources, sceneId, bindings, issues), ...(entryView ? { entryView } : {}) }, issues };
 }

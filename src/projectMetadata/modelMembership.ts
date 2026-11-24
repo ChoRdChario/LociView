@@ -16,12 +16,14 @@ type Provider = Extract<ProjectProviderRead, { kind: 'scene-provider' }>;
 const shape = (o: object, keys: string[]) => { if (Object.keys(o).sort().join(',') !== keys.sort().join(',')) fail('model-copy-shape'); };
 const exact = <T>(v: { kind: string; value?: T } | undefined): T => v?.kind === 'value' ? v.value! : fail('model-copy-unresolved');
 /** Complete known active records, not a winner or an incomplete display DTO. */
-export function assetCopySource(provider: Provider, sceneId: string, assetId: string, limits: MetadataLimits) {
+export function assetCopySource(provider: Provider, sceneId: string, assetId: string, limits: MetadataLimits, membershipId?: string) {
   const r = candidateReader(provider, limits), asset = r.complete('assetsById', assetId);
   r.active('scenesById', sceneId);
   const status = object(asset.status); if (status.kind !== 'ready') return fail('model-copy-status');
   const read = metadataImmutableReader(provider, limits);
-  const binding = read('assetBindingsById', status.activeBindingId as string);
+  const member = membershipId === undefined ? undefined : r.complete('sceneAssetMembershipsById', membershipId);
+  if (member && (member.sceneId !== sceneId || member.assetId !== assetId)) return fail('model-copy-owner');
+  const binding = read('assetBindingsById', (member?.bindingId ?? status.activeBindingId) as string);
   const revision = read('assetRevisionsById', binding.assetRevisionId as string);
   const reps=list(revision.representationIds).map(id=>read('representationsById',id as string)),gs=reps.filter(r=>r.role==='gsPrimary');
   if(gs.length){
@@ -126,7 +128,7 @@ export function planAssetMembershipCopies(provider: Provider, command: AssetMemb
   const others = command.observedMembershipIds.filter(id => id !== command.originalMembershipId);
   if (copies!.length !== others.length || new Set(copies!.map(c => c.sourceMembershipId)).size !== others.length ||
     copies!.some(c => !others.includes(c.sourceMembershipId))) fail('model-copy-candidates');
-  const source = assetCopySource(provider, command.sceneId, command.assetId, limits), reader = candidateReader(provider, limits);
+  const reader = candidateReader(provider, limits);
   const reserved = new Set<string>();
   const reserve = (v: unknown): void => { reader.charge(); if (typeof v === 'string') reserved.add(v);
     else if (Array.isArray(v)) v.forEach(reserve); else if (v && typeof v === 'object') Object.values(v).forEach(reserve); };
@@ -137,7 +139,12 @@ export function planAssetMembershipCopies(provider: Provider, command: AssetMemb
   const guard = new ProjectRecordFields(provider.semanticProfile);
   const fresh = (id: string, prefix: string) => { guard.id(id, prefix, []); if (reserved.has(id)) fail('model-copy-id'); reserved.add(id); };
   const lifecycle = { state: 'active', reason: 'initial', eventId: command.eventId };
+  const sources = new Map<string, ReturnType<typeof assetCopySource>>();
   for (const copy of copies!) {
+    const membership = reader.complete('sceneAssetMembershipsById', copy.sourceMembershipId);
+    const key = String(membership.bindingId ?? '');
+    const source = sources.get(key) ?? assetCopySource(provider, command.sceneId, command.assetId, limits, copy.sourceMembershipId);
+    sources.set(key, source);
     shape(copy, ['sourceMembershipId', 'ids', 'slots', 'binding', 'revision', 'representation',...(source.proxy?['proxy']:[])]); shape(copy.ids, Object.keys(prefixes));
     for (const [key, prefix] of Object.entries(prefixes)) fresh(copy.ids[key as keyof typeof prefixes], prefix);
     if (!Array.isArray(copy.slots) || copy.slots.length !== source.materials.length || new Set(copy.slots.map(s => s.sourceId)).size !== source.materials.length)
@@ -172,7 +179,9 @@ export function planAssetMembershipCopies(provider: Provider, command: AssetMemb
       checkMutableRecord(guard, map, fields); if (guard.unknown) fail('model-copy-unknown'); edits.push({ map, id: fields.id as string, fields, create: true });
     };
     create('assetsById', { ...source.asset, id: ids.asset, assetFrameId: ids.assetFrame, status: { kind: 'ready', activeBindingId: ids.binding }, lifecycle });
-    create('sceneAssetMembershipsById', { ...reader.complete('sceneAssetMembershipsById', copy.sourceMembershipId), id: ids.membership, assetId: ids.asset, lifecycle });
+    // The original membership can point at its source owner's binding. The new asset's base already contains the remapped one.
+    const { bindingId: _sourceBinding, ...copiedMembership } = membership;
+    create('sceneAssetMembershipsById', { ...copiedMembership, id: ids.membership, assetId: ids.asset, lifecycle });
     for (const slot of copy.slots) {
       const material = materials.get(slot.sourceId);
       if (material) create('materialOverridesById', { ...material, id: slot.materialId!, lifecycle, routing: { scope: { kind: 'scene', sceneId: command.sceneId },

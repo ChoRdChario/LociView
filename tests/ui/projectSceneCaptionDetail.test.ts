@@ -62,7 +62,7 @@ function host(initial = context(), document = new RecordedDocument()) {
   const root = record(controls.root);
   const all = (n: typeof root): typeof root[] => [n, ...n.children.flatMap(all)];
   const input = (name: string) => all(root).find(n => n.getAttribute('aria-label') === name)!;
-  const title = input('タイトル'), body = input('本文'), color = input('ピンの色'), titleGroup = title.parent!.parent!;
+  const title = input('タイトル'), body = input('本文'), color = input('カラーコード'), titleGroup = title.parent!.parent!;
   const actions = record(controls.actions), confirmation = record(controls.confirmation);
   return { controls, document, root, title, body, color, titleGroup, status: root.children[0]!, impact: root.children[1]!,
     picker: input('色を選択'), apply: actions.children[0]!, cancel: actions.children[1]!, confirmation,
@@ -171,11 +171,13 @@ describe('Caption detail: local draft/intents, not durable editor acceptance', (
     await Promise.resolve(); expect(h.document.activeElement).toBe(h.apply);
     expect(h.body.focusCalls).toHaveLength(0); h.controls.dispose();
   });
-  it('keeps one mounted draft with a media slot before secondary properties and the same completion controls', () => {
+  it('puts the selected pin swatch in the summary, with the code and native palette inside', () => {
     const h = host(), slot = record(h.controls.mediaSlot), properties = h.root.children.find(n => n.className === 'lv-caption-properties')!;
     expect(h.root.children.indexOf(h.body.parent!.parent!)).toBeLessThan(h.root.children.indexOf(slot));
     expect(h.root.children.indexOf(slot)).toBeLessThan(h.root.children.indexOf(properties));
-    expect(properties.contains(h.color)).toBe(true); expect(properties.open).toBe(false);
+    const summary = properties.children[0]!;
+    expect(summary.textContent).toBe('ピンカラー'); expect(summary.children[0]!.style.backgroundColor).toBe('#aabbcc');
+    expect(properties.contains(h.color)).toBe(true); expect(properties.contains(h.picker)).toBe(true); expect(properties.open).toBe(false);
     h.title.value = '入力を保持'; h.title.fire('input'); expect(h.title.value).toBe('入力を保持'); expect(h.apply.disabled).toBe(false);
     expect(slot).toBe(record(h.controls.mediaSlot)); h.controls.dispose();
   });
@@ -184,7 +186,7 @@ describe('Caption detail: local draft/intents, not durable editor acceptance', (
     const properties = h.root.children.find(n => n.className === 'lv-caption-properties')!;
     expect(properties.open).toBe(false); h.render(initial); expect(properties.open).toBe(false);
     h.color.value = 'invalid'; h.color.fire('input'); expect(properties.open).toBe(true);
-    expect(h.color.parent!.parent!.children[2]!.hidden).toBe(true); expect(h.apply.disabled).toBe(true);
+    expect(properties.children[0]!.children[0]!.hidden).toBe(true); expect(h.apply.disabled).toBe(true);
     h.render({ ...h.props, source: { kind: 'unavailable', captionId: cap, sceneId: scn, token: 'lost', reason: '状態を確認してください。' } });
     expect(properties.open).toBe(true); expect(h.color.value).toBe('invalid'); h.controls.dispose();
   });

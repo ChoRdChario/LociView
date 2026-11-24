@@ -2,7 +2,7 @@ import { displayBlobRef } from '../domain/portableMedia';
 import type { ResumeReading, ResumeReadingRequest } from './validationCatalog';
 import { createGsProxyWorkflow } from './gsProxyWorkflow';
 import { captureEditor } from '../projectMetadata/editorAttribution';
-import { PORTABLE_MEDIA_CAPABILITY } from '../projectMetadata/requiredCapabilities';
+import { PORTABLE_MEDIA_CAPABILITY, SCENE_PLACEMENT_CAPABILITY } from '../projectMetadata/requiredCapabilities';
 import { assertValidationBodyAllocation } from '../projectFiles/bodyBudget';
 import type { PhotoDecoder } from '../projectFiles/photo';
 import type { MediaDecoders } from '../projectFiles/media';
@@ -711,7 +711,9 @@ async function openValidationHostOwned(options: ValidationHostOptions, run: stri
       cleanup: (token: string) => outputAction(() => sender.cleanup(token), true),
       get privacy() { const sourceIncludesNames = last.source?.includesDeclaredEditorNames ?? false;
         const sourceRequiresPortableMediaReader = !!last.source?.requiredCapabilities.includes(PORTABLE_MEDIA_CAPABILITY);
-        return { sourceIncludesNames, backupIncludesNames: sourceIncludesNames || outputBases.some(b => b.includesDeclaredEditorNames),
+        const sourceRequiresScenePlacementReader = !!last.source?.requiredCapabilities.includes(SCENE_PLACEMENT_CAPABILITY);
+        return { sourceRequiresScenePlacementReader, backupRequiresScenePlacementReader: sourceRequiresScenePlacementReader || outputBases.some(b => b.requiresScenePlacementReader),
+          sourceIncludesNames, backupIncludesNames: sourceIncludesNames || outputBases.some(b => b.includesDeclaredEditorNames),
           sourceRequiresPortableMediaReader, backupRequiresPortableMediaReader: sourceRequiresPortableMediaReader || outputBases.some(b => b.requiresPortableMediaReader) }; },
       get jobs() { return outputJobs; }, get error() { return outputFailure || outputDiscoveryFailure; },
       get bases() { return outputBases; },
@@ -930,7 +932,9 @@ async function openValidationHostOwned(options: ValidationHostOptions, run: stri
         const current = command.kind === 'editMaterial' ? project?.materialData?.records[command.overrideId] : undefined;
         const routing = command.kind === 'createMaterial' ? command.routing : current?.routing.kind === 'value' ? current.routing.value : null;
         const compositing = command.compositing ?? (current?.compositing.kind === 'value' ? current.compositing.value : null);
-        const slots = project?.modelVersions?.flatMap(v => isSavedMesh(v.closure) ? validationMaterialSlots(v.closure) : []) ?? [];
+        const scene = project && resolveScene(project.state, project.resources, command.sceneId);
+        const visible = new Set(scene?.kind === 'ready' ? scene.composition.assets.map(a => a.projection.bindingId) : []);
+        const slots = project?.modelVersions?.flatMap(v => visible.has(v.projection.bindingId) && isSavedMesh(v.closure) ? validationMaterialSlots(v.closure) : []) ?? [];
         const slot = slots.find(s => same(s.target as unknown as JsonObject, routing?.target as JsonObject | undefined));
         if (!slot || !compositing) throw Error('設定するモデルと材質を確認してください。');
         const issue = validationMaterialIssue(slot, { appearance: command.appearance ?? (current?.appearance.kind === 'value' ? current.appearance.value : undefined), compositing } as MaterialIntent, project?.semanticProfile);
@@ -944,7 +948,9 @@ async function openValidationHostOwned(options: ValidationHostOptions, run: stri
           throw error;
         }})();
         const versions = await validationModelVersions(before.provider);
-        const slots = versions.flatMap(v => isSavedMesh(v.closure) ? validationMaterialSlots(v.closure) : []);
+        const scene = resolveScene(before.provider.state, before.provider.resources, command.sceneId);
+        const visible = new Set(scene.kind === 'ready' ? scene.composition.assets.map(a => a.projection.bindingId) : []);
+        const slots = versions.flatMap(v => visible.has(v.projection.bindingId) && isSavedMesh(v.closure) ? validationMaterialSlots(v.closure) : []);
         const slot = slots.find(s => same(s.target as unknown as JsonObject, selected.routing.target));
         if (!slot) throw Error('設定するモデルと材質を確認してください。');
         for (const [id,intent] of selected.intents) {
@@ -1002,7 +1008,7 @@ async function openValidationHostOwned(options: ValidationHostOptions, run: stri
         }, true);
       },
       replaceModelFile: (token, input: ModelFileReplacement) => {
-        const target = { sceneId: input.sceneId, assetId: input.assetId, expectedBindingId: input.expectedBindingId }, selected = input.file;
+        const target = { sceneId: input.sceneId, assetId: input.assetId, expectedBindingId: input.expectedBindingId, ...(input.scope ? { scope: input.scope } : {}) }, selected = input.file;
         const file = { name: selected.name, size: selected.size, blob: selected.blob && captureGsBlob(selected.blob), arrayBuffer: selected.arrayBuffer.bind(selected) };
         return execute(async () => {
           editable(); const editor = captureLocalEditor(); const before = await session.read();
@@ -1011,7 +1017,7 @@ async function openValidationHostOwned(options: ValidationHostOptions, run: stri
           const versions = await validationModelVersions(before.provider);
           const source = versions.find(v => v.assetId === target.assetId && v.projection.bindingId === target.expectedBindingId)?.closure;
           const view = authority.read(), scene = resolveScene(view.state, view.resources, target.sceneId);
-          if (!source || !(isSavedMesh(source) || isOrdinaryPoint(source) || isOrdinaryGs(source)) || scene.kind !== 'ready' || !scene.composition.assets.some(a => a.assetId === target.assetId))
+          if (!source || !(isSavedMesh(source) || isOrdinaryPoint(source) || isOrdinaryGs(source)) || scene.kind !== 'ready' || !scene.composition.assets.some(a => a.assetId === target.assetId && a.projection.bindingId === target.expectedBindingId))
             throw Error('差し替えるモデルを確認してください。');
           const gs = isOrdinaryGs(source), point = isOrdinaryPoint(source);
           if (!Number.isSafeInteger(file.size) || file.size <= 0 || file.size > (gs && file.blob ? content.policy.gs.maxFileBytes : content.limits.maxFileBytes) || file.blob && file.blob.size !== file.size)
@@ -1041,13 +1047,16 @@ async function openValidationHostOwned(options: ValidationHostOptions, run: stri
             throw Error('モデルが更新されています。配置の入力を保持しています。');
           const versions = await validationModelVersions(before.provider);
           const source = versions.find(v => v.assetId === captured.assetId && v.projection.bindingId === captured.expectedBindingId)?.closure;
-          if (!source || !isSavedModel(source)) throw Error('配置するモデルを確認してください。');
+          const selected = resolveScene(before.provider.state, before.provider.resources, captured.sceneId);
+          if (!source || !isSavedModel(source) || selected.kind !== 'ready' ||
+              !selected.composition.assets.some(asset => asset.assetId === captured.assetId && asset.projection.bindingId === captured.expectedBindingId))
+            throw Error('配置するモデルを確認してください。');
           const binding = await sealValidationRecord('asset-binding-revision', { id: captured.bindingId, assetId: captured.assetId,
             assetRevisionId: source.revision.id, parentBindingId: source.binding.id, method: captured.fitReference ? 'bounds' : 'manual',
             assetToProject: captured.placement as unknown as JsonObject });
-          return ready(await session.edit(token, captured.fitReference ? { kind: 'fitAssetBounds', sceneId: captured.sceneId, assetId: captured.assetId,
+          return ready(await session.edit(token, captured.fitReference ? { kind: 'fitAssetBounds', ...(captured.scope ? { scope: captured.scope } : {}), sceneId: captured.sceneId, assetId: captured.assetId,
             expectedBindingId: captured.expectedBindingId, binding, referenceAssetId: captured.fitReference.assetId, expectedReferenceBindingId: captured.fitReference.bindingId } :
-            { kind: 'transformAsset', sceneId: captured.sceneId, assetId: captured.assetId, expectedBindingId: captured.expectedBindingId, binding }, editor));
+            { kind: 'transformAsset', ...(captured.scope ? { scope: captured.scope } : {}), sceneId: captured.sceneId, assetId: captured.assetId, expectedBindingId: captured.expectedBindingId, binding }, editor));
         }, true);
       },
       retry: () => execute(async () => { editable(true); return resume(); }),

@@ -11,6 +11,8 @@ their accepted contracts.
 
 ## Purpose-specific authority
 
+The [scene-specific placement contract](specs/08e-scene-model-placement.md) defines how one scene can replace a model or correct a pin while its shared caption and photographs remain available in other scenes.
+
 | Question | Read |
 |---|---|
 | How to work, verify and push | [AGENTS.md](../AGENTS.md) |

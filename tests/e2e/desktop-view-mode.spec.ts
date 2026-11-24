@@ -69,13 +69,12 @@ test('short Caption workspace keeps dense and filtered lists, Scene choices and 
     for (const name of ['前の記録', '次の記録']) expect((await detail.getByRole('button', { name, exact: true }).boundingBox())!.width).toBeGreaterThanOrEqual(44);
     await p.screenshot({ path: info.outputPath('reading-200percent.png') });
     await p.setViewportSize({ width: 1280, height: 720 }); await header.getByRole('button', { name: '編集する', exact: true }).click(); await expect(header.getByRole('button', { name: '閲覧する', exact: true })).toBeEnabled();
-    const colors = p.locator('.lv-caption-color-menu'); await colors.locator(':scope > summary').click();
+    const colors = p.getByRole('group', { name: 'ピンカラーで絞り込み' });
     expect(await colors.locator('button').evaluateAll(nodes => nodes.every(node => {
       const rect = node.getBoundingClientRect(), hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
       return rect.width >= 44 && rect.height >= 44 && (hit === node || node.contains(hit));
     }))).toBe(true);
     await colors.getByRole('button', { name: '全色', exact: true }).click();
-    await colors.locator(':scope > summary').click();
     const beforeFocus = await split(); await search.focus(); expect(await split()).toEqual(beforeFocus); await expect(task).toHaveAttribute('data-editing', 'false');
     const sceneBefore = await sceneChoice.inputValue(), savedState = header.getByLabel('再開データの状態', { exact: true });
     await search.dispatchEvent('compositionstart', { data: '記録' });
@@ -127,7 +126,7 @@ test('short Caption workspace keeps dense and filtered lists, Scene choices and 
     await sceneChoice.focus(); await p.keyboard.press('ArrowDown'); await p.keyboard.press('Enter');
     await expect(sceneChoice).not.toHaveValue(sceneBefore); await expect(sceneChoice).toBeFocused();
     await p.setViewportSize({ width: 720, height: 500 }); await revealWorkPanel(p); await expect(task).toHaveAttribute('data-selected', 'false');
-    await expect(search).toBeInViewport({ ratio: 1 }); await expect(p.getByRole('button', { name: '記録を追加', exact: true })).toBeInViewport({ ratio: 1 });
+    await expect(search).toBeInViewport({ ratio: 1 }); await expect(p.getByRole('button', { name: '新規ピンを追加', exact: true })).toBeInViewport({ ratio: 1 });
     await p.setViewportSize({ width: 1280, height: 720 });
     await sceneChoice.selectOption({ label: '観察する部品と写真を切り替える長いシーン' });
     await expect(list.locator('.lv-caption-select').filter({ hasText: '既存のピン' })).toBeVisible();
@@ -203,7 +202,7 @@ test('view mode hides editing while preserving reading, local display, existing 
     await axes.click({ position: { x: overlap!.x, y: overlap!.y } }); await expect(hovered).toBeFocused(); await expect(hovered).toHaveAttribute('aria-pressed', 'true'); await expect(p.getByRole('tooltip')).toBeHidden();
     await lookAlongFront(p);
     await revealCoordinateAdd(p); const owner = p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '閲覧するモデル.glb' }); await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
-    for (const axis of ['X', 'Y', 'Z']) await p.getByLabel('位置 ' + axis, { exact: true }).fill(axis === 'Y' ? '.5' : '0');
+    for (const axis of ['X', 'Y', 'Z']) await p.getByRole('region', { name: '位置の調整', exact: true }).getByLabel('位置 ' + axis, { exact: true }).fill(axis === 'Y' ? '.5' : '0');
     await p.getByRole('button', { name: 'ここに記録を作る', exact: true }).click(); await ready('ピンの位置を確定しました。');
     await detail.getByLabel('タイトル', { exact: true }).fill('現地の写真'); await detail.getByLabel('本文', { exact: true }).fill('確認する本文\n二行目');
     await finishCaptionEditing(p, {}, 15000);

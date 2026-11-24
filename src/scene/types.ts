@@ -13,6 +13,9 @@ export interface Scene extends Entity {
   readonly defaultViewId: Field<string | null>;
 }
 export interface Membership extends Entity {
+  /** A missing override inherits the logical model or caption. An unresolved override never inherits. */
+  readonly projection?: Field<AssetProjection>;
+  readonly anchor?: Field<Anchor>;
   readonly sceneId: string;
   readonly resourceId: string;
   readonly orderKey: Field<string>;
@@ -58,6 +61,7 @@ export interface MaterialTarget {
   readonly logicalMaterialSlotId: string;
 }
 export interface Material extends Entity {
+  readonly applicableBindingIds?: readonly string[];
   readonly routing: Field<Readonly<{ scope: { readonly kind: 'project' } |
     { readonly kind: 'scene'; readonly sceneId: string }; target: MaterialTarget }>>;
   /** Whole validated appearance/compositing intent, never a nested merge. */

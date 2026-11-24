@@ -22,7 +22,7 @@ test('delayed explanations stay readable and preserve a Caption draft through to
     await p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('補足説明の確認'); await p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
     await expect(p.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false', { timeout: 90_000 });
     await revealCoordinateAdd(p); const owner = p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '説明の確認.glb' }); await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
-    for (const axis of ['X', 'Y', 'Z']) await p.getByLabel('位置 ' + axis, { exact: true }).fill(axis === 'Y' ? '.5' : '0');
+    for (const axis of ['X', 'Y', 'Z']) await p.getByRole('region', { name: '位置の調整', exact: true }).getByLabel('位置 ' + axis, { exact: true }).fill(axis === 'Y' ? '.5' : '0');
     await p.getByRole('button', { name: 'ここに記録を作る', exact: true }).click(); await expect(p.getByText('ピンの位置を確定しました。', { exact: true })).toBeVisible();
     const title = p.getByRole('region', { name: '記録の詳細', exact: true }).getByLabel('タイトル', { exact: true }); await title.fill('説明を開いても入力を保持');
     const help = p.getByLabel('記録の編集操作', { exact: true }).getByRole('button', { name: '説明', exact: true });

@@ -11,27 +11,31 @@ import { metadataImmutableReader } from './records';
 import type { MetadataRecordEdit } from './commands';
 import { fail, type MetadataLimits } from './format';
 
-export interface GsProxyTarget { readonly sceneId: string; readonly assetId: string; readonly expectedBindingId: string;
+export interface GsProxyTarget { readonly scope?: 'scene'; readonly sceneId: string; readonly assetId: string; readonly expectedBindingId: string;
   readonly gsRepresentationId: string; readonly gsPayloadDigest: string; readonly gsFamilyId: string;
   readonly expectedProxyId: string | null }
 export type GsProxyCommand = GsProxyTarget & { readonly kind: 'attachGsProxy' | 'changeGsProxy' | 'removeGsProxy';
   readonly revision: JsonObject; readonly binding: JsonObject; readonly proxy?: JsonObject };
 export function readGsProxyTarget(provider: Extract<ProjectProviderRead,{kind:'scene-provider'}>, target: GsProxyTarget, limits: MetadataLimits) {
   const reader=candidateReader(provider,limits), read=metadataImmutableReader(provider,limits); reader.active('assetsById',target.assetId);
-  const scene=resolveScene(provider.state,provider.resources,target.sceneId), projection=provider.resources.assets[target.assetId]?.projection;
-  if(scene.kind!=='ready' || !scene.composition.assets.some(a=>a.assetId===target.assetId) || projection?.kind!=='value' || projection.value.bindingId!==target.expectedBindingId) return fail('gs-proxy-stale');
-  const binding=read('assetBindingsById',target.expectedBindingId), revision=read('assetRevisionsById',projection.value.revisionId);
+  if (target.scope !== undefined && (target.scope !== 'scene' || provider.semanticProfile !== 'map2')) return fail('scene-placement-profile');
+  const scene = resolveScene(provider.state, provider.resources, target.sceneId);
+  const member = scene.kind === 'ready' ? scene.composition.assets.find(a => a.assetId === target.assetId) : undefined;
+  const base = provider.resources.assets[target.assetId]?.projection;
+  const projection = member && (target.scope ? member.projection : base?.kind === 'value' ? base.value : undefined);
+  if (!member || !projection || projection.bindingId !== target.expectedBindingId) return fail('gs-proxy-stale');
+  const binding=read('assetBindingsById',target.expectedBindingId), revision=read('assetRevisionsById',projection.revisionId);
   const reps=list(revision.representationIds).map(id=>read('representationsById',id as string)), sources=reps.filter(r=>r.role==='gsPrimary'), proxies=reps.filter(r=>r.role==='interactionProxy');
   const gs=sources[0], proxy=proxies[0];
   if(sources.length!==1 || proxies.length>1 || reps.length!==1+proxies.length || !gs || gs.assetId!==target.assetId ||
     !same(gs.formatProfile,gsSourceDeclaration) || gs.id!==target.gsRepresentationId || gs.payloadDigest!==target.gsPayloadDigest || gs.variantFamilyId!==target.gsFamilyId ||
     (proxy?.id??null)!==target.expectedProxyId || proxy && (proxy.assetId!==target.assetId || proxy.proxyForGsVariantFamilyId!==gs.variantFamilyId)) return fail('gs-proxy-target');
-  return {binding,revision,gs,proxy};
+  return {binding,revision,gs,proxy,membershipId:member.membershipId};
 }
 /** Closed same-GS edit. No placement, GS identity, class or Caption rewriting. */
 export function planGsProxy(provider: Extract<ProjectProviderRead,{kind:'scene-provider'}>, command: GsProxyCommand, limits: MetadataLimits): MetadataRecordEdit[] {
-  const c=new ProjectRecordFields(provider.semanticProfile), {binding:oldBinding,revision:oldRevision,gs,proxy:oldProxy}=readGsProxyTarget(provider,command,limits);
-  const removing=command.kind==='removeGsProxy', keys=['kind','sceneId','assetId','expectedBindingId','gsRepresentationId','gsPayloadDigest','gsFamilyId','expectedProxyId','revision','binding',...(!removing?['proxy']:[])];
+  const c=new ProjectRecordFields(provider.semanticProfile), {binding:oldBinding,revision:oldRevision,gs,proxy:oldProxy,membershipId}=readGsProxyTarget(provider,command,limits);
+  const removing=command.kind==='removeGsProxy', keys=['kind','sceneId','assetId','expectedBindingId','gsRepresentationId','gsPayloadDigest','gsFamilyId','expectedProxyId','revision','binding',...(command.scope ? ['scope'] : []),...(!removing?['proxy']:[])];
   if(Object.keys(command).sort().join('|')!==keys.sort().join('|') || command.kind==='attachGsProxy' && oldProxy || command.kind!=='attachGsProxy' && !oldProxy) return fail('gs-proxy-shape');
   const {revision,binding,proxy}=command, edits:MetadataRecordEdit[]=[];
   for(const [map,r] of [['assetRevisionsById',revision],['assetBindingsById',binding],...(!removing?[['representationsById',proxy!]] as const:[])] as const) {
@@ -59,5 +63,8 @@ export function planGsProxy(provider: Extract<ProjectProviderRead,{kind:'scene-p
   const ids:[[unknown,string],...Array<[unknown,string]>]=[[revision.id,'rev'],[binding.id,'bnd']];
   if(proxy){const catalog=object(proxy.materialCatalog);ids.push([proxy.id,'rep'],[proxy.representationFrameId,'frm'],[proxy.variantFamilyId,'fam'],[catalog.layoutId,'lay'],...list(catalog.slots).map(s=>[object(s).logicalMaterialSlotId,'slot'] as [unknown,string]));}
   for(const [id,prefix]of ids){c.id(id as string,prefix,[]);if(reserved.has(id as string))fail('gs-proxy-id');reserved.add(id as string);}
-  edits.push({map:'assetsById',id:command.assetId,create:false,fields:{status:{kind:'ready',activeBindingId:binding.id!}}}); return edits;
+  edits.push(command.scope === 'scene'
+    ? {map:'sceneAssetMembershipsById',id:membershipId,create:false,fields:{bindingId:binding.id!}}
+    : {map:'assetsById',id:command.assetId,create:false,fields:{status:{kind:'ready',activeBindingId:binding.id!}}});
+  return edits;
 }

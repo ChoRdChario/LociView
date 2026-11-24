@@ -1,6 +1,6 @@
 import { resolveScene } from '../../scene/resolve';
 import { same } from '../../domain/projectGraphSupport';
-import { value, type Field, type Caption } from '../../scene/types';
+import { value, type Field, type Caption, type Anchor, type AssetProjection, type SceneState, type SceneResources } from '../../scene/types';
 import type { JsonValue, JsonObject } from '../../domain/values';
 import type { WorkspaceProvider } from './projectWorkspacePorts';
 import type { CaptionListItem } from './captionListState';
@@ -8,6 +8,24 @@ import type { CaptionIncludeSource } from './captionIncludeState';
 import type { ModelListSource, ModelMembership } from './modelListState';
 
 export const fieldValue = <T>(f: Field<T> | undefined): T | undefined => f?.kind === 'value' ? f.value : undefined;
+type SceneRead = { state: SceneState; resources: SceneResources };
+type MemberRead = { bindings: ReadonlyMap<string, AssetProjection>; anchors: ReadonlyMap<string, Field<Anchor>>; captionMembershipIds: ReadonlyMap<string, string> };
+const memberReads = new WeakMap<SceneState, { resources: SceneResources; sceneId: string; members: MemberRead }>();
+
+/** A single immutable scene read feeds all the controls and the viewport. No global fallback for unresolved members. */
+export function sceneMembers(project: SceneRead, sceneId: string): MemberRead {
+  const cached = memberReads.get(project.state);
+  if (cached?.resources === project.resources && cached.sceneId === sceneId) return cached.members;
+  const scene = resolveScene(project.state, project.resources, sceneId);
+  const members: MemberRead = {
+    bindings: new Map(scene.kind === 'ready' ? scene.composition.assets.map(asset => [asset.assetId, asset.projection] as const) : []),
+    anchors: new Map(scene.kind === 'ready' ? scene.composition.captions.map(caption => [caption.captionId, caption.anchor] as const) : []),
+    captionMembershipIds: new Map(scene.kind === 'ready' ? scene.composition.captions.map(caption => [caption.captionId, caption.membershipId] as const) : []),
+  };
+  memberReads.set(project.state, { resources: project.resources, sceneId, members });
+  return members;
+}
+
 export function projectIdentity(provider: WorkspaceProvider): string {
   const field = provider.inspection.candidates.fields.find(f => f.path.length === 1 && f.path[0] === 'identity');
   const atom = field?.valid && field.candidates.length === 1 ? field.candidates[0] : undefined;
@@ -16,28 +34,33 @@ export function projectIdentity(provider: WorkspaceProvider): string {
 const unknown = <T>(): Field<T> => ({ kind: 'unresolved', reason: 'conflict' });
 export const activeRecord = (fields: Readonly<Record<string, Field<JsonValue | undefined>>>): boolean =>
   (fieldValue(fields.lifecycle) as JsonObject | undefined)?.state === 'active';
+export function projectAssetMembership(provider: WorkspaceProvider, sceneId: string, assetId: string): Field<ModelMembership> {
+  const edges: { id: string; order: Field<string> }[] = []; let uncertain = false;
+  for (const [id, fields] of Object.entries(provider.details.mutable.sceneAssetMembershipsById)) {
+    const scene = fieldValue(fields.sceneId), owner = fieldValue(fields.assetId);
+    if (typeof scene === 'string' && scene !== sceneId || typeof owner === 'string' && owner !== assetId) continue;
+    const deleteEdit = provider.issues.some(i => i.code === 'concurrent-delete-edit' && i.path[0] === 'sceneAssetMembershipsById' && i.path[1] === id);
+    if ((fieldValue(fields.lifecycle) as JsonObject | undefined)?.state === 'deleted' && !deleteEdit) continue;
+    const edge = provider.state.assetMemberships[id];
+    if (scene !== sceneId || owner !== assetId || !activeRecord(fields) || fieldValue(fields.id) !== id || fields.orderKey?.kind !== 'value' ||
+      !edge || edge.sceneId !== sceneId || edge.resourceId !== assetId || fieldValue(edge.lifecycle)?.state !== 'active' ||
+      deleteEdit) uncertain = true;
+    else edges.push({ id, order: fields.orderKey as Field<string> });
+  }
+  return uncertain || edges.length > 1 ? unknown() : edges[0] ?
+    value({ kind: 'included', membershipId: edges[0].id, sceneId, assetId, orderKey: edges[0].order }) : value({ kind: 'absent' });
+}
+
 export function projectModels(provider: WorkspaceProvider, sceneId: string, projectId: string, hidden: readonly string[],
   viewport: { ready: boolean; issue: string | null; assetIds?: readonly string[] }): ModelListSource {
   if (resolveScene(provider.state, provider.resources, sceneId).kind !== 'ready') return { kind: 'unavailable', token: provider.token, projectId, sceneId, reason: 'シーンの状態を確認してください。' };
   return { kind: 'ready', token: provider.token, projectId, sceneId, items: Object.values(provider.resources.assets).map(asset => {
-    const edges: { id: string; order: Field<string> }[] = []; let uncertain = false;
-    for (const [id, fields] of Object.entries(provider.details.mutable.sceneAssetMembershipsById)) {
-      if ((fieldValue(fields.lifecycle) as JsonObject | undefined)?.state === 'deleted') continue;
-      const scene = fieldValue(fields.sceneId), owner = fieldValue(fields.assetId);
-      if (typeof scene === 'string' && scene !== sceneId || typeof owner === 'string' && owner !== asset.id) continue;
-      const edge = provider.state.assetMemberships[id];
-      if (scene !== sceneId || owner !== asset.id || !activeRecord(fields) || fieldValue(fields.id) !== id || fields.orderKey?.kind !== 'value' ||
-        !edge || edge.sceneId !== sceneId || edge.resourceId !== asset.id || fieldValue(edge.lifecycle)?.state !== 'active' ||
-        provider.issues.some(i => i.code === 'concurrent-delete-edit' && i.path[0] === 'sceneAssetMembershipsById' && i.path[1] === id)) uncertain = true;
-      else edges.push({ id, order: fields.orderKey as Field<string> });
-    }
-    const membership: Field<ModelMembership> = uncertain || edges.length > 1 ? unknown() : edges[0] ?
-      value({ kind: 'included', membershipId: edges[0].id, sceneId, assetId: asset.id, orderKey: edges[0].order }) : value({ kind: 'absent' });
-    const shown = viewport.ready && viewport.assetIds?.includes(asset.id) && asset.projection.kind === 'value';
+    const membership = projectAssetMembership(provider, sceneId, asset.id);
+    const shown = viewport.ready && viewport.assetIds?.includes(asset.id) && sceneMembers(provider, sceneId).bindings.has(asset.id);
     return { id: asset.id, name: provider.details.mutable.assetsById[asset.id]!.label as Field<string>,
       lifecycle: asset.lifecycle.kind === 'value' ? value(asset.lifecycle.value.state) : asset.lifecycle,
       membership, display: value(membership.kind === 'value' && membership.value.kind === 'absent' ? 'outsideScene' : membership.kind === 'value' && hidden.includes(asset.id) ? 'temporarilyHidden' : !shown ? 'unavailable' : 'visible'),
-      displayReason: uncertain || membership.kind !== 'value' ? 'モデルの所属・更新候補を確認してください。' : shown ? null : viewport.issue ?? '3D表示を確認してください。' };
+      displayReason: membership.kind !== 'value' ? 'モデルの所属・更新候補を確認してください。' : shown ? null : viewport.issue ?? '3D表示を確認してください。' };
   }) };
 }
 export function projectAttachments(provider: WorkspaceProvider, captionId: string) {
@@ -124,7 +147,9 @@ export function projectCaptions(provider: WorkspaceProvider, sceneId: string, hi
   const mediaCount = captionMediaCounts(provider);
   const searchTags = captionSearchTags(provider);
   return scene.composition.captions.map(c => { const anchor = fieldValue(c.anchor), item = anchor?.kind === 'asset' && models.kind === 'ready' ? models.items.find(a => a.id === anchor.assetId) : undefined;
-    const projection = anchor?.kind === 'asset' ? fieldValue(provider.resources.assets[anchor.assetId]?.projection) : undefined;
+    // An outside model can be revealed using its inherited frame; an unresolved member cannot.
+    const projection = anchor?.kind === 'asset' ? (item?.membership.kind === 'value' && item.membership.value.kind === 'absent'
+      ? fieldValue(provider.resources.assets[anchor.assetId]?.projection) : sceneMembers(provider, sceneId).bindings.get(anchor.assetId)) : undefined;
     const ownerHidden = anchor?.kind === 'asset' && item?.lifecycle.kind === 'value' && item.lifecycle.value === 'active' && item.membership.kind === 'value' &&
       projection?.assetFrameId === anchor.assetFrameId &&
       !provider.issues.some(i => i.code === 'concurrent-delete-edit' && i.path[0] === 'assetsById' && i.path[1] === anchor.assetId) &&
@@ -164,11 +189,14 @@ export function projectCaptionInventory(provider: WorkspaceProvider, sceneId: st
     else counts.set(owner, (counts.get(owner) ?? 0) + 1);
   }
   const visibleOwners = new Set(scene.composition.assets.map(a => a.assetId).filter(id => !hiddenAssetIds.includes(id)));
+  const includedAnchors = new Map(scene.composition.captions.map(c => [c.captionId, c.anchor] as const));
   const mediaCount = captionMediaCounts(provider);
   return { ...scope, kind: 'ready', items: Object.values(provider.resources.captions).map(caption => {
-    const anchor = fieldValue(caption.anchor), owner = anchor?.kind === 'asset' ? anchor.assetId : null, count = counts.get(caption.id) ?? 0;
-    return { caption: projectCaptionItem(provider, caption, anchor?.kind === 'unplaced' ? 'unplaced' : owner && !visibleOwners.has(owner) ? 'ownerHidden' : 'unavailable', mediaCount(caption.id)),
+    const count = counts.get(caption.id) ?? 0, memberUnknown = uncertainAll || uncertain.has(caption.id) || count > 1;
+    const location = memberUnknown ? unknown<Anchor>() : count ? includedAnchors.get(caption.id) ?? unknown<Anchor>() : caption.anchor;
+    const anchor = fieldValue(location), owner = anchor?.kind === 'asset' ? anchor.assetId : null;
+    return { caption: projectCaptionItem(provider, { ...caption, anchor: location }, anchor?.kind === 'unplaced' ? 'unplaced' : owner && !visibleOwners.has(owner) ? 'ownerHidden' : 'unavailable', mediaCount(caption.id)),
       lifecycle: caption.lifecycle.kind === 'value' && !deleteEdits.has(`captionsById/${caption.id}`) ? value(caption.lifecycle.value.state) : unknown(),
-      membership: uncertainAll || uncertain.has(caption.id) || count > 1 ? unknown() : value(count ? 'included' : 'absent') };
+      membership: memberUnknown ? unknown() : value(count ? 'included' : 'absent') };
   }) };
 }

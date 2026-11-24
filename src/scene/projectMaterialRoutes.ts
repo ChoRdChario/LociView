@@ -20,3 +20,13 @@ export function projectMaterialRoutes(provider: Provider, id: string) {
   }
   return { routes, complete, hasUnknownFields: field?.hasUnknownFields ?? false };
 }
+
+/** Material lookup outside a Scene still uses the logical source catalog. A local override must resolve exactly. */
+export function sceneMaterialProjection(provider: Provider, sceneId: string, assetId: string) {
+  const base = provider.resources.assets[assetId]?.projection;
+  const scoped = Object.values(provider.state.assetMemberships).filter(edge => edge.sceneId === sceneId && edge.resourceId === assetId &&
+    !(edge.lifecycle.kind === 'value' && edge.lifecycle.value.state === 'deleted'));
+  if (!scoped.some(edge => edge.projection)) return base;
+  if (scoped.length !== 1 || scoped[0]!.lifecycle.kind !== 'value' || scoped[0]!.orderKey.kind !== 'value') return undefined;
+  return scoped[0]!.projection;
+}

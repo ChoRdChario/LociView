@@ -50,7 +50,9 @@ export const mutableRecordFields = Object.freeze({
 export type MutableRecordMap = keyof typeof mutableRecordFields;
 const map2Fields = Object.freeze({ ...mutableRecordFields, assetsById: Object.freeze({ ...mutableRecordFields.assetsById,
   pinScale: optional({ check: (c, v, p) => { const n = c.number(v, p); if (n < 0.001 || n > 1000) reject('value', p); } }),
-}) });
+}), sceneAssetMembershipsById: Object.freeze({ ...mutableRecordFields.sceneAssetMembershipsById, bindingId: optional(id('bnd')) }),
+  sceneCaptionMembershipsById: Object.freeze({ ...mutableRecordFields.sceneCaptionMembershipsById, anchor: optional({ check: (c, v, p) => c.anchor(v, p) }) }),
+});
 /** The map1 dictionary stays fixed, including original overwritten unknown fields. */
 export const mutableFieldsFor = (profile: ProjectSemanticProfile = 'map1'): typeof mutableRecordFields =>
   profile === 'map2' ? map2Fields : mutableRecordFields;

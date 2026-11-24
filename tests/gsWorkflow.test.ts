@@ -225,6 +225,40 @@ async function gsReplacement(r: Awaited<ReturnType<typeof setup>>, bytes=gsFixtu
   return {p,prior,prepared,command};
 }
 describe('08a ordinary GS body replacement',()=>{
+  it('changes the GS body and its replacement proxy only in the selected Scene', async () => {
+    const r=await setup(true), initial=await r.target(), bytes=triangleGlb();
+    const file={name:'surface.glb',size:bytes.length,arrayBuffer:async()=>Uint8Array.from(bytes).buffer};
+    const {token,...target}=initial;
+    const prepared=await r.workflow.prepare(token,target,file);
+    await r.workflow.commit(token,prepared.id); r.workflow.completed();
+    const secondId=`scn_${newId()}`, sceneId=target.sceneId, before=await r.read();
+    await r.session.edit(before.token,{kind:'createScene',sceneId:secondId,sourceSceneId:sceneId,activeSceneId:sceneId,
+      name:'Second',orderKey:'B',membershipIds:[`sam_${newId()}`],eventId:`evt_${newId()}`});
+    const change=await gsReplacement(r);
+    const updated=await r.session.edit(change.p.token,{...change.command,scope:'scene'});
+    expect(updated.state).toBe('ready');
+    const inScene=async(id:string)=>{
+      const p=await r.read(), scene=resolveScene(p.state,p.resources,id);
+      if(scene.kind!=='ready'||!scene.composition.assets[0])throw Error('Missing GS');
+      return {p,projection:scene.composition.assets[0].projection};
+    };
+    const old=await inScene(secondId), local=await inScene(sceneId);
+    expect(old.projection.representationIds).toEqual([change.prior.representation.id,change.prior.proxy!.id]);
+    expect(local.projection.representationIds).toEqual([change.prepared.representation.id]);
+    const next={scope:'scene' as const,sceneId,assetId:target.assetId,expectedBindingId:local.projection.bindingId,
+      gsRepresentationId:String(change.prepared.representation.id),gsPayloadDigest:String(change.prepared.representation.payloadDigest),
+      gsFamilyId:String(change.prepared.representation.variantFamilyId),expectedProxyId:null};
+    const attach=await r.workflow.prepare(local.p.token,next,file);
+    await r.workflow.commit(local.p.token,attach.id); r.workflow.completed();
+    const attached=await inScene(sceneId);
+    expect(attached.projection.representationIds).toHaveLength(2);
+    const newProxy=attached.projection.representationIds[1]!;
+    expect(newProxy).not.toBe(change.prior.proxy!.id);expect((await inScene(secondId)).projection).toEqual(old.projection);
+    const remove=await r.workflow.prepare(attached.p.token,{...next,expectedBindingId:attached.projection.bindingId,expectedProxyId:newProxy});
+    await r.workflow.commit(attached.p.token,remove.id);
+    expect((await inScene(sceneId)).projection.representationIds).toEqual([change.prepared.representation.id]);
+    expect((await inScene(secondId)).projection).toEqual(old.projection);
+  });
   it('inspects only the native GS prefix for selection copy before committing a replacement',async()=>{
     const r=await setup(true),row=Array(89).fill(0);row[85]=1;
     const file=new Blob([gsFixture(4,Array.from({length:256},()=>row)).slice().buffer]),original=Blob.prototype.arrayBuffer,reads:number[]=[],fallback=vi.fn(async()=>{throw Error('Whole selected file forbidden');});

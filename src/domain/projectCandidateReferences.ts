@@ -4,6 +4,7 @@ import { immutableKinds, object, list, string, type GraphEdge } from './projectG
 import type { JsonValue } from './values';
 
 export interface CandidateReferencePort {
+  readonly sceneOverrides?: boolean;
   readonly entities: readonly { map: ProjectRecordMap; id: string }[];
   candidates(path: readonly string[]): readonly AtomicCandidate[];
   resolved(path: readonly string[]): JsonValue | undefined;
@@ -36,6 +37,22 @@ export function inspectCandidateReferences(p: CandidateReferencePort): void {
     }
   };
   for (const candidate of values(['project', 'defaultSceneId'])) ref(['project', 'defaultSceneId'], 'scenesById', string(candidate.value), candidate.operationId);
+  const sceneBindings = new Map<string, Map<string, Set<string>>>();
+  if (p.sceneOverrides) for (const { map, id } of p.entities) {
+    p.charge();
+    if (map !== 'sceneAssetMembershipsById' || deleted(map, id)) continue;
+    const sceneId = p.resolved([map, id, 'sceneId']), assetId = p.resolved([map, id, 'assetId']);
+    for (const c of values([map, id, 'bindingId'])) {
+      const bindingId = string(c.value);
+      ref([map, id, 'bindingId'], 'assetBindingsById', bindingId, c.operationId);
+      const binding = p.resolved(['assetBindingsById', bindingId]);
+      if (assetId !== undefined && binding !== undefined && object(binding).assetId !== assetId)
+        p.report([map, id, 'bindingId'], 'foreign-binding-owner', 'invalid', c.operationId);
+      if (typeof sceneId !== 'string' || typeof assetId !== 'string') continue;
+      const byScene = sceneBindings.get(assetId) ?? new Map<string, Set<string>>(), ids = byScene.get(sceneId) ?? new Set<string>();
+      ids.add(bindingId); byScene.set(sceneId, ids); sceneBindings.set(assetId, byScene);
+    }
+  }
   const counts = new Map<string, Set<string>>();
   for (const { map, id } of p.entities) {
     p.charge();
@@ -83,7 +100,8 @@ export function inspectCandidateReferences(p: CandidateReferencePort): void {
         const binding = p.resolved(['assetBindingsById', bindingId]);
         if (binding !== undefined && object(binding).assetId !== id) p.report(path('status'), 'foreign-binding-owner', 'invalid', c.operationId);
       }
-    } else if (map === 'captionsById') {
+    }
+    if (map === 'captionsById' || p.sceneOverrides && map === 'sceneCaptionMembershipsById') {
       for (const c of values(path('anchor'))) { const anchor = object(c.value);
         if (anchor.kind === 'asset') ref(path('anchor'), 'assetsById', string(anchor.assetId), c.operationId);
         if (anchor.kind === 'unplaced' && anchor.ownerAssetId !== undefined) ref(path('anchor'), 'assetsById', string(anchor.ownerAssetId), c.operationId);
@@ -95,15 +113,21 @@ export function inspectCandidateReferences(p: CandidateReferencePort): void {
         ref(path('routing'), 'assetsById', assetId, c.operationId);
         if (scope.kind === 'scene') ref(path('routing'), 'scenesById', string(scope.sceneId), c.operationId);
         const statuses = values(['assetsById', assetId, 'status']);
-        for (const s of statuses) {
-          p.charge(); const status = object(s.value), binding = status.kind === 'ready' ? p.resolved(['assetBindingsById', string(status.activeBindingId)]) : undefined;
+        const base = statuses.map(s => object(s.value)).filter(s => s.kind === 'ready').map(s => string(s.activeBindingId));
+        const byScene = sceneBindings.get(assetId), local = scope.kind === 'scene' && byScene?.get(string(scope.sceneId));
+        const bindings = local ? [...local] : scope.kind === 'project' && byScene ? [...new Set([...base, ...[...byScene.values()].flatMap(set => [...set])])] : base;
+        let match = false, unmatched = false;
+        for (const id of bindings) {
+          p.charge(); const binding = p.resolved(['assetBindingsById', id]);
           const revision = binding && object(binding).assetId === assetId ? p.resolved(['assetRevisionsById', string(object(binding).assetRevisionId)]) : undefined;
           if (!revision || object(revision).assetId !== assetId) continue;
-          const reps = list(object(revision).representationIds).flatMap(id => { const r = p.resolved(['representationsById', string(id)]); return r ? [object(r)] : []; });
-          if (!reps.some(r => r.assetId === assetId && r.variantFamilyId === target.variantFamilyId && r.materialCatalog &&
-            object(r.materialCatalog).layoutId === target.materialLayoutId && list(object(r.materialCatalog).slots).some(slot => object(slot).logicalMaterialSlotId === target.logicalMaterialSlotId)))
-            p.report(path('routing'), 'candidate-target-not-in-catalog', 'review', c.operationId);
+          const reps = list(object(revision).representationIds).flatMap(id => { p.charge(); const r = p.resolved(['representationsById', string(id)]); return r ? [object(r)] : []; });
+          if (reps.some(r => r.assetId === assetId && r.variantFamilyId === target.variantFamilyId && r.materialCatalog &&
+            object(r.materialCatalog).layoutId === target.materialLayoutId && list(object(r.materialCatalog).slots).some(slot => object(slot).logicalMaterialSlotId === target.logicalMaterialSlotId))) match = true;
+          else unmatched = true;
         }
+        if (unmatched && !(scope.kind === 'project' && byScene && match))
+          p.report(path('routing'), 'candidate-target-not-in-catalog', 'review', c.operationId);
       }
     }
   }

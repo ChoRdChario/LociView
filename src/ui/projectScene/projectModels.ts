@@ -1,7 +1,7 @@
 import { createModelListControls } from './modelListControls';
 import { modelListPlanIsCurrent, newModelListMemory, type ModelListContext, type ModelListMemory } from './modelListState';
 import { projectIdentity, projectModels } from './projectRead';
-import type { WorkspaceFile, WorkspaceModelProposal } from './projectWorkspacePorts';
+import { localModelEditIssue, type WorkspaceFile, type WorkspaceModelProposal } from './projectWorkspacePorts';
 import { newProjectId, panelNodes, sameProjectValue, type ProjectPanelHost, type ProjectModelPanel } from './projectPanel';
 import { boundsCentre, placementAroundPivot, fitAlignmentBounds } from '../../domain/alignment';
 import type { WorkspacePlacement } from './projectWorkspacePorts';
@@ -16,6 +16,9 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
   let edit: WorkspaceModelProposal | null = null, raw: string[] = [], composing = false, disposed = false;
   let reference: { assetId: string; bindingId: string } | null = null, pivot: 'origin' | 'centre' = 'origin';
   type PlacementStep = { before: WorkspacePlacement; after: WorkspacePlacement; bindingId: string };
+  const historyKey = (sceneId: string, assetId: string) => `${sceneId}/${assetId}`;
+  const scopeIssueFor = (details: NonNullable<ReturnType<ProjectPanelHost['ports']['modelDetails']>>) => localModelEditIssue(details.sceneCount, host.source().provider.semanticProfile === 'map2');
+  let referenceScene = '';
   const placementHistory = new Map<string, { past: PlacementStep[]; future: PlacementStep[] }>();
   const setProposal = (proposal: WorkspaceModelProposal) => { edit = proposal; raw = [...proposal.placement.translation.map(String), ...host.ports.modelAngles(proposal.placement.rotationXYZW), String(proposal.placement.uniformScale)]; };
   let proxyScope: {token:string;target:NonNullable<ReturnType<typeof host.ports.modelDetails>>['gsProxyTarget'];removing:boolean;prepared?:{id:string;label:string;externalMaterialsUnavailable?:boolean};resumePlacement?:(registered:boolean)=>void} | null=null;
@@ -54,7 +57,7 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
   const beginFile = (kind: 'add' | 'replace') => {
     if (host.block('models') || ownInput() || memory().composing) return;
     const { provider, sceneId } = host.source(), details = memory().assetId ? host.ports.modelDetails(sceneId, memory().assetId!) : null;
-    if (kind === 'replace' && (!details || details.replacementAvailable === false || details.sceneCount.kind !== 'value')) return;
+    if (kind === 'replace' && (!details || details.replacementAvailable === false || scopeIssueFor(details))) return;
     fileScope = { kind, token: provider.token, sceneId, assetId: kind === 'add' ? newProjectId('ast') : details!.target.assetId,
       expectedBindingId: kind === 'replace' ? details!.target.bindingId : undefined };
     const selected = kind === 'add' ? addInput : replaceInput; selected.value = ''; host.changed(); selected.click();
@@ -91,8 +94,10 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
   const proxyArea=make('section'),proxyNote=make('p'),proxyInput=input('ピン配置用モデルを選択');proxyArea.setAttribute('aria-label','ピン配置用モデル');proxyNote.setAttribute('role','status');
   const beginProxy=(removing:boolean,resumePlacement?:(registered:boolean)=>void)=>{
     if(host.block('models')||ownInput()||memory().composing)return;
-    const target=memory().assetId?host.ports.modelDetails(host.source().sceneId,memory().assetId!)?.gsProxyTarget:undefined;
-    if(!target||!host.ports.prepareGsProxy)return;proxyScope={token:host.source().provider.token,target,removing,resumePlacement};
+    const assetId = memory().assetId, details = assetId ? host.ports.modelDetails(host.source().sceneId, assetId) : null;
+    if (!details?.gsProxyTarget || !host.ports.prepareGsProxy) return;
+    const issue = scopeIssueFor(details); if (issue) { host.message(issue); return; }
+    proxyScope={token:host.source().provider.token,target:details.gsProxyTarget,removing,resumePlacement};
     if(removing)prepareProxy();else{proxyInput.value='';host.changed();proxyInput.click();}
   };
   const proxyAdd=button('ピン配置用モデルを追加',()=>beginProxy(false)),proxyRemove=button('ピン配置用モデルを外す',()=>beginProxy(true));
@@ -124,44 +129,108 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     const m = memory(), { sceneId } = host.source(), details = m.assetId ? host.ports.modelDetails(sceneId, m.assetId) : null;
     const item = context().source.kind === 'ready' ? projectModels(host.source().provider, sceneId, m.projectId, m.hiddenAssetIds, host.viewport().read()) : null;
     const available = item?.kind === 'ready' ? item.items.find(i => i.id === m.assetId)?.display : undefined;
-    if (!details || reference?.assetId === details.target.assetId || details.sceneCount.kind !== 'value' || available?.kind !== 'value' || available.value !== 'visible') return;
+    if (!details || reference?.assetId === details.target.assetId || scopeIssueFor(details) || available?.kind !== 'value' || available.value !== 'visible') return;
     setProposal({ target: details.target, placement: details.placement, mode: 'translate', ...(pivot === 'centre' && details.boundsAsset ? { pivotAsset: boundsCentre(details.boundsAsset) } : {}) }); host.changed();
   });
-  const fields = make('div'), labels = ['モデル位置 X', 'モデル位置 Y', 'モデル位置 Z', 'モデル回転 X', 'モデル回転 Y', 'モデル回転 Z', 'モデル倍率'];
+  const fields = make('div'), labels = ['位置 X', '位置 Y', '位置 Z', '回転 X', '回転 Y', '回転 Z', '倍率'];
+  fields.className = 'lv-model-transform-values';
+  let cancelScrub: (() => void) | null = null;
+  function updateField(index: number, value: string) {
+    if (!edit || host.block('models')) return;
+    raw[index] = value;
+    try {
+      const parsed = host.ports.modelPlacement(raw.slice(0, 3), raw.slice(3, 6), raw[6]!);
+      let placement = { ...parsed, rotationXYZW: index >= 3 && index <= 5 ? parsed.rotationXYZW : edit.placement.rotationXYZW };
+      if (index >= 3 && edit.pivotAsset) placement = placementAroundPivot(edit.placement, placement, edit.pivotAsset);
+      edit = { ...edit, placement, fitReference: undefined };
+      if (index >= 3 && edit.pivotAsset) placement.translation.forEach((axis, i) => { raw[i] = String(axis); });
+    } catch { /* Keep incomplete text and the last valid preview. */ }
+    host.changed();
+  }
   const inputs = labels.map((text, index) => {
-    const label = make('label', text), node = make('input'); node.type = 'number'; node.step = 'any'; node.setAttribute('aria-label', text); label.append(node); fields.append(label);
-    node.addEventListener('input', () => { if (!edit || host.block('models')) return; raw[index] = node.value;
-      try { const parsed = host.ports.modelPlacement(raw.slice(0, 3), raw.slice(3, 6), raw[6]!);
-        let placement = { ...parsed, rotationXYZW: index >= 3 && index <= 5 ? parsed.rotationXYZW : edit.placement.rotationXYZW };
-        if (index >= 3 && edit.pivotAsset) placement = placementAroundPivot(edit.placement, placement, edit.pivotAsset);
-        edit = { ...edit, placement, fitReference: undefined }; if (index >= 3 && edit.pivotAsset) { raw[0] = String(placement.translation[0]); raw[1] = String(placement.translation[1]); raw[2] = String(placement.translation[2]); }
-      } catch { /* Invalid text stays in the form; last valid preview remains. */ } host.changed(); });
-    node.addEventListener('compositionstart', () => { composing = true; host.changed(); }); node.addEventListener('compositionend', () => { composing = false; host.changed(); }); return node;
+    const label = make('label'), heading = make('span', text), node = make('input');
+    node.type = 'number'; node.step = 'any'; node.setAttribute('aria-label', text); label.append(heading, node); fields.append(label);
+    node.addEventListener('input', () => updateField(index, node.value));
+    node.addEventListener('compositionstart', () => { composing = true; host.changed(); });
+    node.addEventListener('compositionend', () => { composing = false; host.changed(); });
+    label.addEventListener('pointerdown', down => {
+      if (!edit || cancelScrub || composing || node.disabled || host.block('models') || !valid() ||
+        down.button !== 0 || down.isPrimary === false || !Number.isFinite(down.clientX) ||
+        down.pointerType === 'touch' && down.target === node) return;
+      const original = edit, originalRaw = [...raw], start = Number(raw[index]), browser = document.defaultView;
+      let expected = edit, moved = false, pending: string | undefined, frame: number | undefined;
+      const current = () => !disposed && !composing && edit === expected && !host.block('models') &&
+        host.source().provider.token === original.target.token && host.source().sceneId === original.target.sceneId;
+      const flush = () => {
+        frame = undefined;
+        if (pending === undefined || !current()) return;
+        updateField(index, pending); expected = edit!; pending = undefined;
+      };
+      const finish = (restore: boolean) => {
+        if (cancelScrub !== cancel) return;
+        cancelScrub = null;
+        if (frame !== undefined) browser?.cancelAnimationFrame(frame);
+        label.removeEventListener('pointermove', move); label.removeEventListener('pointerup', end);
+        label.removeEventListener('pointercancel', end); label.removeEventListener('lostpointercapture', end);
+        label.removeEventListener('keydown', key);
+        try { label.releasePointerCapture?.(down.pointerId); } catch { /* Already released. */ }
+        if (!moved || !current()) return;
+        if (restore) { edit = original; raw = originalRaw; host.changed(); }
+        else flush();
+      };
+      const cancel = () => finish(true);
+      const move = (event: PointerEvent) => {
+        if (event.pointerId !== down.pointerId) return;
+        if (!current() || event.buttons === 0 || !Number.isFinite(event.clientX)) { cancel(); return; }
+        const dx = event.clientX - down.clientX;
+        if (!moved && Math.abs(dx) < 4) return;
+        moved = true; event.preventDefault();
+        const step = (index >= 3 && index < 6 ? 0.5 : 0.01) * (event.shiftKey ? 0.1 : 1);
+        const next = index === 6 ? start * Math.exp(dx * step) : start + dx * step;
+        if (!Number.isFinite(next) || (index === 6 && next <= 0)) return;
+        pending = String(Number(next.toPrecision(12)));
+        if (browser && frame === undefined) frame = browser.requestAnimationFrame(flush);
+        else if (!browser) flush();
+      };
+      const end = (event: PointerEvent) => { if (event.pointerId === down.pointerId) finish(event.type !== 'pointerup'); };
+      const key = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); cancel(); }
+      };
+      try { label.setPointerCapture?.(down.pointerId); } catch { return; }
+      cancelScrub = cancel;
+      if (down.target !== node && down.pointerType !== 'touch') node.focus({ preventScroll: true });
+      label.addEventListener('pointermove', move); label.addEventListener('pointerup', end);
+      label.addEventListener('pointercancel', end); label.addEventListener('lostpointercapture', end);
+      label.addEventListener('keydown', key);
+    });
+    return node;
   });
   const modes = make('div'), modeButtons = new Map<string, HTMLButtonElement>();
-  modes.setAttribute('role', 'group'); modes.setAttribute('aria-label', '配置の操作');
+  modes.className = 'lv-model-gizmo-modes'; modes.setAttribute('role', 'group');
+  modes.setAttribute('aria-label', 'ギズモ切り替え'); modes.append(make('span', 'ギズモ切り替え'));
   for (const [mode, text] of [['translate', '移動'], ['rotate', '回転'], ['scale', '拡大縮小']] as const) {
     const control = button(text, () => { if (edit && !host.block('models') && !composing) { edit = { ...edit, mode }; host.changed(); } });
     modeButtons.set(mode, control); modes.append(control);
   }
   const confirm = button('配置を確定', () => {
-    if (!edit || host.block('models') || composing || !valid()) return;
+    if (!edit || cancelScrub || host.block('models') || composing || !valid()) return;
     const captured = edit, current = host.ports.modelDetails(captured.target.sceneId, captured.target.assetId);
     if (!current || !sameProjectValue(current.target, captured.target)) { host.message('モデルが更新されています。入力を保持しています。'); return; }
+    const reason = scopeIssueFor(current); if (reason) { host.message(reason); return; }
     if (sameProjectValue(current.placement, captured.placement)) { edit = null; host.message('配置に変更はありません。'); return; }
     const command = { sceneId: captured.target.sceneId, assetId: captured.target.assetId, expectedBindingId: captured.target.bindingId,
       bindingId: newProjectId('bnd'), placement: captured.placement, ...(captured.fitReference ? { fitReference: captured.fitReference } : {}) };
     host.execute('models', captured.target.token, () => host.ports.transformModel(captured.target.token, command), () => {
-      const h = placementHistory.get(captured.target.assetId) ?? { past: [], future: [] };
+      const h = placementHistory.get(historyKey(captured.target.sceneId, captured.target.assetId)) ?? { past: [], future: [] };
       if (h.past.length && h.past.at(-1)!.bindingId !== current.target.bindingId) h.past = [];
-      h.past.push({ before: current.placement, after: captured.placement, bindingId: command.bindingId }); h.future = []; placementHistory.set(captured.target.assetId, h);
+      h.past.push({ before: current.placement, after: captured.placement, bindingId: command.bindingId }); h.future = []; placementHistory.set(historyKey(captured.target.sceneId, captured.target.assetId), h);
       edit = null; host.message('モデルの配置を確定しました。');
     });
   });
   const cancel = button('配置を取り消す', () => { if (!host.block('models', false) && !composing) { edit = null; host.changed(); } });
-  const impact = make('p'); impact.setAttribute('role', 'status'); placement.append(begin, fields, modes);
-  const placementActions = make('section'); placementActions.className = 'lv-task-footer'; placementActions.setAttribute('aria-label', '配置の終了操作'); placementActions.append(impact, confirm, cancel);
-  const alignment = make('details'); alignment.setAttribute('aria-label', '位置合わせ'); alignment.append(make('summary', '位置合わせ'));
+  const scopeNote = make('p'); scopeNote.setAttribute('role', 'status'); placement.append(make('h3', 'モデル配置'), begin, scopeNote, modes, fields);
+  const placementActions = make('section'); placementActions.className = 'lv-task-footer'; placementActions.setAttribute('aria-label', '配置の終了操作'); placementActions.append(confirm, cancel);
+  const alignment = make('details'); alignment.setAttribute('aria-label', '基準・リセット'); alignment.append(make('summary', '基準・リセット'));
   const pivotLabel = make('label', '回転・拡縮の基準'), pivotSelect = make('select'); pivotSelect.setAttribute('aria-label', '回転・拡縮の基準');
   for (const [value, label] of [['origin', 'モデルの原点'], ['centre', 'モデルの中心']]) { const option = make('option', label); option.value = value!; pivotSelect.append(option); } pivotLabel.append(pivotSelect);
   pivotSelect.addEventListener('change', () => { if (host.block('models') || composing || host.viewport().read().dragging) return;
@@ -176,17 +245,17 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
   const fit = button('基準の中心と大きさに合わせる', () => {
     if (host.block('models') || ownInput() || !reference) return; const s = host.source(), id = memory().assetId;
     const d = id ? host.ports.modelDetails(s.sceneId, id) : null, ref = host.ports.modelDetails(s.sceneId, reference.assetId);
-    if (!d?.boundsAsset || !ref?.boundsAsset || ref.target.bindingId !== reference.bindingId || d.target.assetId === reference.assetId) return;
+    if (!d?.boundsAsset || scopeIssueFor(d) || !ref?.boundsAsset || ref.target.bindingId !== reference.bindingId || d.target.assetId === reference.assetId) return;
     try { setProposal({ target: d.target, placement: fitAlignmentBounds(d.boundsAsset, d.placement, ref.boundsAsset, ref.placement), mode: 'translate', fitReference: reference }); host.changed(); }
     catch (error) { host.message((error as Error).message); }
   });
   const resetTo = (imported: boolean) => { if (host.block('models') || ownInput()) return; const id = memory().assetId, d = id ? host.ports.modelDetails(host.source().sceneId, id) : null;
-    if (!d || reference?.assetId === id || imported && !d.importedPlacement) return;
+    if (!d || scopeIssueFor(d) || reference?.assetId === id || imported && !d.importedPlacement) return;
     setProposal({ target: d.target, placement: imported ? d.importedPlacement! : { translation: [0, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1 }, mode: 'translate' }); host.changed(); };
   const resetIdentity = button('原点・回転なし・倍率1に戻す', () => resetTo(false)), resetImported = button('読み込み時の配置に戻す', () => resetTo(true));
   function compensatePlacement(forward: boolean) {
-    if (host.block('models') || ownInput()) return; const id = memory().assetId, d = id ? host.ports.modelDetails(host.source().sceneId, id) : null, h = id ? placementHistory.get(id) : undefined;
-    const step = (forward ? h?.future : h?.past)?.at(-1); if (!d || !h || !step || d.target.bindingId !== step.bindingId || reference?.assetId === id) return;
+    if (host.block('models') || ownInput()) return; const id = memory().assetId, d = id ? host.ports.modelDetails(host.source().sceneId, id) : null, h = id ? placementHistory.get(historyKey(host.source().sceneId, id)) : undefined;
+    const step = (forward ? h?.future : h?.past)?.at(-1); if (!d || scopeIssueFor(d) || !h || !step || d.target.bindingId !== step.bindingId || reference?.assetId === id) return;
     const bindingId = newProjectId('bnd'); host.execute('models', d.target.token, () => host.ports.transformModel(d.target.token, { sceneId: d.target.sceneId, assetId: d.target.assetId,
       expectedBindingId: d.target.bindingId, bindingId, placement: forward ? step.after : step.before }), () => {
       if (forward) { h.future.pop(); h.past.push({ ...step, bindingId }); if (h.future.length) h.future.at(-1)!.bindingId = bindingId; }
@@ -215,12 +284,15 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
   root.append(content, placementActions); if (preview) root.append(preview.root);
   editOnly(manage, placementActions, fileArea, proxyArea, placement, remove, deletionBox);
   function render() {
-    if (disposed) return; placementActions.hidden = !edit; if (fileScope || deletion) manage.open = true; list.render(context()); const block = host.block('models'), selected = memory().assetId, { provider, sceneId } = host.source();
+    if (disposed) return;
+    const shownScene = host.source().sceneId;
+    if (referenceScene !== shownScene) { reference = null; referenceScene = shownScene; } placementActions.hidden = !edit; if (fileScope || deletion) manage.open = true; list.render(context()); const block = host.block('models'), selected = memory().assetId, { provider, sceneId } = host.source();
     const details = selected ? host.ports.modelDetails(sceneId, selected) : null;
     proxyArea.hidden=!details?.gsProxyTarget&&!proxyScope;
     proxyAdd.textContent=details?.gsProxyTarget?.expectedProxyId?'ピン配置用モデルを変更':'ピン配置用モデルを追加';
-    proxyAdd.disabled=!!block||ownInput()||!details?.gsProxyTarget;proxyRemove.hidden=!details?.gsProxyTarget?.expectedProxyId;
-    proxyRemove.disabled=!!block||ownInput();proxyConfirm.hidden=!proxyScope?.prepared;proxyCancel.hidden=!proxyScope;
+    const proxyBlocked = !details?.gsProxyTarget || !!scopeIssueFor(details) || !!block || ownInput();
+    proxyAdd.disabled=proxyBlocked;proxyRemove.hidden=!details?.gsProxyTarget?.expectedProxyId;
+    proxyRemove.disabled=proxyBlocked;proxyConfirm.hidden=!proxyScope?.prepared;proxyCancel.hidden=!proxyScope;
     proxyConfirm.textContent=proxyScope?.resumePlacement?'このモデルでピンを配置する':proxyScope?.removing?'取り外しを確定':proxyScope?.target?.expectedProxyId?'変更を確定':'ピン配置用モデルを設定';
     proxyConfirm.disabled=!!block||!proxyScope?.prepared||proxyScope.token!==provider.token;proxyCancel.disabled=!!host.block('models',false);
     proxyNote.textContent=proxyScope?.token&&proxyScope.token!==provider.token?'モデルが更新されています。入力は保持しています。取り消して選び直してください。':proxyScope?.removing?'モデル上を選んで位置を指定するには、ピン配置用モデルが必要です。保存済みの記録位置は変わりません。':proxyScope?.prepared?`${proxyScope.prepared.label} を選択中のモデルに関連付けます。同じ原点・向き・倍率で用意したモデルであることを確認してください。ピン配置用モデルは通常表示されず、保存済みの記録位置は変わりません。`:'このモデルと同じ座標で用意したモデルのデータを選択してください。';
@@ -231,31 +303,34 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     pointSizeArea.hidden = !details?.pointCloud; pointSizeInput.disabled = !!host.block('models', false) || ownInput() || composing || memory().composing; if (selected) pointSizeInput.value = String(host.viewport().pointDiameter?.(selected) ?? 3);
     const included = selectedItem?.membership.kind === 'value' && selectedItem.membership.value.kind === 'included';
     const visible = selectedItem?.display.kind === 'value' && selectedItem.display.value === 'visible';
+    const scopeIssue = details && included ? scopeIssueFor(details) : null;
+    scopeNote.textContent = scopeIssue ?? ''; scopeNote.hidden = !scopeIssue;
     add.disabled = !!block || ownInput() || memory().composing || !sceneId;
-    replace.disabled = !!block || ownInput() || memory().composing || !details || details.replacementAvailable === false || !included || details.sceneCount.kind !== 'value';
+    replace.disabled = !!block || ownInput() || memory().composing || !details || details.replacementAvailable === false || !included || !!scopeIssue;
     confirmAddition.hidden=fileScope?.kind!=='add'||!fileScope.file||!fileScope.externalMaterialsUnavailable;confirmAddition.disabled=!!block||fileScope?.token!==provider.token;
     confirmReplacement.hidden = fileScope?.kind !== 'replace' || !fileScope.file; confirmReplacement.disabled = !!block || fileScope?.token !== provider.token || !!host.ports.modelSelectionNotice&&fileScope?.externalMaterialsUnavailable===undefined;
     cancelFile.hidden = !fileScope; cancelFile.disabled = !!host.block('models', false);
-    fileNote.textContent = fileScope?.kind === 'replace' ? `${fileScope.file?.name ?? 'ファイルを選択してください。'} ${details?.sceneCount.kind === 'value' ? `${details.sceneCount.value}シーンのモデルを差し替えます。` : ''} 配置と記録は保持され、ピンは要確認になります。${details?.gsProxyTarget ? details.gsProxyTarget.expectedProxyId ? 'ピン配置用モデルは未設定になります。必要な場合は設定し直してください。' : '' : details?.pointCloud ? '同じ形式のXYZ・RGB点群を選択してください。' : '材質の調整は引き継ぎません。'}` : fileScope ? '追加するモデルを選択してください。' : '';
+    fileNote.textContent = fileScope?.kind === 'replace' ? `${fileScope.file?.name ?? 'ファイルを選択してください。'} ${details?.sceneCount.kind === 'value' ? 'このシーンのモデルを差し替えます。' : ''} 配置と記録は保持され、ピンは要確認になります。${details?.gsProxyTarget ? details.gsProxyTarget.expectedProxyId ? 'ピン配置用モデルは未設定になります。必要な場合は設定し直してください。' : '' : details?.pointCloud ? '同じ形式のXYZ・RGB点群を選択してください。' : '材質の調整は引き継ぎません。'}` : fileScope ? '追加するモデルを選択してください。' : '';
+    if (!fileScope && scopeIssue && details?.replacementAvailable !== false) fileNote.textContent = 'このモデルの差し替えは、このシーンだけで使うモデルで行えます。';
     if(fileScope?.externalMaterialsUnavailable)fileNote.textContent+=' OBJの外部材質・画像は読み込まず、既定の材質で表示します。';
     const referenceDetails = reference ? host.ports.modelDetails(sceneId, reference.assetId) : null;
     const referenceChanged = !!reference && (!referenceDetails || referenceDetails.target.bindingId !== reference.bindingId);
     const referenceSelected = !!reference && reference.assetId === selected;
-    begin.disabled = !!block || ownInput() || !details || !visible || details.sceneCount.kind !== 'value' || referenceSelected;
+    begin.hidden = !!edit;
+    begin.disabled = !!block || ownInput() || !details || !visible || !!scopeIssue || referenceSelected;
     setReference.disabled = !!block || ownInput() || !details || !visible;
     clearReference.hidden = !reference; clearReference.disabled = !!host.block('models', false) || ownInput();
     pivotSelect.value = pivot; pivotSelect.disabled = !!block || composing || host.viewport().read().dragging || !!fileScope || !!deletion;
     const name = reference ? provider.details.mutable.assetsById[reference.assetId]?.label : undefined;
     referenceNote.textContent = referenceChanged ? '基準モデルの配置が変わっています。基準を選び直してください。' : reference ? `基準：${name?.kind === 'value' ? name.value : 'モデル名を確認'}` : '';
-    fit.disabled = !!block || ownInput() || !visible || !details?.boundsAsset || !referenceDetails?.boundsAsset || referenceChanged || referenceSelected;
-    resetIdentity.disabled = !!block || ownInput() || !visible || !details || referenceSelected;
+    fit.disabled = !!block || ownInput() || !!scopeIssue || !visible || !details?.boundsAsset || !referenceDetails?.boundsAsset || referenceChanged || referenceSelected;
+    resetIdentity.disabled = !!block || ownInput() || !!scopeIssue || !visible || !details || referenceSelected;
     resetImported.disabled = resetIdentity.disabled || !details?.importedPlacement;
-    const history = selected ? placementHistory.get(selected) : undefined;
+    const history = selected ? placementHistory.get(historyKey(sceneId, selected)) : undefined;
     undoPlacement.disabled = resetIdentity.disabled || !history?.past.length || history.past.at(-1)!.bindingId !== details?.target.bindingId;
     redoPlacement.disabled = resetIdentity.disabled || !history?.future.length || history.future.at(-1)!.bindingId !== details?.target.bindingId;
-    fields.hidden = modes.hidden = confirm.hidden = cancel.hidden = !edit; confirm.disabled = !!block || composing || !valid(); cancel.disabled = !!host.block('models', false) || composing;
+    fields.hidden = modes.hidden = confirm.hidden = cancel.hidden = !edit; confirm.disabled = !!block || !!scopeIssue || composing || !valid(); cancel.disabled = !!host.block('models', false) || composing;
     inputs.forEach((node, index) => { node.disabled = !!block; if (!composing) node.value = raw[index] ?? ''; });
-    impact.textContent = edit ? `${details?.sceneCount.kind === 'value' ? details.sceneCount.value : '要確認の'}シーンで共有されています。変更は全シーンに反映されます。` : '';
     deletionBox.hidden = !deletion;
     try { const deps = selected ? host.ports.modelDeletion(selected).dependencies : []; remove.disabled = !!block || ownInput() || !selected || deps.length > 0;
       deletionNote.textContent = deps.length ? `削除するには、参照しているシーン・記録・材質の設定を先に解除してください（${deps.length}件）。` : ''; }
@@ -312,5 +387,5 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     propose(next) { if (!edit || composing || memory().composing || next.mode !== edit.mode || host.block('models', true, true) || !sameProjectValue(next.target, edit.target)) return false;
       if (!next.placement.translation.every(Number.isFinite) || !Number.isFinite(next.placement.uniformScale) || next.placement.uniformScale <= 0) return false;
       edit = next; raw = [...next.placement.translation.map(String), ...host.ports.modelAngles(next.placement.rotationXYZW), String(next.placement.uniformScale)]; host.changed(); return true; },
-    dispose() { disposed = true; fileScope=null; preview?.dispose(); list.dispose(); root.remove(); } };
+    dispose() { disposed = true; cancelScrub?.(); fileScope=null; preview?.dispose(); list.dispose(); root.remove(); } };
 }

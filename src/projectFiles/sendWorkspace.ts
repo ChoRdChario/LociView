@@ -1,5 +1,5 @@
 import type { ProjectWorkspaceFS } from '../platform/fs';
-import { hasEditorCapability, hasPortableMediaCapability, PORTABLE_MEDIA_CAPABILITY } from '../projectMetadata/requiredCapabilities';
+import { hasEditorCapability, hasPortableMediaCapability, hasScenePlacementCapability, PORTABLE_MEDIA_CAPABILITY } from '../projectMetadata/requiredCapabilities';
 import type { MetadataProjectSession, MetadataSessionRead, BackupPresentationObserver, CompletedBackupDisplay } from '../projectMetadata/session';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import type { MetadataLimits, MetadataProof } from '../projectMetadata/format';
@@ -19,8 +19,8 @@ import { workspaceFileOperation } from './receiveWorkspace';
 import { fileError } from './validation';
 import { readOutputArtifacts } from '../platform/outputArtifactLock';
 
-export interface WorkspaceOutputState { id: string; purpose: 'teamWorkspace' | 'contribution' | 'backup' | 'clean' | 'review'; includesDeclaredEditorNames?: boolean; requiresEditorAttributionReader?: boolean; requiresPortableMediaReader?: boolean; label?: string; stale?: boolean; token?: string; cancellable?: boolean; state: 'unstarted' | 'incomplete' | 'generated' | 'file-verified' | 'abandoned' | 'cancelled' | 'repair-required' }
-export interface ContributionBaseChoice { selection: ContributionBaseSelection; label: string; includesDeclaredEditorNames?: boolean; deltaIncludesDeclaredEditorNames?: boolean; requiresPortableMediaReader?: boolean }
+export interface WorkspaceOutputState { id: string; purpose: 'teamWorkspace' | 'contribution' | 'backup' | 'clean' | 'review'; includesDeclaredEditorNames?: boolean; requiresEditorAttributionReader?: boolean; requiresScenePlacementReader?: boolean; requiresPortableMediaReader?: boolean; label?: string; stale?: boolean; token?: string; cancellable?: boolean; state: 'unstarted' | 'incomplete' | 'generated' | 'file-verified' | 'abandoned' | 'cancelled' | 'repair-required' }
+export interface ContributionBaseChoice { selection: ContributionBaseSelection; label: string; includesDeclaredEditorNames?: boolean; deltaIncludesDeclaredEditorNames?: boolean; requiresScenePlacementReader?: boolean; requiresPortableMediaReader?: boolean }
 const settledOutputDisplay = (rows: readonly WorkspaceOutputState[]) =>
   rows.every(row => ['generated', 'file-verified', 'abandoned', 'cancelled'].includes(row.state));
 interface BackupDisplaySource { readonly source: NonNullable<MetadataSessionRead['source']>; readonly proof: MetadataProof; readonly token: string }
@@ -120,6 +120,7 @@ export class WorkspaceSender {
       choices.push({ selection, label: `作業一式 ${i + 1}（${r.completions.some(c => c.observation === 'imported') ? '受信' : '作成'}・変更 ${fact.changes} 件）`,
         ...(fact.named ? { includesDeclaredEditorNames: true } : {}),
         ...(fact.portable ? { requiresPortableMediaReader: true } : {}),
+        ...(fact.scenePlacement ? { requiresScenePlacementReader: true } : {}),
         ...(fact.deltaNamed ? { deltaIncludesDeclaredEditorNames: true } : {}) });
     }
     return choices;
@@ -188,6 +189,7 @@ export class WorkspaceSender {
           job.source.editorDeclarations().some(d => manifest.changes.some(c => c.expectedChangeHash === d.changeId)));
         result.push({ id, purpose, ...extra, ...(requiresEditor ? { requiresEditorAttributionReader: true } : {}),
           ...(hasPortableMediaCapability(manifest.requiredCapabilities) ? { requiresPortableMediaReader: true } : {}),
+          ...(hasScenePlacementCapability(manifest.requiredCapabilities) ? { requiresScenePlacementReader: true } : {}),
           ...(includesNames ? { includesDeclaredEditorNames: true } : {}), token: job.source.token, cancellable: kinds.length === 0, state: kinds.includes('cancelled') ? 'cancelled' : kinds.includes('externalFileVerified') ? 'file-verified' :
           kinds.includes(key.kind === 'workspace' ? 'baseRecorded' : 'artifactVerified') ? 'generated' : 'incomplete' });
       } catch { result.push({ id, purpose, state: 'repair-required' }); }

@@ -1,5 +1,5 @@
 import * as A from '@automerge/automerge/slim';
-import { checkRequiredCapabilities, PORTABLE_MEDIA_CAPABILITY } from '../projectMetadata/requiredCapabilities';
+import { checkRequiredCapabilities, PORTABLE_MEDIA_CAPABILITY, SCENE_PLACEMENT_CAPABILITY } from '../projectMetadata/requiredCapabilities';
 import type { OriginBlobStore } from '../projectMetadata/blobStore';
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import { fail, type MetadataLimits, type MetadataProof } from '../projectMetadata/format';
@@ -81,12 +81,13 @@ export class WorkspaceBaseStore {
   async displayFacts(store: Pick<OriginBlobStore, 'inspect'>, currentEditorChanges: readonly string[]) {
     const limits = { ...this.limits }, proof = structuredClone(this.proof), current = [...currentEditorChanges];
     return withMetadataRead(this.fs, undefined, async ({ fs }) => {
-      const facts = new Map<string, { changes: number; named: boolean; portable: boolean; deltaNamed: boolean }>();
+      const facts = new Map<string, { changes: number; named: boolean; portable: boolean; scenePlacement: boolean; deltaNamed: boolean }>();
       const rows = await new WorkspaceBaseStore(fs, limits, proof).readDirect(async (row, source, closure) => {
         for (const ref of closure.semanticRefs) if (await store.inspect(ref) !== 'verified-present') fail('contribution-base-payload-unavailable');
         const hashes = new Set(source.read().history.changes.map(c => c.id));
         facts.set(row.workspacePackageId, { changes: source.originalChanges().length, named: source.includesDeclaredEditorNames,
-          portable: source.requiredCapabilities.includes(PORTABLE_MEDIA_CAPABILITY), deltaNamed: current.some(id => !hashes.has(id)) });
+          portable: source.requiredCapabilities.includes(PORTABLE_MEDIA_CAPABILITY),
+          scenePlacement: source.requiredCapabilities.includes(SCENE_PLACEMENT_CAPABILITY), deltaNamed: current.some(id => !hashes.has(id)) });
       });
       return rows.map(record => ({ record, ...facts.get(record.workspacePackageId)! }));
     });

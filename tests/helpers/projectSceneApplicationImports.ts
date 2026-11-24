@@ -254,6 +254,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "three/addons/controls/TransformControls.js"
   ],
   "src/projectScene/pinParent.ts": [
+    "../scene/resolve",
     "./displayTypes",
     "./viewportModel",
     "three"
@@ -294,6 +295,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "../projectMetadata/captionUndo"
   ],
   "src/projectScene/productWorkspace.ts": [
+    "../ui/projectScene/projectRead",
     "../ui/projectScene/storageFeedback",
     "../scene/types",
     "../domain/materialIntent",
@@ -324,6 +326,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "./modelTypes"
   ],
   "src/projectScene/reviewView.ts": [
+    "../projectPackage/reviewSnapshot",
     "../nativeGs/sha256",
     "../projectFiles/glb",
     "../projectFiles/streamSource",
@@ -524,6 +527,7 @@ export const projectSceneApplicationImports:Readonly<Record<string,readonly stri
     "three"
   ],
   "src/projectScene/validationProjection.ts": [
+    "../scene/types",
     "../domain/meshSource",
     "../projectFiles/meshSource",
     "../projectFiles/nativeSpatial",

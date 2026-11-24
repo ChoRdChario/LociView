@@ -11,6 +11,7 @@ import { ProjectMetadataSource, type MetadataLimits } from '../src/projectMetada
 import { planRemoteChanges, type FullMetadataSource } from '../src/projectMetadata/remote';
 import { captureJournalRemote, type JournalRemoteInput, type PackageRemoteBatchProof } from '../src/projectMetadata/packageRemote';
 import type { JsonObject } from '../src/domain/values';
+import { readProjectScene } from '../src/scene/projectProvider';
 import { inspectAtomicHistory } from '../src/domain/atomicHistory';
 import { fixture, id, limits as valueLimits } from './helpers/projectRecordsFixture';
 import { developmentContentVerifier, developmentContentBytes } from '../poc/scene-history/content-verifier';
@@ -2138,5 +2139,37 @@ describe('new-workspace metadata persistence service (memory ports, not device/a
     expect(active).toBe(0); expect((await h.session().read()).state).toBe('pending');
     h.fault.afterSave = () => {}; lost = false;
     expect((await h.session().retry()).state).toBe('ready');
+  });
+});
+
+
+describe('scene membership inherited-value conflict recovery', () => {
+  it.each(['bindingId', 'anchor'] as const)('writes a single causal absent choice even when both clients already removed %s', async field => {
+    const model = field === 'bindingId', map = model ? 'sceneAssetMembershipsById' : 'sceneCaptionMembershipsById';
+    const membershipId = model ? id('sam') : id('scm'), r = fixture();
+    r.schema = { major: 2, minor: 1 };
+    r[map][membershipId][field] = model ? id('bnd') : r.captionsById[id('cap')].anchor;
+    const initial = ProjectMetadataSource.bootstrap(r.schema, r.identity, limits, {semanticProfile:'map2'}).initialize(r);
+    const base = A.load<Record<string, any>>(initial.encodeFullSource());
+    const remove = () => A.change(A.clone(base), doc => { delete doc[map][membershipId][field]; });
+    const merged = ProjectMetadataSource.fromFullSource(A.save(A.merge(remove(), remove())), initial.proof, limits);
+    const verifier = developmentContentVerifier([{variantFamilyId:id('fam'),representationId:id('rep'),payloadDigest:r.representationsById[id('rep')].payloadDigest}],developmentContentBytes);
+    const p = await readProjectScene(merged.read(), limits, verifier);
+    if (p.kind !== 'scene-provider') throw Error('Provider');
+    const candidate = (source: ProjectMetadataSource) => {
+      const inspection = inspectAtomicHistory(source.read().history, limits);
+      if (inspection.kind === 'rejected') throw Error('History');
+      return inspection.fields.find(f => f.path.join('/') === [map,membershipId,field].join('/'))!.candidates;
+    };
+    const duplicates = candidate(merged);
+    expect(duplicates.map(c => c.value)).toEqual([{kind:'absent'}, {kind:'absent'}]);
+    const before = merged.originalChanges();
+    const resolved = merged.prepareEdit(merged.token, { kind:model?'resolveScenePlacement':'resolveScenePin',
+      sceneId:id('scn'),membershipId,operationId:duplicates[0]!.operationId }, p, '1'.repeat(32));
+    const cold = ProjectMetadataSource.fromFullSource(resolved.encodeFullSource(), resolved.proof, limits);
+    expect(cold.originalChanges().slice(0,before.length)).toEqual(before);
+    expect(candidate(cold)).toHaveLength(1);
+    expect(candidate(cold)[0]!.value).toEqual({kind:'absent'});
+    expect(candidate(cold)[0]!.operationId).not.toBe(duplicates[0]!.operationId);
   });
 });

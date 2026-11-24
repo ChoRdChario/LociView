@@ -174,7 +174,7 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
     const options = await model.locator('option').evaluateAll(nodes => nodes.map(node => (node as HTMLOptionElement).value).filter(Boolean));
     expect(options).toHaveLength(1); await model.selectOption(options[0]!);
     await page.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
-    for (const [axis, value] of [['X', '0.2'], ['Y', '0.2'], ['Z', '0']] as const) await page.getByLabel(`位置 ${axis}`, { exact: true }).fill(value);
+    for (const [axis, value] of [['X', '0.2'], ['Y', '0.2'], ['Z', '0']] as const) await page.getByRole('region', { name: '位置の調整', exact: true }).getByLabel(`位置 ${axis}`, { exact: true }).fill(value);
     await page.getByRole('button', { name: 'ここに記録を作る', exact: true }).click();
     await expect(page.getByText('ピンの位置を確定しました。', { exact: true })).toBeVisible();
     const detail = page.getByRole('region', { name: '記録の詳細', exact: true });
@@ -214,12 +214,12 @@ test('GLBと画像の編集を保存し、ブラウザ再起動と別端末相�
         await page.getByRole('tab', { name: '記録', exact: true }).click();
         await lookAlongFront(page);
         await page.getByRole('button', { name: '全体表示', exact: true }).click();
-        await page.getByRole('button', { name: '記録を追加', exact: true }).click();
+        await page.getByRole('button', { name: '新規ピンを追加', exact: true }).click();
         const box = await canvas.boundingBox(); expect(box).toBeTruthy();
         await canvas.click({ position: { x: box!.width / 2, y: box!.height / 2 } });
       };
-      await pick(); await expect(page.getByText('この場所にはピンを置けません。別の場所を選んでください。', { exact: true })).toBeVisible();
-      await expect(pinArea.getByRole('button', { name: 'ここに記録を作る', exact: true })).toBeHidden();
+      await pick(); await expect(page.getByText('モデルの原点に仮置きしました。矢印で位置を調整できます。', { exact: true })).toBeVisible();
+      await expect(pinArea.getByRole('button', { name: 'ここに記録を作る', exact: true })).toBeEnabled();
       await pinArea.getByRole('button', { name: '取り消す', exact: true }).click();
       await page.getByRole('tab', { name: '描画', exact: true }).click();
       await beginMaterialEditing(panel);

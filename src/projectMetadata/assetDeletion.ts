@@ -21,9 +21,12 @@ export function assetDeletionImpact(provider: Provider, assetId: string, limits:
     return f.candidates.map(c => c.value.kind === 'value' ? c.value.value : null);
   };
   for (const [map, field, kind] of [['sceneAssetMembershipsById', 'assetId', 'scene'],
-    ['captionsById', 'anchor', 'caption'], ['materialOverridesById', 'routing', 'material']] as const) {
+    ['captionsById', 'anchor', 'caption'], ['sceneCaptionMembershipsById', 'anchor', 'caption'], ['materialOverridesById', 'routing', 'material']] as const) {
     for (const [id, fields] of r.records.get(map) ?? []) {
-      r.charge(); const candidates = values(fields.get(field));
+      r.charge(); const entry = fields.get(field);
+      if (map === 'sceneCaptionMembershipsById' && (!entry || entry.valid && !entry.hasUnknownFields &&
+          entry.candidates.every(c => c.value.kind === 'absent'))) continue;
+      const candidates = values(entry);
       const targets = candidates?.map(v => field === 'assetId' ? v : field === 'routing' ? object(object(v).target).assetId :
         object(v).kind === 'project' ? null : object(v).kind === 'asset' ? object(v).assetId : object(v).kind === 'unplaced' ? object(v).ownerAssetId ?? null : undefined);
       const complete = !!targets && targets.every(t => t === null || typeof t === 'string');
@@ -34,8 +37,10 @@ export function assetDeletionImpact(provider: Provider, assetId: string, limits:
       const deleteEdit = r.deleteEdits.has(`${map}/${id}`);
       // Never drop a deleted row that still holds a concurrent edit/reference.
       if (knownIdentity && knownLife && object(life![0]).state === 'deleted' && !deleteEdit) continue;
-      const scenes = kind === 'scene' ? values(fields.get('sceneId')) : null;
-      dependencies.push({ kind, id, sceneId: scenes?.length === 1 && typeof scenes[0] === 'string' ? scenes[0] : null,
+      const scenes = kind === 'scene' || map === 'sceneCaptionMembershipsById' ? values(fields.get('sceneId')) : null;
+      const captions = map === 'sceneCaptionMembershipsById' ? values(fields.get('captionId')) : null;
+      dependencies.push({ kind, id: captions?.length === 1 && typeof captions[0] === 'string' ? captions[0] : id,
+        sceneId: scenes?.length === 1 && typeof scenes[0] === 'string' ? scenes[0] : null,
         uncertain: !complete || candidates?.length !== 1 || !knownIdentity || !knownLife || deleteEdit });
     }
   }

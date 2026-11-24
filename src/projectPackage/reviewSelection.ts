@@ -13,6 +13,17 @@ import { inspectReviewSnapshot, reviewSchema, reviewMaps } from './reviewSnapsho
 const fail = (code: string): never => { throw new PackageControlError(`review-${code}`); };
 const table = (r: JsonObject, map: string) => object(r[map]) as Record<string, JsonObject>;
 const copy = (r: JsonObject, fields: readonly string[]): JsonObject => Object.fromEntries(fields.filter(k => r[k] !== undefined).map(k => [k, r[k]!]));
+function groupMemberships(rows: JsonObject[], field: 'captionId' | 'assetId') {
+  const groups = new Map<string, JsonObject[]>();
+  for (const row of rows) { const id = string(row[field]), group = groups.get(id) ?? []; group.push(row); groups.set(id, group); }
+  return groups;
+}
+function reviewAnchor(a: JsonObject): JsonObject {
+  if (a.kind !== 'asset') return a;
+  const result: Record<string, JsonValue> = { ...copy(a, ['kind', 'assetId', 'assetFrameId', 'positionAsset', 'normalAsset', 'authoredAnchorCompatibilityId']) };
+  if (a.hitEvidence) { const hit = object(a.hitEvidence); result.hitEvidence = copy(hit, ['method', 'confidence']); if (hit.method === 'manual') delete result.normalAsset; }
+  return result;
+}
 const visualRoles = new Set(['meshPrimary', 'pointPrimary', 'gsPrimary', 'visualPatch']);
 export interface ReviewSelectionOptions {
   readonly sceneId: string;
@@ -110,7 +121,19 @@ export async function selectReviewRecords(source: ProjectMetadataSource, limits:
   includeChildren('sceneAssetMembershipsById', 'sceneId', scenes);
   includeChildren('sceneCaptionMembershipsById', 'sceneId', scenes);
   const captionIds = new Set(Object.values(table(records, 'sceneCaptionMembershipsById')).map(r => string(r.captionId)));
-  for (const id of captionIds) table(records, 'captionsById')[id] = current('captionsById', id);
+  const captionMemberships = Object.values(table(records, 'sceneCaptionMembershipsById'));
+  const captionGroups = groupMemberships(captionMemberships, 'captionId');
+  for (const id of captionIds) {
+    const members = captionGroups.get(id)!;
+    const inherits = members.some(m => m.anchor === undefined);
+    const caption = current('captionsById', id, inherits ? [] : ['anchor']);
+    const anchor = reviewAnchor(object(inherits ? caption.anchor : members[0]!.anchor));
+    table(records, 'captionsById')[id] = { ...caption, anchor };
+    for (const m of members) if (m.anchor !== undefined) {
+      const scoped = reviewAnchor(object(m.anchor)), value = { ...m }; delete value.anchor;
+      table(records, 'sceneCaptionMembershipsById')[string(m.id)] = same(scoped, anchor) ? value : { ...value, anchor: scoped };
+    }
+  }
   includeChildren('captionAttachmentsById', 'captionId', captionIds); includeChildren('captionTagMembershipsById', 'captionId', captionIds);
   includeChildren('viewsById', 'sceneId', scenes);
   const media = new Set(Object.values(table(records, 'captionAttachmentsById')).map(r => string(r.mediaResourceId)));
@@ -119,12 +142,13 @@ export async function selectReviewRecords(source: ProjectMetadataSource, limits:
   for (const id of tags) table(records, 'captionTagsById')[id] = current('captionTagsById', id);
   const memberships = Object.values(table(records, 'sceneAssetMembershipsById'));
   const visualAssets = new Set(memberships.map(r => string(r.assetId)));
-  const sceneAssets = new Set(memberships.map(r => canonical([r.sceneId!, r.assetId!])));
-  const anchors = Object.values(table(records, 'captionsById')).map(r => object(r.anchor));
+  const sceneBindings = new Map<string, string>();
+  const assetGroups = groupMemberships(memberships, 'assetId');
+  const anchors = [...Object.values(table(records, 'captionsById')), ...Object.values(table(records, 'sceneCaptionMembershipsById')).filter(m => m.anchor !== undefined)].map(r => object(r.anchor));
   const owners = new Set([...visualAssets, ...anchors.flatMap(a => a.kind === 'asset' ? [string(a.assetId)] : a.kind === 'unplaced' && a.ownerAssetId !== undefined ? [string(a.ownerAssetId)] : [])]);
   const compatible = new Map<string, readonly string[]>(), transformOnlyBindings = new Set<string>(), ownerClasses = new Map<string, Set<string>>();
-  for (const r of Object.values(table(records, 'captionsById'))) {
-    charge(); const a = object(r.anchor); if (a.kind !== 'asset') continue;
+  for (const a of anchors) {
+    charge(); if (a.kind !== 'asset') continue;
     const ids = ownerClasses.get(string(a.assetId)) ?? new Set<string>(); ids.add(string(a.authoredAnchorCompatibilityId)); ownerClasses.set(string(a.assetId), ids);
   }
   for (const id of owners) {
@@ -133,7 +157,10 @@ export async function selectReviewRecords(source: ProjectMetadataSource, limits:
       const a = current('assetsById', id, ['label', 'status']);
       table(records, 'assetsById')[id] = { ...a, label: 'モデル未収録', status: { kind: 'unresolved', reason: 'missingSource' } }; continue;
     }
-    const a = current('assetsById', id, visualAssets.has(id) ? [] : ['label']), status = object(a.status);
+    const members = assetGroups.get(id) ?? [];
+    const allScoped = members.length > 0 && members.every(m => m.bindingId !== undefined);
+    const a = current('assetsById', id, allScoped ? ['status'] : visualAssets.has(id) ? [] : ['label']);
+    const status = allScoped ? { kind: 'ready', activeBindingId: members[0]!.bindingId! } : object(a.status);
     let transform: JsonValue | undefined, binding: JsonObject | undefined;
     if (status.kind === 'ready') {
       binding = current('assetBindingsById', string(status.activeBindingId));
@@ -145,34 +172,56 @@ export async function selectReviewRecords(source: ProjectMetadataSource, limits:
       table(records, 'assetsById')[id] = { ...a, label: 'モデル未収録', status: { kind: 'unresolved', reason: 'missingSource', pendingAssetToProject: transform! } }; continue;
     }
     if (!binding) return fail('visual-model-unavailable');
-    const revision = current('assetRevisionsById', string(binding.assetRevisionId)); if (revision.assetId !== id) fail('foreign-owner');
-    const reps: JsonObject[] = [];
-    for (const repId of list(revision.representationIds)) {
-      charge();
-      const r = current('representationsById', string(repId)); if (r.assetId !== id) fail('foreign-owner');
-      const purposes = list(r.purposes).filter(v => v !== 'source'); if (!purposes.length) continue;
-      reps.push(r); const trimmed: Record<string, JsonValue> = { ...r, purposes, derivedFrom: [] }; delete trimmed.derivation;
-      table(records, 'representationsById')[string(r.id)] = trimmed;
+    const baseBindingId = string(binding.id);
+    table(records, 'assetsById')[id] = { ...a, status };
+    for (const m of members) sceneBindings.set(canonical([m.sceneId!, m.assetId!]), string(m.bindingId ?? baseBindingId));
+    const bindings = new Set([baseBindingId]);
+    for (const m of members) if (m.bindingId !== undefined) {
+      if (m.bindingId === baseBindingId) { const row = { ...m }; delete row.bindingId; table(records, 'sceneAssetMembershipsById')[string(m.id)] = row; }
+      else bindings.add(string(m.bindingId));
     }
-    const families = new Set(reps.filter(r => visualRoles.has(string(r.role))).map(r => string(r.variantFamilyId)));
-    const partition = list(revision.anchorCompatibilityClasses).map(object).map(k => { charge(1 + list(k.targetVariantFamilyIds).length);
-      return { id: k.id!, targetVariantFamilyIds: list(k.targetVariantFamilyIds).filter(f => families.has(string(f))) }; }).filter(k => k.targetVariantFamilyIds.length);
-    const partitionIds = new Set(partition.map(k => string(k.id))), referenced = ownerClasses.get(id) ?? new Set<string>();
-    compatible.set(id, list(revision.anchorCompatibilityClasses).map(object).filter(k => referenced.has(string(k.id)) || partitionIds.has(string(k.id))).map(k => string(k.id)).sort());
-    table(records, 'assetsById')[id] = a;
-    table(records, 'assetBindingsById')[string(binding.id)] = { ...copy(binding, ['id', 'assetId', 'assetRevisionId', 'assetToProject']), method: 'import' };
-    table(records, 'assetRevisionsById')[string(revision.id)] = { ...copy(revision, ['id', 'assetId']), representationIds: reps.map(r => r.id!).sort(), anchorCompatibilityClasses: partition,
-      provenance: { origin: 'import', inputBlobDigests: [...new Set(reps.map(r => string(object(r.blob).digest)))].sort() } };
+    for (const bindingId of bindings) {
+      const selectedBinding = bindingId === baseBindingId ? binding : current('assetBindingsById', bindingId); if (selectedBinding.assetId !== id) fail('foreign-owner');
+      const revision = current('assetRevisionsById', string(selectedBinding.assetRevisionId)); if (revision.assetId !== id) fail('foreign-owner');
+      const reps: JsonObject[] = [];
+      for (const repId of list(revision.representationIds)) {
+        charge();
+        const r = current('representationsById', string(repId)); if (r.assetId !== id) fail('foreign-owner');
+        const purposes = list(r.purposes).filter(v => v !== 'source'); if (!purposes.length) continue;
+        reps.push(r); const trimmed: Record<string, JsonValue> = { ...r, purposes, derivedFrom: [] }; delete trimmed.derivation;
+        table(records, 'representationsById')[string(r.id)] = trimmed;
+      }
+      const families = new Set(reps.filter(r => visualRoles.has(string(r.role))).map(r => string(r.variantFamilyId)));
+      const partition = list(revision.anchorCompatibilityClasses).map(object).map(k => { charge(1 + list(k.targetVariantFamilyIds).length);
+        return { id: k.id!, targetVariantFamilyIds: list(k.targetVariantFamilyIds).filter(f => families.has(string(f))) }; }).filter(k => k.targetVariantFamilyIds.length);
+      const partitionIds = new Set(partition.map(k => string(k.id))), referenced = ownerClasses.get(id) ?? new Set<string>();
+      compatible.set(bindingId, list(revision.anchorCompatibilityClasses).map(object).filter(k => referenced.has(string(k.id)) || partitionIds.has(string(k.id))).map(k => string(k.id)).sort());
+      table(records, 'assetBindingsById')[string(selectedBinding.id)] = { ...copy(selectedBinding, ['id', 'assetId', 'assetRevisionId', 'assetToProject']), method: 'import' };
+      table(records, 'assetRevisionsById')[string(revision.id)] = { ...copy(revision, ['id', 'assetId']), representationIds: reps.map(r => r.id!).sort(), anchorCompatibilityClasses: partition,
+        provenance: { origin: 'import', inputBlobDigests: [...new Set(reps.map(r => string(object(r.blob).digest)))].sort() } };
+    }
   }
-  const materialTargets = new Set<string>();
-  for (const r of Object.values(table(records, 'representationsById'))) if (r.materialCatalog) {
-    const catalog = object(r.materialCatalog);
-    for (const slot of list(catalog.slots).map(object)) materialTargets.add(canonical([r.assetId!, r.variantFamilyId!, catalog.layoutId!, slot.logicalMaterialSlotId!]));
+  const materialTargets = new Set<string>(), targetsByRevision = new Map<string, Set<string>>();
+  for (const revision of Object.values(table(records, 'assetRevisionsById'))) {
+    const keys = new Set<string>();
+    for (const repId of list(revision.representationIds)) {
+      charge(); const rep = table(records, 'representationsById')[string(repId)]!;
+      if (!rep.materialCatalog) continue;
+      const catalog = object(rep.materialCatalog);
+      for (const slot of list(catalog.slots).map(object)) {
+        charge(); const key = canonical([rep.assetId!, rep.variantFamilyId!, catalog.layoutId!, slot.logicalMaterialSlotId!]);
+        keys.add(key); materialTargets.add(key);
+      }
+    }
+    targetsByRevision.set(string(revision.id), keys);
   }
   const applies = (value: JsonValue) => {
     const route = object(value), scope = object(route.scope), target = object(route.target);
-    return (scope.kind === 'project' || scope.kind === 'scene' && sceneAssets.has(canonical([scope.sceneId!, target.assetId!]))) &&
-      materialTargets.has(canonical([target.assetId!, target.variantFamilyId!, target.materialLayoutId!, target.logicalMaterialSlotId!]));
+    const key = canonical([target.assetId!, target.variantFamilyId!, target.materialLayoutId!, target.logicalMaterialSlotId!]);
+    if (scope.kind === 'project') return materialTargets.has(key);
+    if (scope.kind !== 'scene') return false;
+    const binding = sceneBindings.get(canonical([scope.sceneId!, target.assetId!]));
+    return !!binding && !!targetsByRevision.get(string(table(records, 'assetBindingsById')[binding]!.assetRevisionId))?.has(key);
   };
   for (const id of recordIds.materialOverridesById) {
     charge(); const route = field('materialOverridesById', id, 'routing'); if (!canInclude(route, applies) || !active('materialOverridesById', id)) continue;
@@ -184,12 +233,6 @@ export async function selectReviewRecords(source: ProjectMetadataSource, limits:
     if (!related || issue.kind === 'unverified' || ['anchor-class-not-current', 'source-index-unverified', 'verified-source-index-range-required', 'partial-material-map', 'ambiguous-material-maps'].includes(issue.code)) continue;
     if (issue.path[0] === 'assetBindingsById' && transformOnlyBindings.has(issue.path[1]!) && issue.path[2] === 'assetRevisionId') continue;
     fail('unresolved-closure');
-  }
-  for (const r of Object.values(table(records, 'captionsById'))) {
-    const a = object(r.anchor); if (a.kind !== 'asset') continue;
-    const anchor: Record<string, JsonValue> = { ...copy(a, ['kind', 'assetId', 'assetFrameId', 'positionAsset', 'normalAsset', 'authoredAnchorCompatibilityId']) };
-    if (a.hitEvidence) { const hit = object(a.hitEvidence); anchor.hitEvidence = copy(hit, ['method', 'confidence']); if (hit.method === 'manual') delete anchor.normalAsset; }
-    table(records, 'captionsById')[string(r.id)] = { ...r, anchor };
   }
   for (const [map, kind] of Object.entries(immutableKinds)) for (const r of Object.values(table(records, map)))
     table(records, map)[string(r.id)] = { ...r, payloadDigest: await immutableDigest(kind, r) };
@@ -213,6 +256,15 @@ export async function prepareReviewSnapshot(source: ProjectMetadataSource, limit
   const snapshot: JsonObject = { schema: reviewSchema(source.semanticProfile, scenes.length > 1), snapshotId: frozen?.snapshotId ?? `snp_${newId()}`, project: records.project!,
     ...(scenes.length === 1 ? { scene: scenes[0]! } : { scenesById: Object.fromEntries(scenes.map(scene => [string(scene.id), scene])) }),
     ...Object.fromEntries(reviewMaps.map(m => [m, {}])) };
+  const redundantBindings = new Map<string, string | null>();
+  const bindingsByAsset = groupMemberships(Object.values(table(records, 'assetBindingsById')), 'assetId');
+  const visual = (binding: JsonObject) => {
+    const revision = table(records, 'assetRevisionsById')[string(binding.assetRevisionId)]!;
+    const sourceBinding = reverse.get(string(binding.id)) ?? fail('binding-map');
+    return { assetToProject: binding.assetToProject!, representationIds: list(revision.representationIds).map(string).sort(),
+      anchorClassPartition: revision.anchorCompatibilityClasses!, compatibleAnchorClassIds: (selected.compatible.get(sourceBinding) ?? [])
+        .map(id => mapping.get(id) ?? fail('class-map')).sort() };
+  };
   for (const map of reviewMaps) for (const r of Object.values(table(records, map))) {
     if (map === 'assetsById') {
       const status = object(r.status);
@@ -220,15 +272,25 @@ export async function prepareReviewSnapshot(source: ProjectMetadataSource, limit
       if (status.kind === 'unresolved') { table(snapshot, map)[string(r.id)] = source.semanticProfile === 'map2' && status.pendingAssetToProject === undefined
         ? { kind: 'unplacedOwner', ...copy(r, ['id', 'assetFrameId']), ...extra }
         : { kind: 'nonvisualOwner', ...copy(r, ['id', 'assetFrameId']), ...extra, assetToProject: status.pendingAssetToProject! }; continue; }
-      const binding = table(records, 'assetBindingsById')[string(status.activeBindingId)]!, revision = table(records, 'assetRevisionsById')[string(binding.assetRevisionId)]!;
-      const sourceId = reverse.get(string(r.id)) ?? fail('asset-map');
-      table(snapshot, map)[string(r.id)] = { kind: 'visual', ...copy(r, ['id', 'label', 'assetFrameId']), ...extra, assetToProject: binding.assetToProject!,
-        representationIds: list(revision.representationIds).map(string).sort(), anchorClassPartition: revision.anchorCompatibilityClasses!,
-        compatibleAnchorClassIds: (selected.compatible.get(sourceId) ?? []).map(id => mapping.get(id) ?? fail('class-map')).sort() }; continue;
+      const binding = table(records, 'assetBindingsById')[string(status.activeBindingId)]!;
+      const base = visual(binding), scenePlacements: Record<string, JsonObject> = {};
+      const known = new Map<string, string | null>([[canonical(base), null]]);
+      for (const alternate of bindingsByAsset.get(string(r.id)) ?? []) {
+        if (alternate.id === binding.id) continue;
+        const placement = visual(alternate), key = canonical(placement), id = string(alternate.id);
+        if (known.has(key)) redundantBindings.set(id, known.get(key)!);
+        else { scenePlacements[id] = placement; known.set(key, id); }
+      }
+      table(snapshot, map)[string(r.id)] = { kind: 'visual', ...copy(r, ['id', 'label', 'assetFrameId']), ...extra, ...base,
+        ...(Object.keys(scenePlacements).length ? { scenePlacements } : {}) }; continue;
     }
     const value: Record<string, JsonValue> = { ...r }; delete value.lifecycle;
+    if (map === 'sceneAssetMembershipsById' && typeof value.bindingId === 'string' && redundantBindings.has(value.bindingId)) {
+      const replacement = redundantBindings.get(value.bindingId);
+      if (replacement) value.bindingId = replacement; else delete value.bindingId;
+    }
     if (map === 'representationsById') { delete value.payloadDigest; delete value.derivedFrom; }
-    if (map === 'captionsById') { const anchor = { ...object(value.anchor) }; delete anchor.authoredAssetRevisionId; value.anchor = anchor; }
+    if (map === 'captionsById' || map === 'sceneCaptionMembershipsById' && value.anchor !== undefined) value.anchor = reviewAnchor(object(value.anchor));
     table(snapshot, map)[string(r.id)] = value;
   }
   const review = await inspectReviewSnapshot(snapshot, limits);

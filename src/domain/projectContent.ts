@@ -120,7 +120,7 @@ export async function inspectProjectContent(input: unknown, limits: HistoryReadL
       else for (const e of entries.slice(1)) report([revisionMap, string(e.revision.id), 'anchorCompatibilityClasses'], `surface-equivalence-${result.outcome}`);
     }
     const anchorsChecked = new Set<string>(), anchorsPending = new Set<string>();
-    for (const f of candidates.fields) if (f.path[0] === 'captionsById' && f.path[2] === 'anchor') {
+    for (const f of candidates.fields) if ((f.path[0] === 'captionsById' || f.path[0] === 'sceneCaptionMembershipsById' && candidates.source.semanticProfile === 'map2') && f.path[2] === 'anchor') {
       const valid = new Set(f.validOperationIds);
       for (const c of f.candidates) if (valid.has(c.operationId) && c.value.kind === 'value') {
         charge(); const anchor = object(c.value.value), evidence = anchor.hitEvidence ? object(anchor.hitEvidence) : undefined;

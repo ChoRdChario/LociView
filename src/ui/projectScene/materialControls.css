@@ -32,3 +32,9 @@
 @container material-panel (max-width: 380px) {
   .lv-material-target, .lv-material-fields, .lv-material-advanced-fields { grid-template-columns: minmax(0, 1fr); }
 }
+
+.lv-material-color-tools { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.lv-material-color-tools[hidden], .lv-material-color-tools [hidden] { display: none; }
+.lv-material-color-tools > label { display: inline-flex; align-items: center; gap: 6px; }
+.lv-material-color-tools input[type=color] { width: 3rem; height: 44px; padding: 4px; cursor: pointer; }
+.lv-material-color-tools > p { flex-basis: 100%; }

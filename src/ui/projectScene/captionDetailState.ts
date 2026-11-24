@@ -4,7 +4,7 @@ import type { CaptionListItem } from './captionListState';
 import { mapTextareaEdit, type TextareaEditRange } from './textareaBody';
 
 export type CaptionEditField = 'title' | 'body' | 'color';
-export const captionFieldLabels = Object.freeze({ title: 'タイトル', body: '本文', color: 'ピンの色' });
+export const captionFieldLabels = Object.freeze({ title: 'タイトル', body: '本文', color: 'ピンカラー' });
 export type DetailSource = Readonly<{ token: string; sceneId: string }> & (
   Readonly<{ kind: 'ready'; caption: CaptionListItem; sceneCount: Field<number> }> |
   Readonly<{ kind: 'unavailable'; captionId: string | null; reason: string }>);

@@ -9,7 +9,7 @@ import { checkProjectHeader, checkProjectRecord, projectRecordMaps } from '../do
 import { cloneCanonicalValue, type JsonObject, type JsonValue } from '../domain/values';
 import type { StoredBlobRef } from '../projectMetadata/blobStore';
 import type { MetadataLimits } from '../projectMetadata/source';
-import { PORTABLE_MEDIA_CAPABILITY, type ReaderCapabilities } from '../projectMetadata/requiredCapabilities';
+import { capabilityUnion, PORTABLE_MEDIA_CAPABILITY, SCENE_PLACEMENT_CAPABILITY, type ReaderCapabilities } from '../projectMetadata/requiredCapabilities';
 import { prepareCleanRecords, type CleanReconstruction } from './cleanRecords';
 import { PACKAGE_LIMITS as L, summaryAlgorithm, type AutomaticSummary, type Entry } from './contract';
 import { packageByteHash, PackageControlError } from './manifest';
@@ -29,12 +29,30 @@ export const reviewMaps = ['assetsById', 'representationsById', 'captionsById', 
   'captionTagsById', 'captionTagMembershipsById', 'sceneAssetMembershipsById', 'sceneCaptionMembershipsById', 'viewsById', 'materialOverridesById'] as const;
 export type ReviewMap = typeof reviewMaps[number];
 export function reviewCapabilities(review: ReviewSnapshot): ReaderCapabilities {
-  return Object.values(table(review.snapshot, 'mediaResourcesById')).some(r => r.portableDisplay !== undefined) ? [PORTABLE_MEDIA_CAPABILITY] : [];
+  return capabilityUnion(
+    Object.values(table(review.snapshot, 'mediaResourcesById')).some(r => r.portableDisplay !== undefined) ? [PORTABLE_MEDIA_CAPABILITY] : [],
+    Object.values(table(review.snapshot, 'sceneAssetMembershipsById')).some(r => r.bindingId !== undefined) ||
+      Object.values(table(review.snapshot, 'sceneCaptionMembershipsById')).some(r => r.anchor !== undefined) ? [SCENE_PLACEMENT_CAPABILITY] : []);
 }
 const fail = (code: string): never => { throw new PackageControlError(`review-${code}`); };
 const table = (r: JsonObject, map: string) => object(r[map]) as Record<string, JsonObject>;
 export const reviewScenes = (snapshot: JsonObject): JsonObject[] =>
   snapshot.scene ? [object(snapshot.scene)] : Object.values(table(snapshot, 'scenesById'));
+const placementsOf = (asset: JsonObject) => (asset.scenePlacements ?? {}) as Record<string, JsonObject>;
+export function reviewSceneValues(snapshot: JsonObject, sceneId: string) {
+  const originals = table(snapshot, 'assetsById'), shared = table(snapshot, 'captionsById');
+  let assets = originals, captions = shared;
+  for (const m of Object.values(table(snapshot, 'sceneAssetMembershipsById'))) if (m.sceneId === sceneId && m.bindingId !== undefined) {
+    if (assets === originals) assets = { ...originals };
+    const id = string(m.assetId), a = assets[id]!;
+    assets[id] = { ...a, ...placementsOf(a)[string(m.bindingId)] };
+  }
+  for (const m of Object.values(table(snapshot, 'sceneCaptionMembershipsById'))) if (m.sceneId === sceneId && m.anchor !== undefined) {
+    if (captions === shared) captions = { ...shared };
+    const id = string(m.captionId); captions[id] = { ...captions[id], anchor: m.anchor };
+  }
+  return { assets, captions };
+}
 const encode = (r: JsonObject) => new TextEncoder().encode(canonical(r));
 const setsEqual = (a: Iterable<string>, b: Iterable<string>) => same([...new Set(a)].sort(), [...new Set(b)].sort());
 class ClosedFields extends ProjectRecordFields {
@@ -111,6 +129,18 @@ export async function inspectReviewSnapshot(input: unknown, limits: MetadataLimi
     if (c.id(scene.id!, 'scn', ['scenesById', id]) !== id) fail('scene-id');
   }
   if (!scenes.some(([id]) => id === project.defaultSceneId)) fail('default-scene');
+  const bindingOwners = new Map<string, string>();
+  const validateVisual = (r: JsonObject) => {
+    c.transform(c.required(r, 'assetToProject', []), []);
+    c.sorted(c.required(r, 'representationIds', []), [], (v, p) => c.id(v, 'rep', p), 1);
+    c.sorted(c.required(r, 'compatibleAnchorClassIds', []), [], (v, p) => c.id(v, 'cmp', p));
+    let previous = '';
+    for (const value of c.list(c.required(r, 'anchorClassPartition', []), 4096, [], 1)) {
+      const entry = c.shape(value, ['id', 'targetVariantFamilyIds'], []), id = c.id(c.required(entry, 'id', []), 'cmp', []);
+      if (id <= previous) fail('partition-order'); previous = id;
+      c.sorted(c.required(entry, 'targetVariantFamilyIds', []), [], (v, p) => c.id(v, 'fam', p), 1);
+    }
+  };
   let count = scenes.length;
   for (const map of reviewMaps) {
     const records = c.object(c.required(root, map, []), [map]); count += Object.keys(records).length;
@@ -120,21 +150,28 @@ export async function inspectReviewSnapshot(input: unknown, limits: MetadataLimi
       if (r.id !== key) fail('record-id');
       if (map === 'assetsById') {
         c.enum(c.required(r, 'kind', []), profile === 'map2' ? ['visual', 'nonvisualOwner', 'unplacedOwner'] : ['visual', 'nonvisualOwner'], []);
-        const fields = r.kind === 'visual' ? ['kind', 'id', 'label', 'assetFrameId', 'assetToProject', 'compatibleAnchorClassIds', 'representationIds', 'anchorClassPartition'] :
+        const fields = r.kind === 'visual' ? ['kind', 'id', 'label', 'assetFrameId', 'assetToProject', 'compatibleAnchorClassIds', 'representationIds', 'anchorClassPartition', 'scenePlacements'] :
           r.kind === 'unplacedOwner' ? ['kind', 'id', 'assetFrameId'] : ['kind', 'id', 'assetFrameId', 'assetToProject'];
         c.shape(r, profile === 'map2' ? [...fields, 'pinScale'] : fields, [map, key]);
         c.id(c.required(r, 'assetFrameId', []), 'frm', []);
-        if (r.kind !== 'unplacedOwner') c.transform(c.required(r, 'assetToProject', []), []);
+        if (r.kind === 'nonvisualOwner') c.transform(c.required(r, 'assetToProject', []), []);
         if (r.pinScale !== undefined) checkMutableField(c, 'assetsById', 'pinScale', r.pinScale);
         if (r.kind === 'visual') {
           c.text(c.required(r, 'label', []), 256, []);
-          c.sorted(c.required(r, 'representationIds', []), [], (v, p) => c.id(v, 'rep', p), 1);
-          c.sorted(c.required(r, 'compatibleAnchorClassIds', []), [], (v, p) => c.id(v, 'cmp', p));
-          let previous = '';
-          for (const value of c.list(c.required(r, 'anchorClassPartition', []), 4096, [], 1)) {
-            const entry = c.shape(value, ['id', 'targetVariantFamilyIds'], []), id = c.id(c.required(entry, 'id', []), 'cmp', []);
-            if (id <= previous) fail('partition-order'); previous = id;
-            c.sorted(c.required(entry, 'targetVariantFamilyIds', []), [], (v, p) => c.id(v, 'fam', p), 1);
+          validateVisual(r);
+          if (r.scenePlacements !== undefined) {
+            if (!multiple || profile !== 'map2') fail('unsupported-scene-placement');
+            const placements = c.object(r.scenePlacements, [map, key, 'scenePlacements']);
+            if (!Object.keys(placements).length) fail('empty-scene-placements');
+            const base = Object.fromEntries(['assetToProject', 'compatibleAnchorClassIds', 'representationIds', 'anchorClassPartition'].map(k => [k, r[k]!]));
+            const unique = new Set([canonical(base)]);
+            for (const [bindingId, value] of Object.entries(placements)) {
+              if (++count > L.closureRecords) fail('record-budget');
+              c.id(bindingId, 'bnd', []); if (bindingOwners.has(bindingId)) fail('duplicate-scene-binding');
+              bindingOwners.set(bindingId, key);
+              const placement = c.shape(value, Object.keys(base), []); validateVisual(placement);
+              const signature = canonical(placement); if (unique.has(signature)) fail('redundant-placement'); unique.add(signature);
+            }
           }
         }
       } else if (map === 'representationsById') {
@@ -147,12 +184,22 @@ export async function inspectReviewSnapshot(input: unknown, limits: MetadataLimi
       } else {
         c.shape(r, Object.keys(mutableRecordFields[map as MutableRecordMap]).filter(k => k !== 'lifecycle'), [map, key]);
         checkProjectRecord(c, map, { ...r, lifecycle: life });
-        if (map === 'captionsById') {
+        if (!multiple && (map === 'sceneCaptionMembershipsById' && r.anchor !== undefined ||
+            map === 'sceneAssetMembershipsById' && r.bindingId !== undefined)) fail('single-scene-override');
+        if (map === 'captionsById' || map === 'sceneCaptionMembershipsById' && r.anchor !== undefined) {
           const anchor = object(r.anchor); if (anchor.authoredAssetRevisionId !== undefined || anchor.hitEvidence && object(anchor.hitEvidence).source !== undefined) fail('anchor-provenance');
         }
       }
     }
   }
+  const usedBindings = new Set<string>(), baseMembers = new Set<string>();
+  for (const m of Object.values(table(root, 'sceneAssetMembershipsById'))) {
+    charge();
+    if (m.bindingId === undefined) { baseMembers.add(string(m.assetId)); continue; }
+    if (bindingOwners.get(string(m.bindingId)) !== m.assetId) fail('foreign-scene-binding');
+    usedBindings.add(string(m.bindingId));
+  }
+  if (!setsEqual(usedBindings, bindingOwners.keys()) || [...bindingOwners.values()].some(id => !baseMembers.has(id))) fail('scene-binding-closure');
   // The general Project graph has bounded nested class/slot comparisons. Charge
   // their actual potential fanout here rather than letting a small caller budget
   // pay an uncounted captions×classes or materials×catalogs scan.
@@ -160,13 +207,18 @@ export async function inspectReviewSnapshot(input: unknown, limits: MetadataLimi
   for (const a of Object.values(table(root, 'assetsById'))) {
     charge(); if (a.kind !== 'visual') continue;
     let slots = 0;
-    for (const repId of list(a.representationIds)) {
-      charge(); const r = table(root, 'representationsById')[string(repId)]; if (!r) fail('missing-representation');
-      slots += 2 + (r!.materialCatalog ? list(object(r!.materialCatalog).slots).length : 0);
+    let classes = 0;
+    for (const placement of [a, ...Object.values(placementsOf(a))]) {
+      classes += list(placement.anchorClassPartition).length;
+      for (const repId of list(placement.representationIds)) {
+        charge(); const r = table(root, 'representationsById')[string(repId)]; if (!r) fail('missing-representation');
+        slots += 2 + (r!.materialCatalog ? list(object(r!.materialCatalog).slots).length : 0);
+      }
     }
-    assetWork.set(string(a.id), { classes: list(a.anchorClassPartition).length, slots });
+    assetWork.set(string(a.id), { classes, slots });
   }
-  for (const r of Object.values(table(root, 'captionsById'))) charge(1 + (assetWork.get(string(object(r.anchor).assetId))?.classes ?? 0));
+  const positionedRecords = [...Object.values(table(root, 'captionsById')), ...Object.values(table(root, 'sceneCaptionMembershipsById')).filter(m => m.anchor !== undefined)];
+  for (const r of positionedRecords) charge(1 + (assetWork.get(string(object(r.anchor).assetId))?.classes ?? 0));
   for (const r of Object.values(table(root, 'materialOverridesById'))) charge(1 + (assetWork.get(string(object(object(r.routing).target).assetId))?.slots ?? 0));
   for (const r of Object.values(table(root, 'mediaResourcesById'))) {
     charge(); if (await immutableDigest(immutableKinds.mediaResourcesById, r) !== r.payloadDigest) fail('media-digest');
@@ -184,26 +236,68 @@ export async function inspectReviewSnapshot(input: unknown, limits: MetadataLimi
     }
   }
   const ownerCaptions = new Map<string, JsonObject[]>();
-  for (const caption of Object.values(captions)) {
+  for (const caption of positionedRecords) {
     const a = object(caption.anchor), owner = a.kind === 'asset' ? a.assetId : a.kind === 'unplaced' ? a.ownerAssetId : undefined;
     if (owner === undefined) continue;
     const group = ownerCaptions.get(string(owner)) ?? []; group.push(caption); ownerCaptions.set(string(owner), group);
   }
-  const includedReps = new Set<string>(); let missingModelCaptions = 0, newlyNeedsReviewCaptions = 0;
+  const includedReps = new Set<string>();
+  const classEffects = new Map<JsonObject, { partition: Set<string>; compatible: Set<string> }>();
+  const missingCaptions = new Set<string>(), reviewCaptions = new Set<string>();
   for (const a of Object.values(assets)) {
     const id = string(a.id), owned = ownerCaptions.get(id) ?? [];
     const positioned = owned.filter(r => object(r.anchor).kind === 'asset');
     if (a.kind === 'nonvisualOwner' || a.kind === 'unplacedOwner') {
       if (sceneAssets.has(id) || !owned.length || a.kind === 'unplacedOwner' && positioned.length || a.kind === 'nonvisualOwner' && !positioned.length) fail('nonvisual-closure');
-      missingModelCaptions += owned.length; continue;
+      continue;
     }
     if (!sceneAssets.has(id)) fail('visual-without-membership');
-    const partition = new Set(list(a.anchorClassPartition).map(v => string(object(v).id))), compatible = new Set(list(a.compatibleAnchorClassIds).map(string));
-    const referenced = new Set(positioned.map(r => string(object(r.anchor).authoredAnchorCompatibilityId)));
-    if ([...partition].some(id => !compatible.has(id)) || [...compatible].some(id => !partition.has(id) && !referenced.has(id))) fail('compatible-set');
-    for (const r of positioned) { const klass = string(object(r.anchor).authoredAnchorCompatibilityId); if (compatible.has(klass) && !partition.has(klass)) newlyNeedsReviewCaptions++; }
-    for (const id of list(a.representationIds).map(string)) includedReps.add(id);
+    for (const placement of [a, ...Object.values(placementsOf(a))]) {
+      const partition = new Set(list(placement.anchorClassPartition).map(v => string(object(v).id))), compatible = new Set(list(placement.compatibleAnchorClassIds).map(string));
+      const referenced = new Set(positioned.map(r => string(object(r.anchor).authoredAnchorCompatibilityId)));
+      if ([...partition].some(id => !compatible.has(id)) || [...compatible].some(id => !partition.has(id) && !referenced.has(id))) fail('compatible-set');
+      classEffects.set(placement, { partition, compatible });
+      for (const id of list(placement.representationIds).map(string)) includedReps.add(id);
+    }
   }
+  const materialKeys = new Map<JsonObject, Set<string>>();
+  const placementKeys = (placement: JsonObject) => {
+    const known = materialKeys.get(placement); if (known) return known;
+    const keys = new Set<string>();
+    for (const repId of list(placement.representationIds)) {
+      charge(); const rep = table(root, 'representationsById')[string(repId)]!;
+      if (!rep.materialCatalog) continue;
+      const cat = object(rep.materialCatalog);
+      for (const slot of list(cat.slots)) { charge(); keys.add(canonical([rep.variantFamilyId!, cat.layoutId!, object(slot).logicalMaterialSlotId!])); }
+    }
+    materialKeys.set(placement, keys); return keys;
+  };
+  const placementsByScene = new Map<string, JsonObject>();
+  for (const m of Object.values(table(root, 'sceneAssetMembershipsById'))) {
+    const a = assets[string(m.assetId)]!;
+    placementsByScene.set(canonical([m.sceneId!, m.assetId!]), m.bindingId === undefined ? a : placementsOf(a)[string(m.bindingId)]!);
+  }
+  for (const m of Object.values(table(root, 'materialOverridesById'))) {
+    charge(); const routing = object(m.routing), target = object(routing.target), scope = object(routing.scope);
+    if (scope.kind !== 'scene') continue;
+    const placement = placementsByScene.get(canonical([scope.sceneId!, target.assetId!]));
+    if (!placement || !placementKeys(placement).has(canonical([target.variantFamilyId!, target.materialLayoutId!, target.logicalMaterialSlotId!]))) fail('material-placement');
+  }
+  const baseCaptions = new Set<string>();
+  for (const m of Object.values(table(root, 'sceneCaptionMembershipsById'))) {
+    charge(); const id = string(m.captionId), caption = captions[id]!, anchor = object(m.anchor ?? caption.anchor);
+    if (m.anchor === undefined) baseCaptions.add(id);
+    else if (same(m.anchor, caption.anchor)) fail('redundant-anchor');
+    const owner = string(anchor.kind === 'asset' ? anchor.assetId : anchor.kind === 'unplaced' ? anchor.ownerAssetId : undefined);
+    if (!owner) continue;
+    if (assets[owner]?.kind !== 'visual') { missingCaptions.add(id); continue; }
+    if (anchor.kind !== 'asset') continue;
+    const placement = placementsByScene.get(canonical([m.sceneId!, owner])) ?? assets[owner]!, sets = classEffects.get(placement)!;
+    const klass = string(anchor.authoredAnchorCompatibilityId);
+    if (sets.compatible.has(klass) && !sets.partition.has(klass)) reviewCaptions.add(id);
+  }
+  if (Object.keys(captions).some(id => !baseCaptions.has(id))) fail('caption-base-closure');
+  const missingModelCaptions = missingCaptions.size, newlyNeedsReviewCaptions = reviewCaptions.size;
   if (!setsEqual(includedReps, Object.keys(table(root, 'representationsById'))) ||
     !setsEqual(Object.keys(captions), Object.values(table(root, 'sceneCaptionMembershipsById')).map(r => string(r.captionId))) ||
     !setsEqual(Object.keys(table(root, 'mediaResourcesById')), Object.values(table(root, 'captionAttachmentsById')).map(r => string(r.mediaResourceId))) ||
@@ -241,18 +335,38 @@ async function validationGraph(snapshot: JsonObject, charge: (n?: number) => voi
       table(out, map)[string(r.id)] = record;
     }
   }
-  let ordinal = 0;
+  let ordinal = 0; const graphBindings = new Map<string, string>();
   for (const id of Object.keys(table(snapshot, 'assetsById')).sort()) {
     charge();
     const a = table(snapshot, 'assetsById')[id]!;
     const pinScale: JsonObject = a.pinScale === undefined ? {} : { pinScale: a.pinScale };
     if (a.kind === 'nonvisualOwner' || a.kind === 'unplacedOwner') { table(out, 'assetsById')[id] = { id, lifecycle: lifecycle(), assetFrameId: a.assetFrameId!, label: 'モデル未収録', ...pinScale,
       status: { kind: 'unresolved', reason: 'missingSource', ...(a.kind === 'nonvisualOwner' ? { pendingAssetToProject: a.assetToProject! } : {}) } }; continue; }
-    const bindingId = placeholder('bnd', ++ordinal), revisionId = placeholder('rev', ordinal);
-    table(out, 'assetsById')[id] = { id, lifecycle: lifecycle(), label: a.label!, assetFrameId: a.assetFrameId!, ...pinScale, status: { kind: 'ready', activeBindingId: bindingId } };
-    table(out, 'assetBindingsById')[bindingId] = { id: bindingId, assetId: id, assetRevisionId: revisionId, assetToProject: a.assetToProject!, method: 'import' };
-    table(out, 'assetRevisionsById')[revisionId] = { id: revisionId, assetId: id, representationIds: a.representationIds!, anchorCompatibilityClasses: a.anchorClassPartition!,
-      provenance: { origin: 'import', inputBlobDigests: [...new Set(list(a.representationIds).map(rep => string(object(table(out, 'representationsById')[string(rep)]?.blob).digest)))].sort() } };
+    // Moving the same model creates a new binding. A second revision would claim a second surface
+    // with the same compatibility classes and require an unrelated surface-equivalence proof.
+    const revisions = new Map<string, string>();
+    const materialize = (placement: JsonObject) => {
+      charge();
+      const bindingId = placeholder('bnd', ++ordinal);
+      const revisionKey = canonical([placement.representationIds!, placement.anchorClassPartition!]);
+      let revisionId = revisions.get(revisionKey);
+      if (!revisionId) {
+        revisionId = placeholder('rev', ordinal);
+        revisions.set(revisionKey, revisionId);
+        const digests = list(placement.representationIds).map(rep => string(object(table(out, 'representationsById')[string(rep)]?.blob).digest));
+        table(out, 'assetRevisionsById')[revisionId] = { id: revisionId, assetId: id, representationIds: placement.representationIds!, anchorCompatibilityClasses: placement.anchorClassPartition!,
+          provenance: { origin: 'import', inputBlobDigests: [...new Set(digests)].sort() } };
+      }
+      table(out, 'assetBindingsById')[bindingId] = { id: bindingId, assetId: id, assetRevisionId: revisionId, assetToProject: placement.assetToProject!, method: 'import' };
+      return bindingId;
+    };
+    const activeBindingId = materialize(a);
+    table(out, 'assetsById')[id] = { id, lifecycle: lifecycle(), label: a.label!, assetFrameId: a.assetFrameId!, ...pinScale, status: { kind: 'ready', activeBindingId } };
+    for (const [key, alternate] of Object.entries(placementsOf(a)).sort(([x], [y]) => x < y ? -1 : x > y ? 1 : 0)) graphBindings.set(key, materialize(alternate));
+  }
+  for (const m of Object.values(table(out, 'sceneAssetMembershipsById'))) if (m.bindingId !== undefined) {
+    const bindingId = graphBindings.get(string(m.bindingId)) ?? fail('scene-binding');
+    table(out, 'sceneAssetMembershipsById')[string(m.id)] = { ...m, bindingId };
   }
   for (const [map, kind] of Object.entries(immutableKinds)) for (const r of Object.values(table(out, map))) {
     charge();

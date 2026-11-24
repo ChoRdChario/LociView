@@ -61,7 +61,7 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
     const originalSceneName = await p.getByRole('region', { name: 'シーン', exact: true }).locator('select[aria-label="シーン"] option:checked').innerText();
     expect(originalSceneName).toBe('シーン 1');
     await revealCoordinateAdd(p); const owner = p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '基準.glb' }); await expect(p.getByRole('button', { name: 'このモデルに追加', exact: true })).toBeEnabled(); await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
-    for (const [axis, value] of [['X', '0'], ['Y', '.5'], ['Z', '0']]) await p.getByLabel(`位置 ${axis}`, { exact: true }).fill(value!);
+    for (const [axis, value] of [['X', '0'], ['Y', '.5'], ['Z', '0']]) await p.getByRole('region', { name: '位置の調整', exact: true }).getByLabel(`位置 ${axis}`, { exact: true }).fill(value!);
     await p.getByRole('button', { name: 'ここに記録を作る', exact: true }).click(); await ready(p, 'ピンの位置を確定しました。');
     await p.getByRole('button', { name: '記録の変更を元に戻す', exact: true }).click(); await ready(p, '記録の変更を元に戻しました。'); await expect(p.locator('.lv-caption-select')).toHaveCount(0);
     await p.getByRole('button', { name: '記録の変更をやり直す', exact: true }).click(); await ready(p, '記録の変更をやり直しました。'); await expect(p.locator('.lv-caption-select')).toHaveCount(1);
@@ -129,11 +129,11 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
     console.log('daily: Scene organization verified');
     await phase(info, 'scenes.ready');
     await p.getByRole('tab', { name: 'モデル', exact: true }).click(); const models = p.getByRole('tabpanel', { name: 'モデル', exact: true });
-    await models.locator('.lv-model-select').filter({ hasText: '移動するモデル.glb' }).click(); await models.getByRole('button', { name: '配置を調整', exact: true }).click(); await models.getByLabel('モデル位置 X', { exact: true }).fill('5'); await models.getByLabel('モデル倍率', { exact: true }).fill('2'); await models.getByRole('button', { name: '配置を確定', exact: true }).click(); await ready(p, 'モデルの配置を確定しました。');
-    await models.getByLabel('位置合わせ', { exact: true }).locator('summary').click(); await models.locator('.lv-model-select').filter({ hasText: '基準.glb' }).click(); await models.getByRole('button', { name: 'このモデルを基準にする', exact: true }).click(); await expect(models.getByRole('button', { name: '配置を調整', exact: true })).toBeDisabled();
+    await models.locator('.lv-model-select').filter({ hasText: '移動するモデル.glb' }).click(); await models.getByRole('button', { name: '配置を調整', exact: true }).click(); await models.getByLabel('位置 X', { exact: true }).fill('5'); await models.getByLabel('倍率', { exact: true }).fill('2'); await models.getByRole('button', { name: '配置を確定', exact: true }).click(); await ready(p, 'モデルの配置を確定しました。');
+    await models.getByLabel('基準・リセット', { exact: true }).locator('summary').click(); await models.locator('.lv-model-select').filter({ hasText: '基準.glb' }).click(); await models.getByRole('button', { name: 'このモデルを基準にする', exact: true }).click(); await expect(models.getByRole('button', { name: '配置を調整', exact: true })).toBeDisabled();
     await models.locator('.lv-model-select').filter({ hasText: '移動するモデル.glb' }).click(); await models.getByRole('button', { name: '基準の中心と大きさに合わせる', exact: true }).click(); await models.getByRole('button', { name: '配置を確定', exact: true }).click(); await ready(p, 'モデルの配置を確定しました。');
     await models.getByRole('button', { name: '配置を元に戻す', exact: true }).click(); await ready(p, '配置を元に戻しました。'); await models.getByRole('button', { name: '配置をやり直す', exact: true }).click(); await ready(p, '配置をやり直しました。');
-    await models.getByLabel('回転・拡縮の基準', { exact: true }).selectOption('centre'); await models.getByRole('button', { name: '配置を調整', exact: true }).click(); await models.getByLabel('モデル回転 Z', { exact: true }).fill('90'); await models.getByRole('button', { name: '配置を確定', exact: true }).click(); await ready(p, 'モデルの配置を確定しました。');
+    await models.getByLabel('回転・拡縮の基準', { exact: true }).selectOption('centre'); await models.getByRole('button', { name: '配置を調整', exact: true }).click(); await models.getByLabel('回転 Z', { exact: true }).fill('90'); await models.getByRole('button', { name: '配置を確定', exact: true }).click(); await ready(p, 'モデルの配置を確定しました。');
     await models.getByRole('button', { name: '読み込み時の配置に戻す', exact: true }).click(); await models.getByRole('button', { name: '配置を取り消す', exact: true }).click();
     console.log('daily: alignment verified');
     await phase(info, 'alignment.ready');

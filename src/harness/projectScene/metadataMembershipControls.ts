@@ -40,10 +40,10 @@ export function createMetadataMembershipControls(document: Document, host: Pick<
         option(choice, '', '解消方法を選択'); option(choice, 'one', '一つを残す');
         option(choice, 'both', '両方残す（別々に編集）');
         let copy: ReturnType<typeof captionCopySource> | undefined;
-        let modelCopy: ReturnType<typeof assetCopySource> | undefined;
+        let modelCopy: Map<string, ReturnType<typeof assetCopySource>> | undefined;
         try { if (kind === 'caption') copy = captionCopySource(provider, captionId, limits); } catch { /* Explain the blocked copy, never substitute projected content. */ }
         try { if (kind === 'asset') {
-          modelCopy = assetCopySource(provider, sceneId, captionId, limits);
+          modelCopy = new Map(edgeIds.map(id => [id, assetCopySource(provider, sceneId, captionId, limits, id)] as const));
         } } catch { /* Keep-one remains possible; incomplete copy never silently omits a dependency. */ }
         preview.textContent = kind === 'asset' ? `同じモデルへの登録が${edgeIds.length}件あります。「一つを残す」は重複登録だけを解除します。モデル本体・キャプション・他のシーンは変わりません。` +
           (modelCopy ? '「両方残す」は現在のモデル・配置・見え方を別項目にコピーします。キャプションは元モデルに残ります。' : '両方残すには、モデルと見え方の未解決の内容を先に確認してください。') :
@@ -71,7 +71,7 @@ export function createMetadataMembershipControls(document: Document, host: Pick<
               kind: 'resolveAssetMembership', sceneId, assetId: captionId, observedMembershipIds: edgeIds,
               originalMembershipId, choice: decision, eventId,
               ...(decision === 'both' ? { copies: await Promise.all(edgeIds.filter(id => id !== originalMembershipId).map(id =>
-                prepareAssetMembershipCopy(modelCopy!, id, prefix => `${prefix}_${newId()}`))) } : {}),
+                prepareAssetMembershipCopy(modelCopy!.get(id)!, id, prefix => `${prefix}_${newId()}`))) } : {}),
             };
             return { kind: 'resolveCaptionMembership', sceneId, captionId,
               observedMembershipIds: edgeIds, originalMembershipId, choice: decision, eventId,

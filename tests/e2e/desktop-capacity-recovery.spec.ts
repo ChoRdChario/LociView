@@ -72,7 +72,7 @@ for(const touch of [false,true])test(`native capacity recovery retains drafts an
     if(touch)await p.getByRole('button',{name:'3D',exact:true}).click();
     await expect(p.getByLabel('3Dモデルの表示',{exact:true})).toHaveAttribute('aria-busy','false',{timeout:90_000});await revealWorkPanel(p);await revealCoordinateAdd(p);
     const model=p.getByLabel('追加先モデル',{exact:true});await model.focus();await model.selectOption({label:'容量確認.glb'});
-    await p.getByRole('button',{name:'このモデルに追加',exact:true}).click();for(const axis of ['X','Y','Z'])await p.getByLabel('位置 '+axis,{exact:true}).fill(axis==='Y'?'.5':'0');
+    await p.getByRole('button',{name:'このモデルに追加',exact:true}).click();for(const axis of ['X','Y','Z'])await p.getByRole('region', { name: '位置の調整', exact: true }).getByLabel('位置 '+axis,{exact:true}).fill(axis==='Y'?'.5':'0');
     await p.getByRole('button',{name:'ここに記録を作る',exact:true}).click();const detail=p.getByRole('region',{name:'記録の詳細',exact:true});
     await expect(detail.getByLabel('タイトル',{exact:true})).toBeEditable();await fault(p,'edit');let started=Date.now();
     await detail.getByLabel('タイトル',{exact:true}).fill('保持する記録');await detail.getByLabel('本文',{exact:true}).fill('容量不足でも失わない本文');

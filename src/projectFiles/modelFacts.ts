@@ -4,7 +4,7 @@ import { nativePointSourceDeclaration, nativeProxySourceDeclaration, nativeSpati
 import { meshSourceFormat } from '../domain/meshSource';
 import { same } from '../domain/projectGraphSupport';
 import { recordBlobRefs } from '../domain/portableMedia';
-import type { Anchor } from '../scene/types';
+import type { Anchor, AssetProjection } from '../scene/types';
 import { readProjectScene, type ProjectProviderRead } from '../scene/projectProvider';
 import { metadataProviderReady, measureMetadata, type MetadataTiming, type MetadataModelFactPort, type MetadataModelFactPlan } from '../projectMetadata/session';
 import type { ProjectMetadataSource } from '../projectMetadata/source';
@@ -39,14 +39,23 @@ export function assertValidationModelClosures(provider:Extract<ProjectProviderRe
         source.value.variantFamilyId !== r.proxyForGsVariantFamilyId) return fileError('位置指定用の面とGSの対応が一致しません。');
     }
   }
-  for(const asset of Object.values(provider.resources.assets)){
-    charge();if(asset.lifecycle.kind!=='value'||asset.lifecycle.value.state!=='active'||asset.projection.kind!=='value')continue;
-    const records=asset.projection.value.representationIds.map(id=>{charge();const field=provider.details.immutable.representationsById[id];
+  const checked = new Set<string>();
+  const verify = (assetId: string, projection: AssetProjection) => {
+    const key = json([assetId, projection.representationIds]);
+    if (checked.has(key)) return;
+    checked.add(key);
+    const records=projection.representationIds.map(id=>{charge();const field=provider.details.immutable.representationsById[id];
       if(field?.kind!=='value')return fileError('モデルの表示本体を確認できません。');return fileObject(field.value) as JsonObject;});
     const visual=records.filter(r=>r.role!=='interactionProxy'),proxy=records.filter(r=>r.role==='interactionProxy'),primary=visual[0];
-    if(visual.length!==1||!primary||!['meshPrimary','pointPrimary','gsPrimary'].includes(primary.role as string)||records.some(r=>r.assetId!==asset.id)||
+    if(visual.length!==1||!primary||!['meshPrimary','pointPrimary','gsPrimary'].includes(primary.role as string)||records.some(r=>r.assetId!==assetId)||
       (primary.role==='gsPrimary'?proxy.length>1||proxy.some(r=>r.proxyForGsVariantFamilyId!==primary.variantFamilyId):proxy.length!==0))
       return fileError('このモデルの表示本体の組み合わせには対応していません。');
+  };
+  for (const asset of Object.values(provider.resources.assets)) {
+    charge(); if (asset.lifecycle.kind === 'value' && asset.lifecycle.value.state === 'active' && asset.projection.kind === 'value') verify(asset.id, asset.projection.value);
+  }
+  for (const row of Object.values(provider.state.assetMemberships)) {
+    charge(); if (row.lifecycle.kind === 'value' && row.lifecycle.value.state === 'active' && row.projection?.kind === 'value') verify(row.resourceId, row.projection.value);
   }
 }
 

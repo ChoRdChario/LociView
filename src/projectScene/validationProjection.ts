@@ -4,6 +4,7 @@ import { nativePointSourceProfile } from '../projectFiles/nativeSpatial';
 import { meshSourceDeclarations, meshSourceFormat, type MeshSourceFormat } from '../domain/meshSource';
 import { meshSourceProfile } from '../projectFiles/meshSource';
 import type { ProjectProviderRead } from '../scene/projectProvider';
+import type { AssetProjection } from '../scene/types';
 import { metadataImmutableReader } from '../projectMetadata/records';
 import { same } from '../domain/projectGraphSupport';
 import { validationGlbProfile, occurrenceGlbProfile, jpegGlbProfile, occurrenceJpegGlbProfile, validationMetadataLimits } from '../projectFiles/validation';
@@ -17,16 +18,25 @@ export async function validationModelVersions(provider: ProjectProviderRead): Pr
   if (provider.kind !== 'scene-provider') throw Error('保存したシーンを確認できません。');
   const read = metadataImmutableReader(provider, validationMetadataLimits), profile = await validationGlbProfile(), occurrence = await occurrenceGlbProfile();
   const gs = await gsSourceProfile(), point = await pointSourceProfile(), nativePoint = await nativePointSourceProfile(), profiles = [profile, occurrence, await jpegGlbProfile(), await occurrenceJpegGlbProfile(), point, nativePoint, gs,...await Promise.all((Object.keys(meshSourceDeclarations) as MeshSourceFormat[]).map(meshSourceProfile))];
-  return freezeDisplay(Object.values(provider.resources.assets).flatMap(asset => {
-    if (asset.lifecycle.kind !== 'value' || asset.lifecycle.value.state !== 'active' || asset.projection.kind !== 'value') return [];
-    const p = asset.projection.value;
+  const bindings = new Map<string, { assetId: string; projection: AssetProjection }>();
+  for (const asset of Object.values(provider.resources.assets)) {
+    if (asset.lifecycle.kind === 'value' && asset.lifecycle.value.state === 'active' && asset.projection.kind === 'value')
+      bindings.set(asset.projection.value.bindingId, { assetId: asset.id, projection: asset.projection.value });
+  }
+  for (const edge of Object.values(provider.state.assetMemberships)) {
+    const owner = provider.resources.assets[edge.resourceId];
+    if (owner?.lifecycle.kind === 'value' && owner.lifecycle.value.state === 'active' && edge.lifecycle.kind === 'value' &&
+        edge.lifecycle.value.state === 'active' && edge.projection?.kind === 'value')
+      bindings.set(edge.projection.value.bindingId, { assetId: edge.resourceId, projection: edge.projection.value });
+  }
+  return freezeDisplay([...bindings.values()].map(({ assetId, projection: p }) => {
 
     const binding = read('assetBindingsById', p.bindingId), revision = read('assetRevisionsById', p.revisionId);
     const reps=p.representationIds.map(id=>read('representationsById',id)), visuals=reps.filter(r=>r.role!=='interactionProxy'), proxies=reps.filter(r=>r.role==='interactionProxy');
     if(visuals.length!==1 || proxies.length>1 || proxies.length && (visuals[0]!.role!=='gsPrimary' || proxies[0]!.proxyForGsVariantFamilyId!==visuals[0]!.variantFamilyId))throw Error('モデルとピン配置用モデルの対応を確認できません。');
     const representation=visuals[0]!, proxy=proxies[0];
-    if (binding.assetId !== asset.id || binding.assetRevisionId !== revision.id || revision.assetId !== asset.id ||
-      representation.assetId !== asset.id || !same(revision.representationIds, p.representationIds) ||
+    if (binding.assetId !== assetId || binding.assetRevisionId !== revision.id || revision.assetId !== assetId ||
+      representation.assetId !== assetId || !same(revision.representationIds, p.representationIds) ||
       !profiles.some(profile => same(representation.formatProfile, profile))) throw Error('保存したモデルと表示本体の対応を確認できません。');
     // These exact immutable values were validated by the provider, not by this UI assertion.
     const closure: ValidationModelClosure = { shape: same(representation.formatProfile, gs) ? 'saved-gs' : same(representation.formatProfile, point) || same(representation.formatProfile, nativePoint) ? 'saved-point' : meshSourceFormat(representation.formatProfile)?'saved-mesh':'saved-glb', assetFrame: { id: p.assetFrameId },
@@ -36,8 +46,8 @@ export async function validationModelVersions(provider: ProjectProviderRead): Pr
     const classes = closure.revision.anchorCompatibilityClasses;
     if (!same(classes.map(c => c.id).slice().sort(), p.anchorCompatibilityIds.slice().sort()))
       throw Error('保存したモデルのピンの対応を確認できません。');
-    const name = provider.details.mutable.assetsById[asset.id]?.label;
-    return [{ assetId: asset.id, label: name?.kind === 'value' && typeof name.value === 'string' ? name.value : '3Dモデル', projection: p,
-      families: classes.flatMap(c => c.targetVariantFamilyIds.map(id => ({ id, name: '表面', compatibilityId: c.id }))), closure }];
+    const name = provider.details.mutable.assetsById[assetId]?.label;
+    return { assetId, label: name?.kind === 'value' && typeof name.value === 'string' ? name.value : '3Dモデル', projection: p,
+      families: classes.flatMap(c => c.targetVariantFamilyIds.map(id => ({ id, name: '表面', compatibilityId: c.id }))), closure };
   }));
 }

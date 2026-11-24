@@ -10,6 +10,8 @@ import { planModelList } from '../../src/ui/projectScene/modelListState';
 import { planPinMode } from '../../src/ui/projectScene/pinModeState';
 import { RecordedDocument, RecordedNode, record } from './domRecorder';
 import { pinPositionInParent } from '../../src/harness/projectScene/pinParent';
+import { pinPositionInParent as savedPinPositionInParent } from '../../src/projectScene/pinParent';
+import { sceneMembers } from '../../src/ui/projectScene/projectRead';
 import { pointInProject } from '../../src/harness/projectScene/viewportModel';
 import { syntheticVersions, versionFromClosure } from '../../src/harness/projectScene/modelFixture';
 import { createFixtureModel, fixtureModelIds } from '../../src/harness/projectScene/modelClosure';
@@ -60,6 +62,42 @@ describe('connected synthetic development host (not rendered, storage or TEAM-FL
     expect(s.composition.captions.find(caption => caption.captionId === f.shared)?.marker).toBe('suppressed'); w.dispose();
   });
 
+  it('keeps two views of one model separate during pin editing and reparenting', () => {
+    const base = new SyntheticSession().snapshot;
+    const initial = syntheticVersions.find(v => v.assetId === f.equipment)!;
+    const scoped = versionFromClosure(createFixtureModel({ ...fixtureModelIds(initial.closure), binding: 'bnd_' + '4'.repeat(32) }, 'original',
+      { translation: [10, 0, 0], rotationXYZW: [0, 0, 0, 1], uniformScale: 1 }));
+    const modelEdge = Object.values(base.state.assetMemberships).find(edge => edge.sceneId === f.overview && edge.resourceId === f.equipment)!;
+    const pinEdge = Object.values(base.state.captionMemberships).find(edge => edge.sceneId === f.overview && edge.resourceId === f.shared)!;
+    const pin = value({ kind: 'project' as const, projectFrameId: base.resources.projectFrameId, positionProject: [12, 0, 0] as const });
+    const project = { ...base, modelVersions: [...syntheticVersions, scoped], state: { ...base.state,
+      assetMemberships: { ...base.state.assetMemberships, [modelEdge.id]: { ...modelEdge, projection: value(scoped.projection) } },
+      captionMemberships: { ...base.state.captionMemberships, [pinEdge.id]: { ...pinEdge, anchor: pin } }
+    } };
+    expect(sceneMembers(project, f.overview).bindings.get(f.equipment)?.bindingId).toBe(scoped.projection.bindingId);
+    expect(sceneMembers(project, f.detail).bindings.get(f.equipment)?.bindingId).toBe(initial.projection.bindingId);
+    expect(sceneMembers(project, f.overview).anchors.get(f.shared)).toEqual(pin);
+    expect(sceneMembers(project, f.detail).anchors.get(f.shared)).toEqual(base.resources.captions[f.shared]!.anchor);
+    expect(savedPinPositionInParent(project, f.shared, f.equipment, f.overview)).toEqual([2, 0, 0]);
+    expect(savedPinPositionInParent(project, f.shared, f.equipment, f.detail)).toEqual([0, 0, 0]);
+    // Losing the scoped closure must never fall back to the other view's source.
+    expect(savedPinPositionInParent({ ...project, modelVersions: syntheticVersions }, f.shared, f.equipment, f.overview)).toBeNull();
+  });
+  it('preserves world position only for a proven outside source and a current scene target', () => {
+    const base = new SyntheticSession().snapshot;
+    const versions = syntheticVersions.map((v, i) => versionFromClosure(createFixtureModel(fixtureModelIds(v.closure), 'original', {
+      translation: [i + 2, 3, -4], rotationXYZW: degreesRotation(['0', '30', '90']), uniformScale: i + 2,
+    })));
+    const project = { ...base, modelVersions: versions, state: { ...base.state,
+      assetMemberships: Object.fromEntries(Object.entries(base.state.assetMemberships).filter(([, edge]) =>
+        edge.sceneId !== f.overview || edge.resourceId !== f.equipment)),
+    } };
+    const expected = savedPinPositionInParent(project, f.shared, f.structure);
+    expect(expected).not.toBeNull();
+    expect(savedPinPositionInParent(project, f.shared, f.structure, f.overview, id => id === f.equipment ? 'absent' : 'included')).toEqual(expected);
+    expect(savedPinPositionInParent(project, f.shared, f.structure, f.overview, id => id === f.equipment ? undefined : 'included')).toBeNull();
+    expect(savedPinPositionInParent(project, f.shared, f.equipment, f.overview, () => 'absent')).toBeNull();
+  });
   it('converts Asset/Project positions through rotated/scaled frames and never invents an unavailable position', () => {
     const base = new SyntheticSession().snapshot;
     const versions = syntheticVersions.map((v, i) => versionFromClosure(createFixtureModel(fixtureModelIds(v.closure), 'original', {

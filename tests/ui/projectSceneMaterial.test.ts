@@ -43,9 +43,10 @@ function effect(context: MaterialContext, kind: 'apply' | 'remove'): MaterialEff
   const plan = planMaterial(context, { kind }); expect(plan.kind).toBe(kind);
   if (plan.kind !== 'apply' && plan.kind !== 'remove') throw Error('not effect'); return plan;
 }
-function host(initial = fixture(),direct=false, frames?: Map<number, FrameRequestCallback>) {
+function host(initial = fixture(),direct=false, frames?: Map<number, FrameRequestCallback>, sample?: () => Promise<{ sRGBHex: string }>) {
   const document = new RecordedDocument(), plans: MaterialPlan[] = []; let context = initial;
   if (frames) { let serial=0; Object.assign(document,{defaultView:{requestAnimationFrame(fn:FrameRequestCallback){frames.set(++serial,fn);return serial;},cancelAnimationFrame(id:number){frames.delete(id);}}}); }
+  if (sample) Object.assign(document, { defaultView: { EyeDropper: class { open = sample; } } });
   const controls = createMaterialControls(document.asDocument(), plan => {
     plans.push(plan); if (['draft', 'select', 'cancel'].includes(plan.kind) && materialPlanIsCurrent(plan, context)) {
       context = applyLocal(context, plan); controls.render(context);
@@ -385,4 +386,24 @@ describe('disconnected material controls (not rendering, browser or save accepta
     expect(color.parent!.hidden).toBe(false); expect(h.context.draft?.edits.keyColor).toBe('#ffffff'); expect(h.apply.disabled).toBe(true);
     expect(h.status.textContent).toContain('有効にするか'); h.controls.dispose();
   });
+});
+
+it('uses a native palette without a screen sampler and rejects a late sample from another revision', async () => {
+  const colorTools = (h: ReturnType<typeof host>) => h.fields.get('keyColor')!.parent!.parent!.children.find(n => n.className === 'lv-material-color-tools')!;
+  const fallback = host(fixture(), true);
+  const [label, sampleButton] = colorTools(fallback).children;
+  expect(sampleButton!.hidden).toBe(true);
+  const palette = label!.children[0]!;
+  palette.click(); palette.value = '#335577'; palette.fire('change');
+  expect(fallback.context.draft?.edits.keyColor).toBe('#335577'); fallback.controls.dispose();
+
+  let finish!: (value: { sRGBHex: string }) => void;
+  const native = host(fixture(), true, undefined, () => new Promise(resolve => { finish = resolve; }));
+  const eyedropper = colorTools(native).children[1]!;
+  expect(eyedropper.hidden).toBe(false);
+  eyedropper.click(); native.render({ ...native.context, source: { ...native.context.source, token: 'next' } });
+  finish({ sRGBHex: '#abcdef' }); await Promise.resolve();
+  expect(native.context.draft).toBeNull();
+  eyedropper.click(); finish({ sRGBHex: '#ABCDEF' }); await Promise.resolve();
+  expect(native.context.draft?.edits.keyColor).toBe('#abcdef'); native.controls.dispose();
 });

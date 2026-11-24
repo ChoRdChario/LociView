@@ -1,5 +1,5 @@
 import { parseJsonWithoutDuplicateMembers } from '../core/json';
-import { readRequiredCapabilities, hasEditorCapability, RequiredCapabilityError } from '../projectMetadata/requiredCapabilities';
+import { readRequiredCapabilities, hasEditorCapability, hasScenePlacementCapability, RequiredCapabilityError } from '../projectMetadata/requiredCapabilities';
 import { cloneCanonicalValue, reject, type JsonObject, type JsonValue } from '../domain/values';
 import { canonical } from '../domain/projectGraphSupport';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
@@ -161,8 +161,11 @@ function checkedManifest(root: JsonValue): { manifest: PackageManifest; payloads
     } return counts;
   };
   const entityCounts = countTable(c.required(sum, 'entityClasses', []), entities);
-  for (const [field, count] of countTable(c.required(sum, 'fieldClasses', []), fields))
+  for (const [field, count] of countTable(c.required(sum, 'fieldClasses', []), fields)) {
     if (count > (entityCounts.get(field.split('.')[0]!) ?? 0)) fail('summary-entity');
+    if ((field === 'sceneAssetMembershipsById.bindingId' || field === 'sceneCaptionMembershipsById.anchor') &&
+        !hasScenePlacementCapability(r.requiredCapabilities)) throw new RequiredCapabilityError('capability-mismatch');
+  }
   const totals = c.shape(req('payloadTotals'), ['entryCount', 'uncompressedBytes', 'largestEntryBytes'], []);
   const total = payloads.reduce((n, e) => n + e.byteLength, 0), largest = Math.max(0, ...payloads.map(e => e.byteLength));
   if (boundedInteger(c.required(totals, 'entryCount', []), L.entryCount - 2) !== payloads.length ||

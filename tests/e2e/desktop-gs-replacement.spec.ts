@@ -1,6 +1,6 @@
 import {test, createBrowserProfile} from '../helpers/browserProfile';
 import { desktopEntry, desktopOrigin } from './desktopEntry';
-import { finishCaptionEditing, chooseHomeFiles, selectShareOutput,  closeFileSurface, revealFileSurface, revealModelManagement, lookAlongFront } from './workspaceUi';
+import { sceneModelBinding, finishCaptionEditing, chooseHomeFiles, selectShareOutput,  closeFileSurface, revealFileSurface, revealModelManagement, lookAlongFront } from './workspaceUi';
 import {expect,chromium,type Page,type BrowserContext,type TestInfo} from '@playwright/test';
 
 import {openAsBlob} from 'node:fs';
@@ -27,7 +27,7 @@ async function output(p:Page,info:TestInfo,name:string,workspace=false){
  const [download]=await Promise.all([p.waitForEvent('download',{timeout:600_000}),primary.click()]);const path=info.outputPath(name+'.zip');await download.saveAs(path);expect(await download.failure()).toBeNull();
  await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy','false',{timeout:600_000});await closeFileSurface(p);return path;
 }
-function active(records:Record<string,any>){const asset=Object.values(records.assetsById)[0] as any,binding=records.assetBindingsById[asset.status.activeBindingId],revision=records.assetRevisionsById[binding.assetRevisionId],reps=revision.representationIds.map((id:string)=>records.representationsById[id]);return {asset,binding,revision,gs:reps.find((r:any)=>r.role==='gsPrimary'),proxy:reps.find((r:any)=>r.role==='interactionProxy')};}
+function active(records:Record<string,any>){const asset=Object.values(records.assetsById)[0] as any,binding=sceneModelBinding(records, asset.id),revision=records.assetRevisionsById[binding.assetRevisionId],reps=revision.representationIds.map((id:string)=>records.representationsById[id]);return {asset,binding,revision,gs:reps.find((r:any)=>r.role==='gsPrimary'),proxy:reps.find((r:any)=>r.role==='interactionProxy')};}
 async function backup(path:string){const b=await BackupArchive.inspect(await openAsBlob(path),validationMetadataLimits),c=await inspectProjectCandidates(b.source.read(),validationMetadataLimits);if(c.kind!=='project-candidate-inspection')throw Error('Backup');const records=c.unambiguousRecords as Record<string,any>;return {b,records,...active(records)};}
 async function verifyBody(b:BackupArchive,digest:string){const file=b.archive.entryBlob('blobs/sha256/'+digest);expect(file.size).toBe(largeGsBytes);const hash=createHash('sha256');const reader=file.stream().getReader();try{for(;;){const part=await reader.read();if(part.done)break;hash.update(part.value);}}finally{reader.releaseLock();}expect(hash.digest('hex')).toBe(digest);}
 
@@ -43,10 +43,10 @@ test('50万点SH4を新しい本体へ差し替え、旧資源の解放・2世�
  try{
   let p=await launch();await chooseHomeFiles(p, original);await p.getByLabel('プロジェクト名',{exact:true}).fill(title);await p.getByRole('button',{name:'プロジェクトを作成',exact:true}).click();await ready(p);await mark('created',p);
   await p.getByRole('tab',{name:'モデル',exact:true}).click();await models(p).locator('.lv-model-select').first().click();const proxy=p.waitForEvent('filechooser');await models(p).getByRole('button',{name:'ピン配置用モデルを追加',exact:true}).click();await(await proxy).setFiles({name:'以前の面.glb',mimeType:'model/gltf-binary',buffer:triangleGlb()});await models(p).getByRole('button',{name:'ピン配置用モデルを設定',exact:true}).click();await expect(p.getByText('ピン配置用モデルを登録しました。',{exact:true})).toBeVisible({timeout:240_000});await ready(p);
-  await lookAlongFront(p);await p.getByRole('tab',{name:'記録',exact:true}).click();await p.getByRole('button',{name:'記録を追加',exact:true}).click();
+  await lookAlongFront(p);await p.getByRole('tab',{name:'記録',exact:true}).click();await p.getByRole('button',{name:'新規ピンを追加',exact:true}).click();
   const canvas=p.getByLabel('3Dモデルの表示',{exact:true}),box=(await canvas.boundingBox())!,extent=4*Math.exp(Math.fround(Math.log(.0007))),bounds={min:[-500/300-extent,-250/300-extent,-extent] as const,max:[499/300+extent,249/300+extent,.0006+extent] as const},pose=fittedPose(bounds,defaultPose(),box.width/box.height,'+z');
   if(pose.projection.kind!=='perspective')throw Error('Perspective');const camera=new THREE.PerspectiveCamera(pose.projection.verticalFov*180/Math.PI,box.width/box.height,.000001,1e9);camera.position.set(...pose.position);camera.up.set(...pose.up);camera.lookAt(new THREE.Vector3(...pose.target));camera.updateMatrixWorld(true);const hit=new THREE.Vector3(.1,.2,0).project(camera);await canvas.click({position:{x:(hit.x+1)*box.width/2,y:(1-hit.y)*box.height/2}});
-  await p.getByText('座標で微調整',{exact:true}).click(); await p.getByLabel('位置 X',{exact:true}).fill('0.2');await p.getByRole('button',{name:'ここに記録を作る',exact:true}).click();await expect(p.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible({timeout:240_000});
+  await p.getByText('座標で微調整',{exact:true}).click(); await p.getByRole('region', { name: '位置の調整', exact: true }).getByLabel('位置 X',{exact:true}).fill('0.2');await p.getByRole('button',{name:'ここに記録を作る',exact:true}).click();await expect(p.getByText('ピンの位置を確定しました。',{exact:true})).toBeVisible({timeout:240_000});
   const detail=p.getByRole('region',{name:'記録の詳細',exact:true});await detail.getByLabel('本文',{exact:true}).fill('差し替えても残す記録');await finishCaptionEditing(p, {}, 240_000);
   const workspace=await WorkspaceArchive.inspect(await openAsBlob(await output(p,info,'before-replacement',true)),validationMetadataLimits),oldInspection=await inspectProjectCandidates(workspace.source.read(),validationMetadataLimits);if(oldInspection.kind!=='project-candidate-inspection')throw Error('Workspace');const oldRecords=oldInspection.unambiguousRecords as Record<string,any>,old=active(oldRecords),caption=Object.values(oldRecords.captionsById)[0] as any;
   const beforePixel=(await presentedCanvas(canvas)).sample;await mark('original-workspace',p);

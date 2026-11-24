@@ -6,7 +6,7 @@ import { object, list, same } from '../domain/projectGraphSupport';
 import { validateMaterialIntent, type MaterialIntent } from '../domain/materialIntent';
 import type { JsonObject } from '../domain/values';
 import type { ProjectProviderRead } from '../scene/projectProvider';
-import { projectMaterialRoutes } from '../scene/projectMaterialRoutes';
+import { projectMaterialRoutes, sceneMaterialProjection } from '../scene/projectMaterialRoutes';
 import { candidateReader } from './membership';
 import { metadataImmutableReader } from './records';
 import { fail, type MetadataLimits } from './format';
@@ -33,7 +33,7 @@ export function materialResolutionContext(p: Provider, sceneId: string, override
   const scope = object(routing.scope), target = object(routing.target), assetId = target.assetId as string;
   if (scope.kind === 'scene' && scope.sceneId !== sceneId) fail('material-scene');
   r.active('assetsById', assetId);
-  const projection = p.resources.assets[assetId]?.projection;
+  const projection = sceneMaterialProjection(p, sceneId, assetId);
   if (projection?.kind !== 'value') return fail('material-target');
   const immutable = metadataImmutableReader(p, limits); let found = false,source:MeshMaterialSource|undefined;
   for (const id of projection.value.representationIds) {

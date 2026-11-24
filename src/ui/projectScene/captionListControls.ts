@@ -22,8 +22,8 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
   const reveal = button('絞り込みを解除'); reveal.hidden = true;
   const count = make('p'); count.className = 'lv-caption-count';
   const colorBar = make('div'); colorBar.className = 'lv-caption-colors';
-  colorBar.setAttribute('role', 'group'); colorBar.setAttribute('aria-label', 'ピンの色');
-  const colorLabel = make('span', 'ピンの色'), colorChoices = make('div'), all = button('全色'), unknown = make('span');
+  colorBar.setAttribute('role', 'group'); colorBar.setAttribute('aria-label', 'ピンカラーで絞り込み');
+  const colorLabel = make('span', 'ピンカラー'), colorChoices = make('div'), all = button('全色'), unknown = make('span');
   colorChoices.className = 'lv-caption-color-choices'; unknown.className = 'lv-caption-note';
   colorBar.append(colorLabel, colorChoices, all, unknown);
   const list = make('ul'); list.className = 'lv-caption-list'; list.setAttribute('aria-label', '記録一覧');
@@ -31,7 +31,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
   const tools=make('section');tools.className='lv-caption-list-tools';tools.setAttribute('aria-label','記録の操作');
   root.append(filters, status, reveal, count, colorBar, list);
   root.append(tools);
-  if(presentation?.compact){root.className+=' lv-caption-browser-compact';const colors=make('details');colors.className='lv-caption-color-menu';colors.append(make('summary','ピンの色'),colorBar);filters.append(count,colors);}
+  if (presentation?.compact) { root.className += ' lv-caption-browser-compact'; filters.append(count); }
   let context: CaptionListContext | undefined, composing = false, disposed = false, rendering = false;
   let observedScrollTop = 0;
   let emptyMessage: string | undefined;
@@ -274,7 +274,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
       let entry = colors.get(color);
       if (!entry) {
         const node = button(''), disc = make('span'), mark = make('span', '✓');
-        node.className = 'lv-caption-color'; node.setAttribute('aria-label', `${color}のピン`); node.title = `${color}のピン`;
+        node.className = 'lv-caption-color'; node.setAttribute('aria-label', `${color}のピン`);
         disc.className = 'lv-caption-disc'; disc.style.backgroundColor = color; disc.setAttribute('aria-hidden', 'true');
         mark.setAttribute('aria-hidden', 'true'); disc.append(mark); node.append(disc);
         const click = () => request({ kind: 'color', color }); node.addEventListener('click', click);
@@ -336,5 +336,5 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     const index = captionId === null ? undefined : layout.index(captionId);
     return { previous: index !== undefined && index > 0, next: index !== undefined && index + 1 < (currentView?.rows.length ?? 0) };
   }
-  return { root, tools, searchId: search.id, render, acceptScroll, neighbors, revealSelected, restoreFirstRow, focusSelection, focusSearch: () => search.focus?.({ preventScroll: true }), dispose, isComposing: () => composing };
+  return { root, list, tools, searchId: search.id, render, acceptScroll, neighbors, revealSelected, restoreFirstRow, focusSelection, focusSearch: () => search.focus?.({ preventScroll: true }), dispose, isComposing: () => composing };
 }

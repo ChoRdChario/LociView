@@ -77,8 +77,8 @@ for (const touch of [false, true]) test(`autosaved text and photos survive file 
       await expect(tasks).toHaveCount(1);
     }
     await revealCaptionList(page);
-    const firstAdd = page.getByRole('button', { name: '記録を追加', exact: true });
-    await expect(firstAdd).toHaveText('記録を追加');
+    const firstAdd = page.getByRole('button', { name: '新規ピンを追加', exact: true });
+    await expect(firstAdd).toHaveText('新規ピンを追加');
     expect(await firstAdd.evaluate(node => Number.parseFloat(getComputedStyle(node).fontSize))).toBeGreaterThanOrEqual(14);
     const sceneSearch = page.getByRole('searchbox', { name: '検索', exact: true });
     expect((await firstAdd.boundingBox())!.y).toBeLessThan((await sceneSearch.boundingBox())!.y);

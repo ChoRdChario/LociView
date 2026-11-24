@@ -139,14 +139,14 @@ async function inspectCandidateRoot(raw: JsonValue, limits: HistoryReadLimits,
       if (a !== undefined && comp !== undefined) try { checkMaterialCoupling(object(a), object(comp), profile); }
       catch (error) { if (!(error instanceof DomainValidationError)) throw error; report([map, id, 'appearance'], 'incompatible-material-intent'); }
     }
-    const g = new GraphInspection(records); inspectModelGraph(g); inspectResourceGraph(g);
-    const anchors: JsonObject[] = [];
-    for (const { map, id } of entities.values()) if (map === 'captionsById') for (const c of candidates([map, id, 'anchor'])) if (c.value.kind === 'value') {
-      const life = resolved([map, id, 'lifecycle']); anchors.push({ id, anchor: c.value.value, ...(life !== undefined ? { lifecycle: life } : {}) });
+    const g = new GraphInspection(records); inspectModelGraph(g); inspectResourceGraph(g, profile === 'map2');
+    const anchors: JsonObject[] = [], sceneAnchors: JsonObject[] = [];
+    for (const { map, id } of entities.values()) if (map === 'captionsById' || profile === 'map2' && map === 'sceneCaptionMembershipsById') for (const c of candidates([map, id, 'anchor'])) if (c.value.kind === 'value') {
+      const life = resolved([map, id, 'lifecycle']); (map === 'captionsById' ? anchors : sceneAnchors).push({ id, anchor: c.value.value, ...(life !== undefined ? { lifecycle: life } : {}) });
     }
-    inspectAnchors(g, anchors);
+    inspectAnchors(g, anchors, sceneAnchors);
     for (const i of g.issues) report(graphPath(i), i.code, i.kind === 'needs-review' ? 'review' : i.kind);
-    const port: CandidateReferencePort = { entities: [...entities.values()], candidates, resolved, charge, report,
+    const port: CandidateReferencePort = { sceneOverrides: profile === 'map2', entities: [...entities.values()], candidates, resolved, charge, report,
       edge: edge => g.edges.push(Object.freeze(edge)), root: id => g.roots.add(id) };
     inspectCandidateReferences(port);
     // Unknown semantics and the exact caller source remain retained, not a clean/export/GC permit.

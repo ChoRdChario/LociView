@@ -93,7 +93,8 @@ export function inspectPhysical(doc: PhysicalDoc, inputProof: MetadataProof, lim
 /** Capability use belongs to original physical scalars, including overwritten writes. */
 export function inspectPhysicalSource(doc: PhysicalDoc, inputProof: MetadataProof, limits: MetadataLimits) {
   const result = inspectPhysicalDetail(doc, inputProof, limits);
-  return { input: result.input, portableChanges: result.portableChanges, mediaRecords: result.mediaRecords, declarations: result.declarations };
+  return { input: result.input, portableChanges: result.portableChanges, scenePlacementChanges: result.scenePlacementChanges,
+    mediaRecords: result.mediaRecords, declarations: result.declarations };
 }
 /** Encoding witness only, never a selected/default View. Include overwritten original scalars. */
 export function originalEntryWitness(doc: PhysicalDoc, proof: MetadataProof, limits: MetadataLimits, sceneId: string): string {
@@ -127,6 +128,7 @@ function inspectPhysicalDetail(doc: PhysicalDoc, inputProof: MetadataProof, limi
   const changes: AtomicChange[] = [], scalars = new Map<string, { objectId: string; key: string }>();
   let work = 0, operations = 0, schema: JsonObject | undefined, identity: JsonValue | undefined, profileMarker: JsonValue | undefined;
   const portableChanges = new Set<string>();
+  const scenePlacementChanges = new Set<string>();
   const mediaRecords: JsonObject[] = [];
   const originals: OriginalScalar[] = []; let nodesUsed = 0;
   const collect = (changeHash: string, operationId: string, path: string[], value: AtomicWrite['value']) => {
@@ -190,6 +192,10 @@ function inspectPhysicalDetail(doc: PhysicalDoc, inputProof: MetadataProof, limi
           mediaRecords.push(value.value as JsonObject);
           if (Object.hasOwn(value.value, 'portableDisplay')) portableChanges.add(hash);
         }
+        if (map2 && path.length === 3 && (
+          path[0] === 'sceneAssetMembershipsById' && path[2] === 'bindingId' ||
+          path[0] === 'sceneCaptionMembershipsById' && path[2] === 'anchor'
+        )) scenePlacementChanges.add(hash);
         if (hash === rootHash) {
           if (writes.has(address)) fail('root-rewrite');
           if (op.key === 'schema' && value.kind === 'value') schema = value.value as JsonObject;
@@ -242,5 +248,5 @@ function inspectPhysicalDetail(doc: PhysicalDoc, inputProof: MetadataProof, limi
     }
   }
   const input = Object.freeze({ ...(map2 ? { semanticProfile: profile } : {}), schema: schema!, recordMaps: Object.freeze(Object.keys(projectRecordMaps)), history: read.history });
-  return { input, portableChanges, mediaRecords, declarations: Object.freeze(declarations), scalars: Object.freeze(originals), nodesUsed, workUsed: work + nodesUsed + read.workUsed };
+  return { input, portableChanges, scenePlacementChanges, mediaRecords, declarations: Object.freeze(declarations), scalars: Object.freeze(originals), nodesUsed, workUsed: work + nodesUsed + read.workUsed };
 }

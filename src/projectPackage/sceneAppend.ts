@@ -137,7 +137,8 @@ export async function planSceneAppend(base: ProjectMetadataSource, review: Revie
     tail = tail.slice(0, position) + alphabet[tail.length < 64 ? 30 : alphabet.indexOf(tail[position]!) + 1];
     Object.assign(scene, { orderKey: tail });
   }
-  for (const value of Object.values(table(records, 'captionsById'))) {
+  for (const value of [...Object.values(table(records, 'captionsById')), ...Object.values(table(records, 'sceneCaptionMembershipsById'))]) {
+    if (object(value).anchor === undefined) continue;
     const anchor = object(object(value).anchor);
     if (anchor.kind === 'project') Object.assign(anchor, { projectFrameId: targetFrame.id });
   }

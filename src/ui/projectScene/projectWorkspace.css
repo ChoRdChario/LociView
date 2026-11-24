@@ -80,7 +80,13 @@
 .lv-project-body [role="tablist"] { display: flex; flex-wrap: wrap; gap: 4px; flex-shrink: 0; }
 .lv-project-body [role="tab"] { flex: 1 0 auto; min-width: 44px; padding: 6px 4px; white-space: nowrap; }
 .lv-project-body [role="tab"][aria-selected="true"] { border-bottom: 3px solid var(--lv-action); background: var(--lv-selected); }
-.lv-project-body [aria-label="モデルの配置"] > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.lv-project-body .lv-model-transform-values,
+.lv-project-body .lv-model-gizmo-modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.lv-model-transform-values label { min-width: 0; }
+.lv-model-transform-values label > span { cursor: ew-resize; user-select: none; touch-action: pan-y; border-bottom: 1px dotted var(--lv-line); justify-self: start; }
+.lv-model-gizmo-modes > span { grid-column: 1 / -1; font-weight: 600; }
+.lv-project-body .lv-model-gizmo-modes button { min-width: 0; padding-inline: 3px; }
+.lv-project-body [aria-label="モデルの配置"] h3 { margin: 0; font-size: 1rem; }
 .lv-project-body [aria-label="モデルの配置"] label { flex: 1 1 96px; min-width: 0; }
 .lv-project-body [aria-label="モデルの配置"] input { width: 100%; }
 .lv-project-body [role="tabpanel"] { flex-shrink: 0; }
@@ -127,7 +133,7 @@
 .lv-project-camera .lv-camera-fit[data-suggested="true"] { box-shadow: inset 0 0 0 1px var(--lv-field); background: var(--lv-ink); }
 .lv-failure-details { font-size: 12px; min-width: 0; }
 .lv-failure-details pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 10rem; overflow: auto; }
-.lv-model-task [aria-label="配置の操作"] button[aria-pressed="true"] { background: var(--lv-selected); border-color: var(--lv-action); box-shadow: inset 0 -2px var(--lv-action); }
+.lv-model-task .lv-model-gizmo-modes button[aria-pressed="true"] { background: var(--lv-selected); border-color: var(--lv-action); box-shadow: inset 0 -2px var(--lv-action); }
 .lv-caption-tag { padding: 6px 0; }
 .lv-caption-tag > span:first-child { display: inline-flex; align-items: center; gap: 6px; }
 .lv-caption-tag i { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #777c70; background: #bbbdb6; }
@@ -156,7 +162,8 @@
 }
 
 /* Content and active tasks share one hierarchy across the workspace. */
-.lv-project-shell .lv-project-workspace button { border-color: transparent; background: transparent; }
+.lv-project-shell .lv-project-workspace button { border-color: var(--lv-line); background: var(--lv-field); }
+.lv-project-shell .lv-project-workspace :is(aside,header) summary { cursor: pointer; text-decoration: underline; text-underline-offset: .22em; text-decoration-color: var(--lv-line); }
 .lv-project-shell .lv-project-workspace button:hover:not(:disabled) { background: var(--lv-hover); }
 .lv-project-shell .lv-project-workspace button:disabled { border-style: solid; color: var(--lv-muted); opacity: .5; }
 .lv-project-shell .lv-project-workspace button[aria-pressed="true"] { border-left: 0; background: var(--lv-selected); }
@@ -240,8 +247,6 @@
 .lv-project-workspace[data-mobile-layout="true"] .lv-caption-toolbar > .lv-caption-search { order: -1; flex-basis: 100%; }
 .lv-project-workspace[data-mobile-layout="true"] :is(.lv-caption-search input, .lv-caption-content input, .lv-caption-content textarea) { font-size: 16px; }
 .lv-project-workspace[data-mobile-layout="true"] .lv-caption-list { overscroll-behavior: contain; }
-.lv-project-workspace[data-mobile-layout="true"] .lv-caption-color-menu > .lv-caption-colors { position: static; width: auto; max-width: 100%; box-shadow: none; }
-.lv-project-workspace[data-mobile-layout="true"] .lv-caption-color-menu { margin-inline-start: auto; }
 .lv-project-workspace[data-mobile-layout="true"] .lv-header-tools button { padding-block: 4px; line-height: 1.25; }
 .lv-project-workspace[data-mobile-layout="true"] .lv-record-tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (min-width: 360px) {
@@ -310,7 +315,7 @@
 /* Record-first workspace: stable list/detail and completion owners. */
 .lv-project-body > aside { overflow: hidden; gap: 8px; }
 .lv-sidebar-toolbar { display: contents; }
-.lv-project-body .lv-sidebar-toolbar > [aria-label="シーン"] { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; flex: 0 0 auto; max-height: 35%; overflow: auto; }
+.lv-project-body .lv-sidebar-toolbar > [aria-label="シーン"] { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 4px; flex: 0 0 auto; max-height: 35%; overflow: auto; border-bottom: 1px solid var(--lv-line); padding-bottom: 4px; }
 .lv-project-body .lv-sidebar-toolbar .lv-scene-choice { display: flex; align-items: center; gap: 8px; flex: 1 1 0; min-width: 0; margin: 0; font-size: 13px; }
 .lv-project-body .lv-sidebar-toolbar .lv-scene-choice > select { flex: 1; width: 0; min-width: 0; padding: 8px; border: 1px solid var(--lv-line); border-radius: 4px; }
 .lv-project-body .lv-sidebar-toolbar > [aria-label="シーン"] > details { flex: 0 0 auto; }
@@ -342,16 +347,11 @@
 .lv-caption-browser-compact .lv-caption-search > label { flex: 1; min-width: 0; }
 .lv-caption-browser-compact .lv-caption-search input { width: 100%; }
 .lv-caption-browser-compact .lv-caption-count { margin: 0 0 10px; white-space: nowrap; font-size: 12px; }
-.lv-caption-color-menu { position: relative; flex: 0 0 auto; }
-.lv-caption-color-menu > summary { min-height: 44px; box-sizing: border-box; padding: 10px 4px; cursor: pointer; }
-.lv-caption-color-menu > .lv-caption-colors { position: absolute; z-index: 7; right: 0; top: 100%; width: 240px; max-height: 180px; overflow: auto; padding: 8px; background: var(--lv-field); border: 1px solid var(--lv-line); border-radius: 6px; box-shadow: 0 4px 16px #25282022; }
 .lv-project-body .lv-caption-task .lv-caption-list { flex: 1 1 0; height: 0; min-height: 44px; max-height: none; overflow-y: auto; margin-block: 0; }
 .lv-caption-list-tools { flex: 0 0 auto; }
 .lv-record-tools, .lv-project-workspace .lv-pin-add-row { display: flex; align-items: start; flex-wrap: wrap; gap: 4px; }
 .lv-record-tools > details { flex: 1 1 auto; }
 .lv-record-tools > details > summary { padding: 10px 4px; min-height: 44px; box-sizing: border-box; cursor: pointer; }
-.lv-caption-add-settings > summary { white-space: nowrap; }
-.lv-caption-add-settings .lv-record-sheet > details > summary { min-height: 44px; box-sizing: border-box; padding: 10px 0; cursor: pointer; }
 .lv-pin-add-row > details > summary { padding: 10px 4px; min-height: 44px; box-sizing: border-box; cursor: pointer; }
 .lv-caption-task > .lv-caption-reading { min-height: 0; display: flex; overflow: hidden; border-top: 1px solid var(--lv-rule); }
 .lv-caption-reading > .lv-caption-detail { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
@@ -429,8 +429,14 @@
 
 .lv-camera-projection select { font-size: 12px; line-height: normal; }
 
-.lv-caption-add { font-size: 0 !important; min-width: 44px; }
-.lv-caption-add::before { content: '+'; font-size: 26px; line-height: 1; }
+.lv-project-shell .lv-project-workspace .lv-caption-add:not(:disabled) { background: var(--lv-action); color: var(--lv-field); border-color: var(--lv-action); }
+.lv-caption-add { min-height: 44px; white-space: nowrap; }
+.lv-caption-advanced > summary { width: max-content; white-space: nowrap; }
+.lv-caption-advanced .lv-record-sheet > details > summary { min-height: 40px; padding: 8px 4px; box-sizing: border-box; }
+.lv-caption-browser .lv-pin-scale { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; }
+.lv-caption-browser .lv-pin-scale label { display: flex; flex: 1; align-items: center; gap: 8px; margin: 0; font-size: 13px; white-space: nowrap; }
+.lv-pin-scale input[type="range"] { flex: 1; min-width: 44px; min-height: 28px; padding: 0; accent-color: var(--lv-action); }
+.lv-pin-scale output { color: var(--lv-muted); font-variant-numeric: tabular-nums; font-size: 12px; }
 .lv-caption-row { display: flex; flex-wrap: wrap; align-items: start; }
 .lv-caption-row > .lv-caption-select { width: 100%; }
 .lv-caption-row > :is(.lv-caption-row-edit,.lv-caption-row-remove) { display: none; }
@@ -449,10 +455,6 @@
   .lv-caption-task[data-selected="true"] .lv-caption-toolbar { flex-wrap: wrap; gap: 4px; }
   .lv-caption-task[data-selected="true"] .lv-caption-toolbar > .lv-caption-search { flex: 1 0 100%; flex-wrap: wrap; }
   .lv-caption-task[data-selected="true"] .lv-caption-search > label { flex: 1 0 100%; }
-  .lv-caption-task[data-selected="true"] .lv-caption-color-menu { min-width: 0; max-width: 100%; }
-  .lv-caption-task[data-selected="true"] .lv-caption-color-menu > .lv-caption-colors {
-    position: static; width: auto; max-width: 100%; box-sizing: border-box; box-shadow: none;
-  }
   .lv-caption-task[data-selected="true"] .lv-caption-heading > h2 { font-size: 18px; }
   .lv-caption-task[data-selected="true"] .lv-record-tools { display: flex; flex-direction: column; align-items: stretch; }
   .lv-caption-task[data-selected="true"] .lv-record-tools > button,
@@ -466,23 +468,34 @@
 .lv-project-workspace[data-mobile-layout="true"] .lv-caption-toolbar > .lv-caption-search { display: contents; }
 .lv-project-workspace[data-mobile-layout="true"] .lv-caption-toolbar .lv-caption-search > label { grid-column: 1 / -1; grid-row: 1; min-width: 0; }
 .lv-project-workspace[data-mobile-layout="true"] .lv-caption-toolbar .lv-caption-count { grid-column: 2; grid-row: 2; justify-self: end; margin: 0; }
-.lv-project-workspace[data-mobile-layout="true"] .lv-caption-toolbar .lv-caption-color-menu { grid-column: 3; grid-row: 2; }
-.lv-project-workspace[data-mobile-layout="true"] .lv-caption-toolbar .lv-caption-color-menu[open] { grid-column: 1 / -1; grid-row: 3; }
 .lv-project-workspace[data-mobile-layout="true"] .lv-caption-task[data-empty="true"] .lv-caption-toolbar > [aria-label="ピンの操作"] { grid-column: 1 / -1; grid-row: 1; }
 .lv-project-workspace[data-mobile-layout="true"] .lv-caption-task[data-empty="true"] .lv-caption-toolbar .lv-caption-search > label { grid-row: 2; }
-.lv-project-workspace[data-mobile-layout="true"] .lv-caption-task[data-empty="true"] .lv-caption-toolbar :is(.lv-caption-count,.lv-caption-color-menu) { grid-row: 3; }
-.lv-project-workspace[data-mobile-layout="true"] .lv-caption-task[data-empty="true"] .lv-caption-toolbar .lv-caption-color-menu[open] { grid-row: 4; }
+.lv-project-workspace[data-mobile-layout="true"] .lv-caption-task[data-empty="true"] .lv-caption-toolbar .lv-caption-count { grid-row: 3; }
 .lv-caption-reading [aria-label="削除の確認"]:not([hidden]) { position:fixed;z-index:30;right:12px;bottom:12px;width:min(380px,calc(100vw - 24px));max-height:70dvh;overflow:auto;box-sizing:border-box;padding:16px;background:var(--lv-field);border:1px solid var(--lv-line);border-radius:8px;box-shadow:0 8px 24px #25282033; }
 
 .lv-material-numeric { cursor: ew-resize; touch-action: pan-y; }
 .lv-material-numeric > input { font-variant-numeric: tabular-nums; }
 .lv-material-numeric > input:not(:focus) { cursor: ew-resize; }
-.lv-caption-add-settings .lv-record-sheet > label {display:flex;align-items:center;gap:10px;}
 .lv-caption-window[data-active="true"] > header { background: var(--lv-selected); }
-@media (min-width: 600px) and (max-width: 760px) {
+@media (min-width: 600px) and (max-width: 760px),
+       (min-width: 1180px) and (max-height: 640px) and (pointer: fine) {
   .lv-sidebar-toolbar { display: flex; flex: 0 0 auto; align-items: start; gap: 8px; }
   .lv-project-body .lv-sidebar-toolbar > [aria-label="シーン"] { flex: 1 1 0; min-width: 0; max-height: 35dvh; }
-  .lv-sidebar-toolbar > [role="tablist"] { flex: 0 0 auto; }
+  .lv-sidebar-toolbar > [role="tablist"] { flex: 0 0 auto; border-inline-start: 1px solid var(--lv-rule); padding-inline-start: 4px; }
+}
+@media (min-width: 600px) and (max-width: 760px) and (max-height: 640px) {
+  .lv-project-body > aside > .lv-caption-task[data-selected="true"]:not([data-mobile-surface]) {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); grid-template-rows: minmax(0, 1fr);
+  }
+  .lv-caption-task[data-selected="true"]:not([data-mobile-surface]) > .lv-caption-reading {
+    border-top: 0; border-left: 1px solid var(--lv-rule); padding-left: 12px;
+  }
+}
+@media (min-width: 1180px) and (max-height: 640px) and (pointer: fine) {
+  .lv-caption-task[data-editing="true"] .lv-caption-content label:has(> input[aria-label="タイトル"]) {
+    display: flex; flex-direction: row; align-items: center; gap: 8px;
+  }
+  .lv-caption-task[data-editing="true"] .lv-caption-content input[aria-label="タイトル"] { flex: 1; min-width: 0; }
 }
 @media (max-height: 640px) {
   .lv-project-body > aside { gap: 4px; padding-block: 8px; }

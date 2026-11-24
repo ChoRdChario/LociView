@@ -1,30 +1,46 @@
-import {expect,it,vi} from 'vitest';
-import {createProjectPinScale} from '../../src/ui/projectScene/projectPinScale';
-import type {ProjectPanelHost} from '../../src/ui/projectScene/projectPanel';
-import {RecordedDocument,record,type RecordedNode} from './domRecorder';
+import { expect, it, vi } from 'vitest';
+import { createProjectPinScale } from '../../src/ui/projectScene/projectPinScale';
+import type { ProjectPanelHost } from '../../src/ui/projectScene/projectPanel';
+import { RecordedDocument, record } from './domRecorder';
 
-function fixture(ids=['a']){
-  const document=new RecordedDocument(),active=(state='active')=>({kind:'value',value:{state,eventId:'evt'}});
-  const provider:any={token:'one',semanticProfile:'map2',issues:[],resources:{assets:Object.fromEntries([...ids,'deleted'].map(id=>[id,{id,lifecycle:active(id==='deleted'?'deleted':'active')}]))},
-    details:{mutable:{assetsById:Object.fromEntries([...ids,'deleted'].map(id=>[id,{label:{kind:'value',value:id},pinScale:{kind:'value',value:1}}]))}}};
-  let sceneId='scene',blocked=false;const dispatch=vi.fn();let panel:ReturnType<typeof createProjectPinScale>;
-  const host={source:()=>({provider,sceneId}),block:(_owner:string,writes=true)=>blocked&&writes?'閲覧中':null,changed:()=>panel.render(),dispatch,message:vi.fn()} as unknown as ProjectPanelHost;
-  panel=createProjectPinScale(document.asDocument(),host);panel.render();const root=record(panel.root),all=(node:RecordedNode):RecordedNode[]=>[node,...node.children.flatMap(all)],named=(name:string)=>all(root).find(node=>node.getAttribute('aria-label')===name)!,button=(name:string)=>all(root).find(node=>node.tag==='button'&&node.textContent===name)!;
-  return{panel,root,provider,dispatch,named,button,changeScene(value:string){sceneId=value;panel.render();},view(){blocked=true;panel.render();}};
+function fixture(sizes: (number | undefined)[] = [1]) {
+  const document = new RecordedDocument();
+  const assets = Object.fromEntries(sizes.map((size, index) => [String(index), {
+    id: String(index), lifecycle: { kind: 'value', value: { state: 'active' } }, pinScale: { kind: 'value', value: size }
+  }]));
+  const provider = { token: 'one', semanticProfile: 'map2', issues: [], resources: { assets } };
+  let sceneId = 'first', blocked = false;
+  const dispatch = vi.fn();
+  const host = { source: () => ({ provider, sceneId }), changed: () => panel.render(), block: () => blocked ? '閲覧中' : null, dispatch, message: vi.fn() } as unknown as ProjectPanelHost;
+  const panel = createProjectPinScale(document.asDocument(), host); panel.render();
+  const root = record(panel.root), slider = root.children[0]!.children[0]!;
+  function drag(exponent: string) { slider.fire('pointerdown'); slider.value = exponent; slider.fire('input'); }
+  return { panel, root, slider, drag, provider, dispatch, transition() { sceneId = 'next'; panel.render(); }, view() { blocked = true; panel.render(); } };
 }
-it('opens one active model directly, excludes deleted targets and keeps the whole control edit-only',()=>{
-  const h=fixture(),model=h.named('ピンのモデル');expect(h.root.getAttribute('data-lv-edit-only')).toBe('');expect(model.children.map(n=>n.value)).toEqual(['','a']);
-  h.root.open=true;h.root.fire('toggle');expect(model.value).toBe('a');expect(h.named('ピンの表示倍率').value).toBe('1');expect(h.panel.hasChanges()).toBe(false);
-  h.view();expect(h.named('ピンの表示倍率').disabled).toBe(true);expect(h.button('倍率を適用').disabled).toBe(true);expect(h.dispatch).not.toHaveBeenCalled();h.panel.dispose();
+
+it('shows the shared slider at rest and keeps mixed model sizes until a gesture ends', () => {
+  const h = fixture([0.03, 2]);
+  expect(h.root.getAttribute('data-lv-edit-only')).toBe('');
+  expect(h.slider.getAttribute('aria-valuetext')).toBe('モデルごとに異なります');
+  h.drag('0.3'); expect(h.panel.previewScale()).toBe(2); expect(h.slider.getAttribute('aria-valuetext')).toBe('2倍');
+  expect(h.dispatch).not.toHaveBeenCalled();
+  h.slider.fire('change');
+  expect(h.dispatch).toHaveBeenCalledExactlyOnceWith('captions', 'one', { kind: 'setProjectPinScale', pinScale: 2 }, expect.any(Function));
+  h.slider.fire('blur'); expect(h.panel.previewScale()).toBe(2);
+  h.dispatch.mock.calls[0]![3](); expect(h.panel.hasChanges()).toBe(false); h.panel.dispose();
 });
-it('requires an explicit model among several, retains stale raw input and cancels without following another target',()=>{
-  const h=fixture(['a','b']),model=h.named('ピンのモデル'),input=h.named('ピンの表示倍率');h.root.open=true;h.root.fire('toggle');expect(model.value).toBe('');
-  model.value='b';model.fire('change');input.fire('focus');input.value='2.5';input.fire('input');expect(h.panel.hasChanges()).toBe(true);expect(model.disabled).toBe(true);
-  h.provider.resources.assets.b.lifecycle={kind:'value',value:{state:'deleted',eventId:'evt2'}};h.provider.token='two';h.panel.render();expect(input.value).toBe('2.5');expect(model.value).toBe('b');expect(h.button('倍率を適用').disabled).toBe(true);expect(h.button('倍率の変更を取り消す').disabled).toBe(false);
-  h.button('倍率を適用').fire('click');expect(h.dispatch).not.toHaveBeenCalled();h.button('倍率の変更を取り消す').fire('click');expect(h.panel.hasChanges()).toBe(false);expect(model.value).toBe('b');h.panel.dispose();
+
+it('cancels preview or a stale gesture without applying to a new scene or generation', () => {
+  const h = fixture();
+  h.drag('1'); h.slider.fire('pointercancel'); expect(h.panel.previewScale()).toBeNull();
+  h.drag('2'); h.provider.token = 'two'; h.panel.render(); h.slider.fire('change');
+  h.drag('3'); h.transition(); h.slider.fire('change'); expect(h.dispatch).not.toHaveBeenCalled();
+  h.view(); expect(h.slider.disabled).toBe(true); h.drag('2'); h.slider.fire('change'); expect(h.dispatch).not.toHaveBeenCalled(); h.panel.dispose();
 });
-it('keeps IME and Scene guards around the same Asset-wide Session command',()=>{
-  const h=fixture();h.root.open=true;h.root.fire('toggle');const input=h.named('ピンの表示倍率');input.fire('focus');input.fire('compositionstart');input.value='2';input.fire('input');expect(h.button('倍率を適用').disabled).toBe(true);input.fire('compositionend');
-  h.button('倍率を適用').fire('click');expect(h.dispatch).toHaveBeenCalledWith('captions','one',{kind:'setAssetPinScale',assetId:'a',pinScale:2},expect.any(Function));
-  h.changeScene('other');expect(input.value).toBe('2');expect(h.button('倍率を適用').disabled).toBe(true);h.panel.dispose();
+
+it('keeps unset sizes equivalent to one, and disables unresolved selections', () => {
+  const h = fixture([1, undefined]); expect(h.slider.getAttribute('aria-valuetext')).toBe('1倍');
+  h.drag('0'); h.slider.fire('change'); expect(h.dispatch).not.toHaveBeenCalled();
+  h.provider.resources.assets['1']!.pinScale.kind = 'unresolved'; h.provider.token = 'two'; h.panel.render();
+  expect(h.slider.disabled).toBe(true); h.panel.dispose();
 });

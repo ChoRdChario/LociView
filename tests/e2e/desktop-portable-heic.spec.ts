@@ -68,7 +68,7 @@ test('08c uses canvas generation, portable offline display/save/reopen and a por
     await p.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill(title); await p.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
     await expect(p.getByRole('heading', { name: 'プロジェクト名', exact: true })).toHaveText(title, { timeout: 90_000 }); await expect(p.getByLabel('3Dモデルの表示', { exact: true })).toHaveAttribute('aria-busy', 'false');
     await revealCoordinateAdd(p); const owner = p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: 'model.glb' }); await p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
-    for (const [axis,value] of [['X','0'],['Y','.5'],['Z','0']]) await p.getByLabel(`位置 ${axis}`, { exact: true }).fill(value!);
+    for (const [axis,value] of [['X','0'],['Y','.5'],['Z','0']]) await p.getByRole('region', { name: '位置の調整', exact: true }).getByLabel(`位置 ${axis}`, { exact: true }).fill(value!);
     await p.getByRole('button', { name: 'ここに記録を作る', exact: true }).click(); await ready(p, 'ピンの位置を確定しました。');
     const settings=p.getByLabel('設定',{exact:true});await settings.locator(':scope > summary').click();await settings.getByLabel('編集者名',{exact:true}).fill('HEIC担当');await settings.getByLabel('このプロジェクトの今後の編集にこの名前を残す',{exact:true}).check();await settings.getByRole('button',{name:'編集者名を設定',exact:true}).click();
     await p.getByLabel('本文',{exact:true}).fill('名前のみの履歴');await finishCaptionEditing(p, {}, 90_000);

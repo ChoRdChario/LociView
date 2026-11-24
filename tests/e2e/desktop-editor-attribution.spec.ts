@@ -114,13 +114,12 @@ test('08b editor names remain exact through collaboration, purpose privacy, rest
     await revealCoordinateAdd(a.p); const owner = a.p.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: 'model.glb' });
     await expect(a.p.getByRole('button', { name: 'このモデルに追加', exact: true })).toBeEnabled();
     await a.p.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
-    for (const [axis, value] of [['X', '0'], ['Y', '.5'], ['Z', '0']]) await a.p.getByLabel(`位置 ${axis}`, { exact: true }).fill(value!);
+    for (const [axis, value] of [['X', '0'], ['Y', '.5'], ['Z', '0']]) await a.p.getByRole('region', { name: '位置の調整', exact: true }).getByLabel(`位置 ${axis}`, { exact: true }).fill(value!);
     await a.p.getByRole('button', { name: 'ここに記録を作る', exact: true }).click(); await expect(a.p.getByText('ピンの位置を確定しました。', { exact: true })).toBeVisible({ timeout: 90_000 });
     const settings = a.p.getByLabel('設定', { exact: true }); await settings.locator(':scope > summary').click();
     await settings.locator('.lv-local-name > summary').click(); await settings.getByLabel('このブラウザの表示名', { exact: true }).fill('私的な名前'); await settings.getByRole('button', { name: '表示名を設定', exact: true }).click();
     await expect(settings.getByLabel('編集者名', { exact: true })).toHaveValue('私的な名前'); await expect(settings.getByRole('checkbox')).not.toBeChecked();
     await editor(a.p, nameA); await edit(a.p, 'タイトル', caption); await edit(a.p, '本文', '配布時の本文');
-    await detail(a.p).getByText('属性', { exact: true }).click();
     await detail(a.p).getByText('編集者情報', { exact: true }).click(); await expect(detail(a.p)).toContainText(`編集者名：${nameA}`); await expect(detail(a.p)).toContainText('編集者情報なし');
     const initial = await output(a.p, info, 'named-workspace', 'teamWorkspace');
     console.log('08b: initial named Workspace downloaded');

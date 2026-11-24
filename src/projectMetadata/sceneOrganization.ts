@@ -92,7 +92,7 @@ export function planSceneOrganization(provider: Provider, command: SceneOrganiza
         const c = captionCopySource(provider, edge.captionId as string, limits);
         const copyIds = (rows: JsonObject[]) => rows.map(v => ({ sourceId: v.id as string, targetId: copied(v.id as string) }));
         appendCaptionCopy(provider, { kind: 'duplicateCaption', sourceId: edge.captionId as string, captionId: copied(edge.captionId as string),
-          sceneId: command.sceneId, membershipId: copied(edge.id as string), orderKey: orderKey(index), attachments: copyIds(c.attachments), tags: copyIds(c.tags), eventId: command.eventId }, limits, w);
+          sceneId: command.sceneId, membershipId: copied(edge.id as string), orderKey: orderKey(index), attachments: copyIds(c.attachments), tags: copyIds(c.tags), eventId: command.eventId }, limits, w, edge.anchor);
       }
       for (const [index, source] of s.views.entries()) { const target = copied(source.id as string); w.fresh(target, 'view'); w.create('viewsById', { ...source, id: target, sceneId: command.sceneId, orderKey: orderKey(index), lifecycle }); }
       for (const source of s.materials) { const target = copied(source.id as string); w.fresh(target, 'ovr'); w.create('materialOverridesById', { ...source, id: target, lifecycle, routing: { ...object(source.routing), scope: { kind: 'scene', sceneId: command.sceneId } } }); }

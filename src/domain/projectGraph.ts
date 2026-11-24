@@ -25,7 +25,7 @@ export async function inspectProjectGraph(input: unknown, limits: ValueLimits, p
   for (const [map, kind] of Object.entries(immutableKinds)) for (const record of g.all(map as ProjectRecordMap)) {
     if (await immutableDigest(kind, record) !== record.payloadDigest) g.issue(map as ProjectRecordMap, string(record.id), 'payloadDigest', 'immutable-digest-mismatch');
   }
-  inspectModelGraph(g); inspectResourceGraph(g);
+  inspectModelGraph(g); inspectResourceGraph(g, profile === 'map2');
   if (current.hasUnknownFields) g.issue('project', undefined, '', 'opaque-data-protection-required', 'unverified');
   if (current.records.migrationSupport !== undefined) g.issue('project', undefined, 'migrationSupport', 'migration-support-authority-required', 'unverified');
   const issues = g.issues.map(issue => ({ issue, key: canonical(issue as unknown as JsonObject) }))

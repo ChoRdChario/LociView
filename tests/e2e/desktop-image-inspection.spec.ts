@@ -40,7 +40,7 @@ test('image details, Scene keyboard focus and dismissible header sheets retain P
     await page.getByLabel('シーン名', { exact: true }).fill('別のシーン'); await page.getByRole('button', { name: 'シーンを追加', exact: true }).click(); await ready('シーンを追加しました。');
     const first = scenes.getByRole('combobox', { name: 'シーン', exact: true }); await first.focus(); await first.selectOption({ label: firstName }); await expect(first).toBeFocused(); await expect(first.locator('option:checked')).toHaveText(firstName);
     await revealCoordinateAdd(page); const owner = page.getByLabel('追加先モデル', { exact: true }); await owner.focus(); await owner.selectOption({ label: '検査用模型.glb' }); await page.getByRole('button', { name: 'このモデルに追加', exact: true }).click();
-    for (const axis of ['X', 'Y', 'Z']) await page.getByLabel('位置 ' + axis, { exact: true }).fill(axis === 'Y' ? '.5' : '0');
+    for (const axis of ['X', 'Y', 'Z']) await page.getByRole('region', { name: '位置の調整', exact: true }).getByLabel('位置 ' + axis, { exact: true }).fill(axis === 'Y' ? '.5' : '0');
     await page.getByRole('button', { name: 'ここに記録を作る', exact: true }).click(); await ready('ピンの位置を確定しました。');
     const detail = page.getByRole('region', { name: '記録の詳細', exact: true }); await detail.getByLabel('タイトル', { exact: true }).fill('細部の記録'); await finishCaptionEditing(page, {}, 15000);
     const choose = page.waitForEvent('filechooser'); await page.getByLabel('メディアを追加', { exact: true }).click(); await (await choose).setFiles({ name: '細部の写真.png', mimeType: 'image/png', buffer: png }); await finishCaptionEditing(page, {}, 15000);

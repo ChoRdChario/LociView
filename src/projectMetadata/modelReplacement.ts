@@ -12,7 +12,7 @@ import { metadataImmutableReader } from './records';
 import type { MetadataRecordEdit } from './commands';
 import { fail, type MetadataLimits } from './format';
 
-export interface ReplaceAssetModelCommand { readonly kind: 'replaceAssetModel'; readonly sceneId: string;
+export interface ReplaceAssetModelCommand { readonly kind: 'replaceAssetModel'; readonly scope?: 'scene'; readonly sceneId: string;
   readonly assetId: string; readonly expectedBindingId: string;
   readonly revision: JsonObject; readonly representation: JsonObject; readonly binding: JsonObject }
 
@@ -20,12 +20,15 @@ export interface ReplaceAssetModelCommand { readonly kind: 'replaceAssetModel'; 
 export function planModelReplacement(provider: Extract<ProjectProviderRead, { kind: 'scene-provider' }>, command: ReplaceAssetModelCommand,
   limits: MetadataLimits): MetadataRecordEdit[] {
   const shape = (v: object, fields: string[]) => { if (Object.keys(v).sort().join(',') !== fields.sort().join(',')) fail('model-replace-shape'); };
-  shape(command, ['kind', 'sceneId', 'assetId', 'expectedBindingId', 'revision', 'representation', 'binding']);
+  shape(command, ['kind', 'sceneId', 'assetId', 'expectedBindingId', 'revision', 'representation', 'binding', ...(command.scope === 'scene' ? ['scope'] : [])]);
+  if (command.scope && provider.semanticProfile !== 'map2') return fail('scene-placement-profile');
   const reader = candidateReader(provider, limits), c = new ProjectRecordFields();
   reader.active('scenesById', command.sceneId); reader.complete('assetsById', command.assetId);
   reader.related('sceneAssetMembershipsById', { sceneId: command.sceneId, assetId: command.assetId });
   const scene = resolveScene(provider.state, provider.resources, command.sceneId);
-  const projection = scene.kind === 'ready' ? scene.composition.assets.find(a => a.assetId === command.assetId)?.projection : undefined;
+  const member = scene.kind === 'ready' ? scene.composition.assets.find(a => a.assetId === command.assetId) : undefined;
+  const base = provider.resources.assets[command.assetId]?.projection;
+  const projection = member && (command.scope ? member.projection : base?.kind === 'value' ? base.value : undefined);
   if (!projection || projection.bindingId !== command.expectedBindingId) return fail('model-replace-stale');
   const old = metadataImmutableReader(provider, limits)('assetBindingsById', command.expectedBindingId);
   shape(old, ['id', 'assetId', 'assetRevisionId', 'assetToProject', 'method', 'payloadDigest', ...(old.parentBindingId ? ['parentBindingId'] : [])]);
@@ -73,6 +76,8 @@ export function planModelReplacement(provider: Extract<ProjectProviderRead, { ki
   for (const [id, prefix] of [[binding.id, 'bnd'], [revision.id, 'rev'], [rep.id, 'rep'], [rep.representationFrameId, 'frm'],
     [rep.variantFamilyId, 'fam'], [object(classes[0]).id, 'cmp'], ...(!gs ? [[catalog.layoutId, 'lay']] : [])]) fresh(id, prefix as string);
   for (const slot of slots) fresh(object(slot).logicalMaterialSlotId, 'slot');
-  edits.push({ map: 'assetsById', id: command.assetId, create: false, fields: { status: { kind: 'ready', activeBindingId: binding.id! } } });
+  edits.push(command.scope === 'scene'
+    ? { map: 'sceneAssetMembershipsById', id: member!.membershipId, create: false, fields: { bindingId: binding.id! } }
+    : { map: 'assetsById', id: command.assetId, create: false, fields: { status: { kind: 'ready', activeBindingId: binding.id! } } });
   return edits;
 }

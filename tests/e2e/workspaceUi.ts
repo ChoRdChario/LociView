@@ -1,5 +1,21 @@
 import { expect, type Page, type Locator } from '@playwright/test';
 
+/** Read the actual member, so a check cannot pass on the Project default while a scene points elsewhere. */
+function activeMember(records: Record<string, any>, table: string, field: string, resourceId: string, sceneId?: string) {
+  const members = Object.values(records[table]).filter((row: any) => row.lifecycle.state === 'active' &&
+    row[field] === resourceId && (!sceneId || row.sceneId === sceneId));
+  expect(members).toHaveLength(1);
+  return members[0] as Record<string, any>;
+}
+export function sceneModelBinding(records: Record<string, any>, assetId: string, sceneId?: string) {
+  const row = activeMember(records, 'sceneAssetMembershipsById', 'assetId', assetId, sceneId);
+  return records.assetBindingsById[row.bindingId ?? records.assetsById[assetId].status.activeBindingId];
+}
+export function scenePinAnchor(records: Record<string, any>, captionId: string, sceneId?: string) {
+  const row = activeMember(records, 'sceneCaptionMembershipsById', 'captionId', captionId, sceneId);
+  return row.anchor ?? records.captionsById[captionId].anchor;
+}
+
 export async function expectSelectedCaptionPhotos(page: Page, count: number, width: number) {
   const attachments = page.getByRole('region', { name: 'メディアの整理', exact: true });
   await expect(attachments.locator('figure')).toHaveCount(count);
@@ -32,7 +48,7 @@ export async function finishCaptionEditing(page: Page,
     await detail.getByRole('button', { name: '変更を適用', exact: true }).click();
     await expect(page.getByText(/^(?:変更を適用しました。|メディアを追加しました。)$/)).toBeVisible({ timeout });
   }
-  for (const [field, label] of [['title', 'タイトル'], ['body', '本文'], ['color', 'ピンの色']] as const) {
+  for (const [field, label] of [['title', 'タイトル'], ['body', '本文'], ['color', 'カラーコード']] as const) {
     if (expected[field] !== undefined) await expect(detail.getByLabel(label, { exact: true })).toHaveValue(expected[field]!);
   }
   await expect(page.locator('main.lv-project-workspace > header > .lv-operation-status')).toHaveAttribute('data-busy', 'false');
@@ -49,13 +65,14 @@ export async function expectResumedProject(page: Page, title: string, timeout: n
 }
 
 /** Same pin-add intent; retained readers can still use their earlier wording. */
+const advancedCaptionMenu = (page: Page) => page.locator('details.lv-caption-advanced, details.lv-caption-add-settings');
 export async function openAddOptions(page: Page) {
-  const menu = page.locator('.lv-caption-add-settings');
+  const menu = advancedCaptionMenu(page);
   if (!await menu.evaluate(node => (node as HTMLDetailsElement).open)) await menu.locator(':scope > summary').click();
 }
 
 export async function revealCoordinateAdd(page:Page){
-  if (await page.locator('.lv-caption-add-settings').count()) await openAddOptions(page);
+  if (await advancedCaptionMenu(page).count()) await openAddOptions(page);
   const current=page.getByText('座標で追加',{exact:true}),summary=await current.count()?current:page.getByText('数値で配置',{exact:true});
   if(!await summary.locator('..').evaluate(n=>(n as HTMLDetailsElement).open))await summary.click();
 }

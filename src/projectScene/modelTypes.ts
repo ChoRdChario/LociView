@@ -6,7 +6,7 @@ import { gsSourceDeclaration } from '../domain/gsSource';
 import { same } from '../domain/projectGraphSupport';
 
 export interface ModelFileAddition { readonly sceneId: string; readonly assetId: string; readonly file: MediaFileSelection }
-export interface ModelFileReplacement extends ModelFileAddition { readonly expectedBindingId: string }
+export interface ModelFileReplacement extends ModelFileAddition { readonly expectedBindingId: string; readonly scope?: 'scene' }
 export interface ModelReplacementTarget { readonly token: string; readonly sceneId: string; readonly assetId: string; readonly expectedBindingId: string }
 
 /** Saved read projection only. Complete immutable records remain attached, not reconstructed as fixtures. */
@@ -41,6 +41,7 @@ export const renderOwner = (model: DisplayModelClosure | ReadonlyRenderModel) =>
 export const renderPlacement = (model: DisplayModelClosure | ReadonlyRenderModel) => isReadonlyModel(model) ? model.assetToProject : model.binding.assetToProject;
 /** Explicit placement edit; no model-content introduction or fixture reconstruction. */
 export interface ModelPlacementCommand {
+  readonly scope?: 'scene';
   readonly sceneId: string; readonly assetId: string; readonly expectedBindingId: string;
   readonly bindingId: string; readonly placement: ModelPlacement;
   readonly fitReference?: { readonly assetId: string; readonly bindingId: string };

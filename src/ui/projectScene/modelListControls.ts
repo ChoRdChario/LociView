@@ -26,9 +26,9 @@ export function createModelListControls(document: Document, onPlan: (plan: Model
   const consequence = make('p', 'シーンから外してもモデルと記録は残ります。モデルに属する3Dピンは非表示になります。');
   consequence.id = `lv-model-consequence-${++nextModelControl}`; consequence.className = 'lv-model-note';
   const list = make('ul'); list.className = 'lv-model-list'; list.setAttribute('aria-label', 'プロジェクトのモデル一覧'); const empty = make('li');
-  const details = make('section'), selectedName = make('h3'), scope = make('p', 'このモデルの配置・差し替えは、使用するすべてのシーンで共通です。');
-  details.setAttribute('aria-label', 'モデルの設定範囲'); details.append(selectedName, scope);
-  editOnly(retry, consequence, scope);
+  const details = make('section'), selectedName = make('h3');
+  details.setAttribute('aria-label', '選択したモデル'); details.append(selectedName);
+  editOnly(retry, consequence);
   const visibility = make('div'), toggleVisibility = button('隠す'), isolate = button('このモデルだけ表示'), showAll = button('すべて表示');
   visibility.className = 'lv-model-visibility'; visibility.setAttribute('role', 'group'); visibility.setAttribute('aria-label', '一時表示');
   visibility.append(make('span', '一時表示'), toggleVisibility, isolate); details.append(visibility);
@@ -78,7 +78,7 @@ export function createModelListControls(document: Document, onPlan: (plan: Model
     const item = row.item; let entry = rows.get(item.id);
     if (!entry) {
       const node = make('li'), select = button(''), check = make('input'), label = make('label'), note = make('p'), review = button('状態を確認');
-      node.className = 'lv-model-row'; select.className = 'lv-model-select'; select.id = `lv-model-name-${++nextModelControl}`;
+      node.className = 'lv-model-row'; select.className = 'lv-model-select'; select.dataset.assetId = item.id; select.id = `lv-model-name-${++nextModelControl}`;
       check.type = 'checkbox'; check.setAttribute('aria-label', 'このシーンに表示'); label.className = 'lv-model-membership'; label.append(check, make('span', 'このシーンに表示'));
       editOnly(label);
       note.id = `lv-model-note-${++nextModelControl}`; note.className = 'lv-model-note';

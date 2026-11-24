@@ -11,6 +11,7 @@ import { canonical, list, object, same, string } from '../domain/projectGraphSup
 import type { JsonObject } from '../domain/values';
 import { materialForDisplay, type MaterialIntent } from '../domain/materialIntent';
 import { ReviewArchive } from '../projectPackage/reviewArchive';
+import { reviewSceneValues } from '../projectPackage/reviewSnapshot';
 import type { PackageArchive } from '../projectPackage/zipArchive';
 import type { PngDecoder } from '../projectFiles/png';
 import type { JpegDecoder } from '../projectFiles/jpeg';
@@ -50,14 +51,15 @@ export async function prepareReviewView(file: Blob | PackageArchive | ReviewArch
   const visibleAssets = new Set(membership('sceneAssetMembershipsById').map(row => row.assetId));
   if (review.closure.entries.reduce((n, b) => n + b.byteLength, 0) > policy.projectBodyBytes)
     throw Error('この検証画面の容量上限を超えています。元のファイルは変更していません。');
-  const edges = ordered(membership('sceneCaptionMembershipsById')), captions = table(snapshot, 'captionsById');
+  const { assets, captions } = reviewSceneValues(snapshot, sceneId);
+  const edges = ordered(membership('sceneCaptionMembershipsById'));
   if (onText && edges.length) onText({ title: string(project.title), sceneId, sceneName: string(scene.name),
     records: edges.map(edge => { const row = captions[string(edge.captionId)]!; return { id: string(row.id), title: string(row.title), body: string(row.body), color: captionColor(row) }; }) });
   const models: ReadonlyRenderModel[] = [], decoded = new Map<string, ValidatedModel>(), images = new Map<string, Blob>();
   // One handoff per GLB in this Scene; retain facts, never the inspected body or decoded textures.
   const preparedGlbs = new Map<string, Omit<ValidatedGlb, 'bytes'>>();
   const reinspectedGlbs = new WeakSet<ValidatedGlb>();
-  const assets = table(snapshot, 'assetsById'), representations = table(snapshot, 'representationsById');
+  const representations = table(snapshot, 'representationsById');
   for (const asset of Object.values(assets)) {
     if (asset.kind !== 'visual' || !visibleAssets.has(asset.id)) continue;
     const ids = list(asset.representationIds), reps=ids.map(id=>representations[string(id)]!),visuals=reps.filter(r=>r.role!=='interactionProxy'),proxies=reps.filter(r=>r.role==='interactionProxy');

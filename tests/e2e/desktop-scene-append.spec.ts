@@ -8,7 +8,7 @@ import { selectCleanRecords } from '../../src/projectPackage/cleanRecords';
 import { validationMetadataLimits } from '../../src/projectFiles/validation';
 import { ownedServer } from '../offline-e2e/server';
 import { smallPng, triangleGlb } from './fixtures';
-import { finishCaptionEditing, chooseHomeFiles, revealReviewFiles, openAddOptions,chooseSharedScene, beginSceneCreation, revealCoordinateAdd, revealFileSurface, selectShareOutput } from './workspaceUi';
+import { finishCaptionEditing, chooseHomeFiles, revealReviewFiles, openAddOptions, chooseSharedScene, beginSceneCreation, revealCoordinateAdd, revealFileSurface, selectShareOutput, revealCaptionList, revealModelManagement, revealWorkPanel, lookAlongFront } from './workspaceUi';
 
 const button = (page: Page, name: string) => page.getByRole('button', { name, exact: true });
 const files = (page: Page) => page.getByRole('region', { name: 'ファイル', exact: true });
@@ -34,6 +34,107 @@ async function backup(page: Page, path: string) {
   await downloadTo(page, path);
   return BackupArchive.inspect(await openAsBlob(path), validationMetadataLimits);
 }
+
+for (const touch of [false, true]) test(`08e local replacement keeps the other scene and shared photo after reopening (${touch ? 'touch' : 'desktop'})`, async ({ browser, baseURL }, info) => {
+  const context = await browser.newContext({ viewport: touch ? { width: 390, height: 844 } : { width: 1280, height: 800 },
+    isMobile: touch, hasTouch: touch, acceptDownloads: true, serviceWorkers: 'block' });
+  try {
+    const page = await context.newPage();
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto(baseURL!); await createProject(page, 'シーン別の整備記録', 0);
+    const scenes = page.getByRole('combobox', { name: 'シーン', exact: true });
+    const detail = page.getByRole('region', { name: '記録の詳細', exact: true });
+    const pin = page.getByRole('region', { name: '位置の調整', exact: true });
+    const row = page.locator('.lv-caption-select').filter({ hasText: '共用する記録' });
+    const panel = page.getByRole('tabpanel', { name: 'モデル', exact: true });
+    const choose = async (name: string) => {
+      await revealCaptionList(page);
+      await scenes.selectOption({ label: name });
+      await expect(row).toBeVisible();
+    };
+    const modelPanel = async () => {
+      await revealWorkPanel(page); await page.getByRole('tab', { name: 'モデル', exact: true }).click();
+      await panel.locator('.lv-model-select').first().click();
+    };
+    await revealCaptionList(page);
+    await button(page, '新規ピンを追加').click();
+    await button(page, '原点から調整').click();
+    await pin.getByRole('button', { name: 'ここに記録を作る', exact: true }).click();
+    await detail.getByLabel('タイトル', { exact: true }).fill('共用する記録');
+    await detail.getByLabel('本文', { exact: true }).fill('同じ部位の写真');
+    await finishCaptionEditing(page, { body: '同じ部位の写真' });
+    const picker = page.waitForEvent('filechooser');
+    await detail.getByLabel('メディアを追加', { exact: true }).click();
+    await (await picker).setFiles({ name: '部位の写真.png', mimeType: 'image/png', buffer: smallPng() });
+    await finishCaptionEditing(page);
+    await revealCaptionList(page);
+    await beginSceneCreation(page); await page.getByLabel('シーン名', { exact: true }).fill('差し替え側');
+    await button(page, 'シーンを追加').click();
+    await expect(scenes.locator('option:checked')).toHaveText('差し替え側');
+    await openAddOptions(page);
+    const include = page.getByLabel('既存の記録を追加', { exact: true });
+    await include.locator(':scope > summary').click();
+    await include.getByRole('listbox').selectOption({ label: '共用する記録 — 共通名.glb' });
+    await include.getByRole('button', { name: 'このシーンに追加', exact: true }).click();
+    await expect(row).toBeVisible();
+    await modelPanel(); await button(page, '配置を調整').click();
+    await panel.getByLabel('位置 X', { exact: true }).fill('0.25');
+    await button(page, '配置を確定').click();
+    await expect(page.getByText('モデルの配置を確定しました。', { exact: true })).toBeVisible();
+    await revealModelManagement(page);
+    const replacement = page.waitForEvent('filechooser');
+    await button(page, 'モデルを差し替える').click();
+    await (await replacement).setFiles({ name: '新しい部品.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb(.5) });
+    await button(page, '差し替えを確定').click();
+    await revealCaptionList(page);
+    await expect(row.locator('..')).toContainText('要確認');
+    await choose('シーン 1'); await expect(row.locator('..')).not.toContainText('要確認');
+    await choose('差し替え側'); await row.click(); await revealCaptionList(page);
+    const settings = page.getByLabel('設定', { exact: true });
+    await settings.locator(':scope > summary').click();
+    await settings.getByLabel('編集者名', { exact: true }).fill('補正担当');
+    await settings.getByLabel('このプロジェクトの今後の編集にこの名前を残す', { exact: true }).check();
+    await settings.getByRole('button', { name: '編集者名を設定', exact: true }).click();
+    await expect(settings.getByRole('status')).toHaveText('編集者名の設定を保存しました。');
+    await settings.locator(':scope > summary').click();
+    await button(page, '位置を調整').click(); await lookAlongFront(page);
+    await button(page, '全体表示').click();
+    const canvas = page.getByLabel('3Dモデルの表示', { exact: true });
+    const box = (await canvas.boundingBox())!;
+    await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
+    await expect(pin.getByRole('button', { name: '位置を確定', exact: true })).toBeEnabled();
+    await pin.getByText('座標で微調整', { exact: true }).click();
+    await pin.getByLabel('位置 X', { exact: true }).fill('0.125');
+    await button(page, '位置を確定').click();
+    await expect(page.getByText('ピンの位置を確定しました。', { exact: true })).toBeVisible();
+    const archive = await backup(page, info.outputPath('シーン別配置.zip'));
+    const records = await selectCleanRecords(archive.source, validationMetadataLimits);
+    expect(Object.keys(records.captionsById!)).toHaveLength(1);
+    expect(Object.values(records.captionsById!)[0]).toMatchObject({ anchor: { positionAsset: [0, 0, 0] } });
+    expect(Object.keys(records.captionAttachmentsById!)).toHaveLength(1);
+    expect(Object.values(records.sceneCaptionMembershipsById!)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ anchor: expect.objectContaining({ positionAsset: [.125, expect.any(Number), expect.closeTo(.5, 8)] }) }),
+    ]));
+    const hashes = archive.archive.control.manifest.blobs.map(blob => blob.sha256);
+    for (const bytes of [triangleGlb(0), triangleGlb(.5), smallPng()]) expect(hashes).toContain(createHash('sha256').update(bytes).digest('hex'));
+    await page.reload(); await ready(page);
+    for (const [name, x] of [['シーン 1', 0], ['差し替え側', .25]] as const) {
+      await choose(name); await expect(row.locator('..')).not.toContainText('要確認');
+      await row.click();
+      await expect(detail.getByLabel('本文', { exact: true })).toHaveValue('同じ部位の写真');
+      await expect(detail.locator('figure')).toHaveCount(1);
+      const summary = detail.getByText('編集者情報', { exact: true });
+      if (!await summary.locator('..').evaluate(n => (n as HTMLDetailsElement).open)) await summary.click();
+      await expect(summary.locator('..').getByRole('listitem').filter({ hasText: 'ピン位置' }))
+        .toContainText(name === '差し替え側' ? '編集者名：補正担当' : '編集者情報なし');
+      await modelPanel(); await button(page, '配置を調整').click();
+      expect(Number(await panel.getByLabel('位置 X', { exact: true }).inputValue())).toBe(x);
+      await panel.getByRole('button', { name: '配置を取り消す', exact: true }).click();
+    }
+    expect(errors).toEqual([]);
+  } finally { await context.close(); }
+});
 
 for (const scenario of [
   { title: 'desktop append', touch: false, interrupt: '' },

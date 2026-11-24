@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { assetCopySource, prepareAssetMembershipCopy } from '../src/projectMetadata/modelMembership';
+import { planMetadataEdit, scenePlacementChoices } from '../src/projectMetadata/commands';
 import { readProjectScene, projectCaptionText } from '../src/scene/projectProvider';
 import { inspectProjectCandidates } from '../src/domain/projectCandidates';
 import { resolveScene, chooseStartupScene } from '../src/scene/resolve';
@@ -9,7 +11,7 @@ import { createFixtureModel } from '../src/harness/projectScene/modelClosure';
 import { fixture, id, limits as valueLimits, lifecycle } from './helpers/projectRecordsFixture';
 import { candidateFixture, candidateWrite as w, withCandidateChanges } from './helpers/projectCandidateFixture';
 import type { ProjectCandidateInput } from '../src/domain/projectCandidates';
-import { projectCaptions, projectCaptionSceneCount, projectMediaUncertain } from '../src/ui/projectScene/projectRead';
+import { projectAssetMembership, projectCaptionInventory, projectCaptions, projectCaptionSceneCount, projectMediaUncertain } from '../src/ui/projectScene/projectRead';
 const limits = { ...valueLimits, maxWork: 1_000_000 };
 const verifier = (r = fixture(), bytes = developmentContentBytes) => developmentContentVerifier(Object.values(r.representationsById).map((rep: any) =>
   ({ variantFamilyId: rep.variantFamilyId, representationId: rep.id, payloadDigest: rep.payloadDigest })), bytes);
@@ -84,6 +86,15 @@ describe('scope-labelled same-token Scene provider; not current-app/source-adapt
       [['assetsById', id('ast'), 'status'], r.assetsById[id('ast')].status],
       [['sceneAssetMembershipsById', id('sam'), 'assetId'], id('ast')],
     ] as const) expect(projectCaptions(await read(r, conflicts(source, [...path], value, value)), id('scn'), [id('ast')])[0]!.pin).not.toBe('ownerHidden');
+  });
+  it('proves an outside model only after checking for unresolved or duplicate membership rows', async () => {
+    const r = fixture(), membership = (p: Awaited<ReturnType<typeof read>>) => projectAssetMembership(p, id('scn'), id('ast'));
+    const raw = candidateFixture(r), edge = r.sceneAssetMembershipsById[id('sam')];
+    expect(membership(await read(r, conflicts(raw, ['sceneAssetMembershipsById', id('sam'), 'assetId'], id('ast'), id('ast')))).kind).toBe('unresolved');
+    r.sceneAssetMembershipsById[id('sam',2)] = { ...edge, id: id('sam',2) };
+    expect(membership(await read(r)).kind).toBe('unresolved');
+    delete r.sceneAssetMembershipsById[id('sam')]; delete r.sceneAssetMembershipsById[id('sam',2)];
+    expect(membership(await read(r))).toEqual({ kind: 'value', value: { kind: 'absent' } });
   });
   it('retains equal mutable candidates and optional absence without selecting or inventing a value', async () => {
     const r = fixture(); delete r.captionsById[id('cap')].colorSrgb; delete r.scenesById[id('scn')].defaultViewId;
@@ -221,5 +232,140 @@ describe('06g input-verified text without a Scene provider or resource authority
     const inspected = await inspectProjectCandidates(candidateFixture(), limits);
     if (inspected.kind !== 'project-candidate-inspection') throw Error();
     expect(() => projectCaptionText(inspected, inspected.workUsed, { maxWork: inspected.workUsed })).toThrow();
+  });
+});
+
+describe('scene-local model and pin adjustments', () => {
+  const editLimits = { ...limits, maxChanges: 1000, maxChangeBytes: 4_000_000, maxTotalBytes: 16_000_000, maxOperations: 100_000 };
+  const selected = (p: Awaited<ReturnType<typeof read>>, n: number) => {
+    const result = resolveScene(p.state, p.resources, id('scn', n));
+    if (result.kind !== 'ready') throw Error('Scene unavailable');
+    return result.composition;
+  };
+  const shared = () => {
+    const r = fixture();
+    r.scenesById[id('scn', 2)] = { ...r.scenesById[id('scn')], id: id('scn', 2), orderKey: 'B' };
+    delete r.scenesById[id('scn', 2)].defaultViewId;
+    for (const [map, prefix] of [['sceneAssetMembershipsById', 'sam'], ['sceneCaptionMembershipsById', 'scm']] as const)
+      r[map][id(prefix, 2)] = { ...r[map][id(prefix)], id: id(prefix, 2), sceneId: id('scn', 2) };
+    return r;
+  };
+  const source = (r: ReturnType<typeof fixture>): ProjectCandidateInput => ({ ...candidateFixture(r), schema: {major:2,minor:1}, semanticProfile: 'map2' });
+  const local = async (r: ReturnType<typeof fixture>) => {
+    const m = createFixtureModel({ asset: id('ast'), assetFrame: id('frm', 2), representationFrame: id('frm', 21), binding: id('bnd', 2),
+      revision: id('rev', 2), representation: id('rep', 2), family: id('fam', 2), compatibility: id('cmp', 2), layout: id('lay', 2), slot: id('slot', 2) },
+      'original', { translation: [2, 3, 4], rotationXYZW: [0, 0, 0, 1], uniformScale: 1 });
+    for (const [map, item] of [['representationsById', m.representation], ['assetRevisionsById', m.revision], ['assetBindingsById', m.binding]] as const)
+      r[map][item.id] = item;
+    r.sceneAssetMembershipsById[id('sam')].bindingId = m.binding.id;
+    return read(r, source(r));
+  };
+  it('describes the effective pin in the record picker for each scene and leaves conflicts unknown', async () => {
+    const r = shared(), raw = r.captionsById[id('cap')].anchor;
+    const pick = (p: Awaited<ReturnType<typeof read>>, n: number) => {
+      const inventory = projectCaptionInventory(p, id('scn', n));
+      if (inventory.kind !== 'ready') throw Error('Missing record inventory');
+      return inventory.items.find(item => item.caption.id === id('cap'))!.caption;
+    };
+    const path = ['sceneCaptionMembershipsById', id('scm'), 'anchor'];
+    r.sceneCaptionMembershipsById[id('scm')].anchor = { kind: 'unplaced' };
+    const p = await read(r, source(r));
+    expect(pick(p, 1)).toMatchObject({ pin: 'unplaced', owner: { kind: 'value', value: { kind: 'none' } } });
+    expect(pick(p, 2).owner).toMatchObject({ kind: 'value', value: { kind: 'asset', assetId: id('ast') } });
+    const conflict = await read(r, conflicts(source(r), path, raw, { kind: 'unplaced' }));
+    expect(pick(conflict, 1).owner.kind).toBe('unresolved');
+    expect(pick(conflict, 2).owner.kind).toBe('value');
+  });
+  it('retains old bindings and material slots in B, flags only A, and moves only A’s shared pin', async () => {
+    const r = shared();
+    r.materialOverridesById[id('ovr')].routing.scope = { kind: 'project' };
+    const p = await local(r);
+    expect(selected(p, 1).assets[0]?.projection.bindingId).toBe(id('bnd', 2));
+    expect(selected(p, 1).captions[0]?.marker).toBe('needsReview');
+    expect(selected(p, 1).materials).toHaveLength(0);
+    expect(selected(p, 2).assets[0]?.projection.bindingId).toBe(id('bnd'));
+    expect(selected(p, 2).captions[0]?.marker).toBe('visible');
+    expect(selected(p, 2).materials.map(m => m.overrideId)).toEqual([id('ovr')]);
+    expect(p.inspection.candidates.knownReferences).toContainEqual({from:id('sam'), to:id('bnd', 2), field:'bindingId', strength:'strong'});
+    const anchor = { ...r.captionsById[id('cap')].anchor, authoredAssetRevisionId: id('rev', 2), authoredAnchorCompatibilityId: id('cmp', 2), positionAsset: [1, 2, 3] };
+    const writes = planMetadataEdit(p, { kind: 'movePin', sceneId: id('scn'), captionId: id('cap'), scope: 'scene', anchor }, editLimits);
+    expect(writes).toEqual([{ map:'sceneCaptionMembershipsById', id:id('scm'), fields:{ anchor }, create:false }]);
+    r.sceneCaptionMembershipsById[id('scm')].anchor = anchor;
+    const after = await read(r, source(r));
+    expect(selected(after, 1).captions[0]).toMatchObject({ marker: 'visible', anchor: { value: anchor } });
+    expect(selected(after, 2).captions[0]).toMatchObject({ marker: 'visible', anchor: { value: r.captionsById[id('cap')].anchor } });
+  });
+  it('keeps unscoped historical commands and map1 behavior, refuses foreign bindings and unverified pin overrides', async () => {
+    const r = shared(), p = await read(r, source(r));
+    const old = r.assetBindingsById[id('bnd')];
+    const binding = { ...old, id: id('bnd', 9), parentBindingId: old.id, method: 'manual', assetToProject:{...old.assetToProject,translation:[1,2,3]} };
+    binding.payloadDigest = await immutableDigest('asset-binding-revision', binding);
+    const command = { kind:'moveAsset' as const, sceneId:id('scn'), assetId:id('ast'), expectedBindingId:old.id, binding };
+    expect(planMetadataEdit(p, command, editLimits).at(-1)).toMatchObject({map:'assetsById',fields:{status:{activeBindingId:binding.id}}});
+    expect(planMetadataEdit(p, {...command, scope:'scene'}, editLimits).at(-1)).toMatchObject({map:'sceneAssetMembershipsById',id:id('sam'),fields:{bindingId:binding.id}});
+    expect(() => planMetadataEdit(p, {...command,scope:'scene',expectedBindingId:id('bnd',7)}, editLimits)).toThrow();
+    const legacy = await read(r);
+    expect(() => planMetadataEdit(legacy, {...command,scope:'scene'}, editLimits)).toThrow();
+    const otherScene = r.sceneAssetMembershipsById[id('sam',2)];
+    addModel(r);
+    r.sceneAssetMembershipsById[id('sam',3)] = { ...otherScene, id:id('sam',3) };
+    r.sceneAssetMembershipsById[id('sam')].bindingId = id('bnd',2);
+    r.sceneCaptionMembershipsById[id('scm')].anchor = {...r.captionsById[id('cap')].anchor,assetFrameId:id('frm',99)};
+    const malformed = await read(r, source(r));
+    expect(selected(malformed,1).assets.some(a=>a.assetId===id('ast'))).toBe(false);
+    expect(selected(malformed,1).captions[0]?.marker).toBe('suppressed');
+    expect(selected(malformed,2).captions[0]?.marker).toBe('visible');
+    const oldProfile = await read(r);
+    expect(selected(oldProfile,1).assets.some(a=>a.assetId===id('ast'))).toBe(true);
+  });
+  it('keeps the selected placement and pin separately when duplicate memberships are kept as independent records', async () => {
+    const r = shared();
+    const duplicateModel = id('sam', 9), duplicateCaption = id('scm', 9);
+    r.sceneAssetMembershipsById[duplicateModel] = { ...r.sceneAssetMembershipsById[id('sam')], id: duplicateModel };
+    r.sceneCaptionMembershipsById[duplicateCaption] = { ...r.sceneCaptionMembershipsById[id('scm')], id: duplicateCaption };
+    const adjusted = { ...r.captionsById[id('cap')].anchor, positionAsset: [1,2,3] };
+    r.sceneCaptionMembershipsById[id('scm')].anchor = adjusted;
+    const p = await local(r);
+    const source = assetCopySource(p, id('scn'), id('ast'), editLimits, id('sam'));
+    expect(source.binding.id).toBe(id('bnd',2));
+    expect(() => assetCopySource(p, id('scn',2), id('ast'), editLimits, id('sam'))).toThrow();
+    let n = 90;
+    const fresh = (prefix: string) => id(prefix, ++n), copy = await prepareAssetMembershipCopy(source, id('sam'), fresh);
+    const writes = planMetadataEdit(p, { kind:'resolveAssetMembership', sceneId:id('scn'), assetId:id('ast'), observedMembershipIds:[id('sam'),duplicateModel],
+      originalMembershipId:duplicateModel, choice:'both', eventId:fresh('evt'), copies:[copy] }, editLimits);
+    expect(writes.find(w => w.map === 'assetBindingsById')?.fields).toMatchObject({assetToProject:source.binding.assetToProject});
+    expect(writes.find(w => w.id === copy.ids.membership)?.fields).not.toHaveProperty('bindingId');
+    const captionId=fresh('cap'), membershipId=fresh('scm');
+    const duplicated = planMetadataEdit(p, { kind:'resolveCaptionMembership', sceneId:id('scn'), captionId:id('cap'), observedMembershipIds:[id('scm'),duplicateCaption],
+      originalMembershipId:duplicateCaption, choice:'both', eventId:fresh('evt'), copies:[{sourceMembershipId:id('scm'),captionId,membershipId,
+        attachments:[{sourceId:id('att'),targetId:fresh('att')}],tags:[{sourceId:id('tgm'),targetId:fresh('tgm')}]}] }, editLimits);
+    expect(duplicated.find(w=>w.id===captionId)?.fields).toMatchObject({anchor:adjusted});
+    expect(duplicated.find(w=>w.id===membershipId)?.fields).not.toHaveProperty('anchor');
+  });
+  it('refuses incompatible coordinates and resolves only the named pin in a duplicate registration', async () => {
+    const r = shared(), initial=r.captionsById[id('cap')].anchor;
+    const path=['sceneCaptionMembershipsById',id('scm'),'anchor'], adjusted={...initial,positionAsset:[1,2,3]};
+    const a = await read(r,conflicts(source(r),path,initial,adjusted));
+    const command={kind:'resolveScenePin' as const,sceneId:id('scn'),membershipId:id('scm'),operationId:'b-op'};
+    expect(selected(a,1).captions[0]?.marker).toBe('suppressed'); expect(selected(a,2).captions[0]?.marker).toBe('visible');
+    expect(planMetadataEdit(a,command,editLimits)).toEqual([{map:'sceneCaptionMembershipsById',id:id('scm'),create:false,fields:{anchor:adjusted}}]);
+    const invalid=await read(r,conflicts(source(r),path,initial,{...adjusted,assetFrameId:id('frm',99)}));
+    expect(()=>planMetadataEdit(invalid,command,editLimits)).toThrow();
+    r.sceneCaptionMembershipsById[id('scm',3)]={...r.sceneCaptionMembershipsById[id('scm')],id:id('scm',3)};
+    const dup=await read(r,conflicts(source(r),path,initial,adjusted));
+    expect(planMetadataEdit(dup,command,editLimits)).toEqual([{map:'sceneCaptionMembershipsById',id:id('scm'),create:false,fields:{anchor:adjusted}}]);
+    expect(selected(dup,1).captions).toHaveLength(0);
+  });
+  it('protects both competing bindings and presents only verified conflict choices', async () => {
+    const r=shared(); await local(r);
+    const path=['sceneAssetMembershipsById',id('sam'),'bindingId'];
+    const p=await read(r, conflicts(source(r), path, id('bnd'), id('bnd',2)));
+    expect(selected(p,1).assets).toHaveLength(0);
+    expect(selected(p,2).assets[0]?.projection.bindingId).toBe(id('bnd'));
+    expect(scenePlacementChoices(p,id('scn'),id('sam'),'bindingId',editLimits).map(c=>c.operationId).sort()).toEqual(['a-op','b-op']);
+    const command={kind:'resolveScenePlacement' as const,sceneId:id('scn'),membershipId:id('sam'),operationId:'b-op'};
+    expect(planMetadataEdit(p,command,editLimits)).toEqual([{map:'sceneAssetMembershipsById',id:id('sam'),fields:{bindingId:id('bnd',2)},create:false}]);
+    expect(() => planMetadataEdit(p,{...command,sceneId:id('scn',2)},editLimits)).toThrow();
+    expect(() => planMetadataEdit(p,{...command,operationId:'unobserved'},editLimits)).toThrow();
   });
 });

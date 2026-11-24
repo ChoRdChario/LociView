@@ -183,7 +183,9 @@ export async function prepareCleanRecords(input: JsonObject, limits: MetadataLim
     const identity = keys.projectIdentity(oldIdentity);
     const out = empty({ major: 2, minor: profile === 'map2' ? 1 : 0 }, identity, { title: project.title!, defaultSceneId: id(project.defaultSceneId, 'scn'),
       frame: { ...copy(frame, ['handedness', 'upAxis', 'unit']), id: id(frame.id, 'frm') } });
-    const anchor = (a: JsonObject): JsonObject => {
+    const sceneBindings = new Map(Object.values(table(records, 'sceneAssetMembershipsById'))
+      .filter(m => typeof m.bindingId === 'string').map(m => [canonical([m.sceneId!, m.assetId!]), string(m.bindingId)]));
+    const anchor = (a: JsonObject, sceneId?: JsonValue): JsonObject => {
       if (profile === 'map2' && a.kind === 'unplaced') return { kind: 'unplaced', ...(a.ownerAssetId === undefined ? {} : { ownerAssetId: id(a.ownerAssetId, 'ast') }) };
       if (a.kind === 'project') return { ...copy(a, ['kind', 'positionProject', 'normalProject']), projectFrameId: id(a.projectFrameId, 'frm') };
       const result: BuildingRecord = { ...copy(a, ['kind', 'positionAsset', 'normalAsset']), assetId: id(a.assetId, 'ast'), assetFrameId: id(a.assetFrameId, 'frm'),
@@ -195,7 +197,9 @@ export async function prepareCleanRecords(input: JsonObject, limits: MetadataLim
       if (source) keys.reserve(source.representationId, 'rep');
       if (hit.method === 'manual') {
         delete result.normalAsset; result.hitEvidence = { method: 'manual' };
-        const status = object(table(records, 'assetsById')[string(a.assetId)]?.status), binding = status?.kind === 'ready' && table(records, 'assetBindingsById')[string(status.activeBindingId)];
+        const status = object(table(records, 'assetsById')[string(a.assetId)]?.status);
+        const selected = sceneId && sceneBindings.get(canonical([sceneId, a.assetId!]));
+        const binding = table(records, 'assetBindingsById')[selected || (status?.kind === 'ready' ? string(status.activeBindingId) : '')];
         const revision = binding && table(records, 'assetRevisionsById')[string(binding.assetRevisionId)];
         if (revision && list(revision.anchorCompatibilityClasses).some(c => object(c).id === a.authoredAnchorCompatibilityId)) result.authoredAssetRevisionId = id(revision.id, 'rev');
       } else {
@@ -242,8 +246,10 @@ export async function prepareCleanRecords(input: JsonObject, limits: MetadataLim
       else if (map === 'captionTagsById') Object.assign(value, copy(r, ['label', 'colorSrgb', 'orderKey']));
       else if (map === 'captionTagMembershipsById') Object.assign(value, { captionId: id(r.captionId, 'cap'), tagId: id(r.tagId, 'tag') });
       else if (map === 'scenesById') { Object.assign(value, copy(r, ['name', 'orderKey'])); if (r.defaultViewId) value.defaultViewId = id(r.defaultViewId, 'view'); }
-      else if (map === 'sceneAssetMembershipsById') Object.assign(value, copy(r, ['orderKey']), { sceneId: id(r.sceneId, 'scn'), assetId: id(r.assetId, 'ast') });
-      else if (map === 'sceneCaptionMembershipsById') Object.assign(value, copy(r, ['orderKey']), { sceneId: id(r.sceneId, 'scn'), captionId: id(r.captionId, 'cap') });
+      else if (map === 'sceneAssetMembershipsById') Object.assign(value, copy(r, ['orderKey']), {
+        sceneId: id(r.sceneId, 'scn'), assetId: id(r.assetId, 'ast'), ...(r.bindingId === undefined ? {} : { bindingId: id(r.bindingId, 'bnd') }) });
+      else if (map === 'sceneCaptionMembershipsById') Object.assign(value, copy(r, ['orderKey']), {
+        sceneId: id(r.sceneId, 'scn'), captionId: id(r.captionId, 'cap'), ...(r.anchor === undefined ? {} : { anchor: anchor(object(r.anchor), r.sceneId) }) });
       else if (map === 'viewsById') Object.assign(value, copy(r, ['name', 'orderKey', 'camera', 'background']), { sceneId: id(r.sceneId, 'scn'), projectFrameId: id(r.projectFrameId, 'frm') });
       else if (map === 'materialOverridesById') { const routing = object(r.routing), scope = object(routing.scope), target = object(routing.target);
         Object.assign(value, copy(r, ['appearance', 'compositing']), { routing: { scope: scope.kind === 'scene' ? { kind: 'scene', sceneId: id(scope.sceneId, 'scn') } : { kind: 'project' },

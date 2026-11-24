@@ -82,7 +82,7 @@ function recoveryChoices(document: Document, group: WorkspaceRecoveryGroup, chan
     values.append(li); option(c.id, c.label + (by ? `（\u2068${by}\u2069）` : ''));
   }
   if (group.manual) option('manual', group.manual === 'name' ? '名前を入力' : '文言を入力');
-  if (group.target.kind !== 'field' || group.target.field !== 'anchor') editOnly(select);
+  if (group.target.kind !== 'scenePin' && (group.target.kind !== 'field' || group.target.field !== 'anchor')) editOnly(select);
   select.addEventListener('change', changed); root.append(values, select);
   return { root, get value() { return select.value; }, disable(disabled: boolean) { select.disabled = disabled; } };
 }
@@ -108,6 +108,8 @@ export function createProjectRecovery(document: Document, host: RecoveryHost) {
     switch (target.kind) {
       case 'name': return { kind: 'resolveSceneName', sceneId: target.sceneId, choice };
       case 'startup': return { kind: 'resolveDefaultScene', operationId: f.select.value };
+      case 'scenePlacement': return { kind: 'resolveScenePlacement', sceneId: target.sceneId, membershipId: target.membershipId, operationId: f.select.value };
+      case 'scenePin': return { kind: 'resolveScenePin', sceneId: target.sceneId, membershipId: target.membershipId, operationId: f.select.value };
       case 'text': return { kind: 'resolveCaptionText', captionId: target.captionId, field: target.field, choice };
       case 'field': return { kind: 'resolveCaptionField', captionId: target.captionId, field: target.field, operationId: f.select.value };
       case 'attachmentField': return { kind: 'resolveAttachmentField', captionId: target.captionId, attachmentId: target.attachmentId, field: target.field, operationId: f.select.value };
@@ -141,7 +143,7 @@ export function createProjectRecovery(document: Document, host: RecoveryHost) {
         const note = make('p', group.note ?? ''), details = make('ul'); note.hidden = !group.note;
         for (const line of group.details ?? []) details.append(make('li', line)); details.hidden = !details.children.length;
         editOnly(text, decision, apply);
-        if (group.target.kind !== 'field' || group.target.field !== 'anchor') editOnly(cancel);
+        if (group.target.kind !== 'scenePin' && (group.target.kind !== 'field' || group.target.field !== 'anchor')) editOnly(cancel);
         item.append(heading, note, details, select.root, text, decision, apply, cancel, message);
         f = { root: item, group, token: host.token(), select, text, decision, apply, cancel, message, composing: false }; forms.set(group.key, f);
         const current = f;
@@ -174,7 +176,10 @@ export function createProjectRecovery(document: Document, host: RecoveryHost) {
     },
     comparison(): WorkspaceViewportState['comparison'] { for (const f of forms.values()) {
       const target = f.group.target, anchor = f.group.choices.find(c => c.id === f.select.value)?.anchor;
-      if (!host.selectBlock() && !composing() && target.kind === 'field' && target.field === 'anchor' && anchor && f.group.ready && f.token === host.token()) return { token: f.token, captionId: target.captionId, anchor };
+      if (!host.selectBlock() && !composing() && anchor && f.group.ready && f.token === host.token()) {
+        if (target.kind === 'scenePin') return { token: f.token, sceneId: target.sceneId, captionId: target.captionId, anchor };
+        if (target.kind === 'field' && target.field === 'anchor') return { token: f.token, captionId: target.captionId, anchor };
+      }
     } return null; },
     dispose() { disposed = true; forms.clear(); root.remove(); } };
 }
