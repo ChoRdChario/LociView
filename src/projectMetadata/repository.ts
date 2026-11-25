@@ -2,7 +2,7 @@ import * as A from '@automerge/automerge/slim';
 import { Repo, stringifyAutomergeUrl, parseAutomergeUrl, type DocumentId, type BinaryDocumentId } from '@automerge/automerge-repo/slim';
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import { checkedChanges, checkedProof, checkLimits, fail, inspectPhysical, type MetadataLimits, type MetadataProof, type PhysicalDoc } from './format';
-import { assertTextDocumentWriter, digest, equalBytes, json, technicalId, withMetadataRead } from './persistence';
+import { assertTextDocumentWriter, digest, equalBytes, json, technicalId, withMetadataRead, measureMetadata, type MetadataTiming } from './persistence';
 import { ProjectMetadataSource, type LiveRecordEdit } from './source';
 
 /** Owned storage factory, bound to one new-workspace namespace; no library objects escape. */
@@ -185,7 +185,7 @@ export class MetadataRepository {
   }
 
   /** Live single-record command only. Recovery uses persist and a full fresh inspection. */
-  async persistRecordEdit(id: string, base: ProjectMetadataSource, expected: ProjectMetadataSource, command: LiveRecordEdit, part: Uint8Array) {
+  async persistRecordEdit(id: string, base: ProjectMetadataSource, expected: ProjectMetadataSource, command: LiveRecordEdit, part: Uint8Array, timing?: MetadataTiming) {
     const owned = part.slice(), key = this.documentId(id);
     assertTextDocumentWriter(this.fs, this.factory, key);
     await this.use(true, async storage => {
@@ -195,7 +195,7 @@ export class MetadataRepository {
       if (!expected.matchesStoredRecord(next, command, this.limits)) return fail('stored-original-bytes');
       await storage.saveDoc(key, next);
     });
-    await this.confirmRecordSource(id, expected, command);
+    await measureMetadata(timing, 'metadata.record.saved-document', () => this.confirmRecordSource(id, expected, command));
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
   }
 

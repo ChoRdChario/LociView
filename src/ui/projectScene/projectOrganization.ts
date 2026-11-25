@@ -15,7 +15,7 @@ interface OrganizationHost {
   run(command: MetadataEdit, complete: () => void, after?: () => Promise<void>, purpose?: 'attachCreatedTag'): void | Promise<void>;
   createdTagAssignment(): 'saving' | 'retry' | undefined;
   tagSaving(): boolean;
-  scene(id: string): void; caption(id: string): void; changed(): void; message(text: string): void;
+  scene(id: string): void; caption(id: string): void; changed(): void; message(text: string, when?: 'on-completion'): void;
   captionPending?(): boolean; canFlushCaption?(): boolean; flushCaption?(): Promise<boolean>;
 }
 /** Task controls only; complete reads and typed command preparation belong to the Host. */
@@ -177,9 +177,10 @@ export function createProjectOrganization(document: Document, host: Organization
     const fields = { label: tagName.value, colorSrgb: tagColor.value.slice(1).match(/../g)!.map(v => parseInt(v, 16) / 255) };
     perform(captured.tagId ? { kind: 'editTag', tagId: captured.tagId, ...fields } : { kind: 'createTag', ...fields }, () => {
       clearTagForm();
-      host.message(captionId ? 'タグを作成しました。記録に付けています。' : 'タグを保存しました。');
+      host.message('タグを保存しました。', 'on-completion');
     }, captionId ? async command => {
-      if (command.kind !== 'createTag' || disposed) return;
+      if (disposed) return;
+      if (command.kind !== 'createTag') { host.changed(); return; }
       // The second command always targets the record and tag captured by this action.
       const authoring = host.ports.authoring;
       if (!authoring || !host.canContinueWrite()) { host.message('タグは作成済みです。元の記録でタグを付けてください。'); return; }
@@ -187,7 +188,7 @@ export function createProjectOrganization(document: Document, host: Organization
       try { assignment = authoring.prepare(host.source().provider.token, { kind: 'setCaptionTag', captionId, tagId: command.tagId, included: true }); }
       catch { host.message('タグは作成済みです。元の記録でタグを確認してください。'); return; }
       assigningTo = captionId;
-      await host.run(assignment, () => { assigningTo = undefined; host.message('記録にタグを付けました。'); }, undefined, 'attachCreatedTag');
+      await host.run(assignment, () => { assigningTo = undefined; host.message('記録にタグを付けました。', 'on-completion'); }, undefined, 'attachCreatedTag');
     } : undefined);
   });
   tagName.addEventListener('keydown', event => {

@@ -13,9 +13,9 @@ import { readProjectScene, type ProjectProviderRead } from '../scene/projectProv
 import { checkLimits, fail, MetadataSourceError, type MetadataLimits } from './format';
 import { ProjectMetadataSource } from './source';
 import { MetadataRepository, type MetadataStorageFactory } from './repository';
-import { TransactionJournal, observeJournal, journalCommandBase, type JournalCommandBase, type JournalStart, type PreparedJournal, type JournalEntry, type PublishedJournalEntry } from './journal';
+import { TransactionJournal, observeJournal, journalCommandBase, hasSmallPublishedReceipts, type JournalCommandBase, type JournalStart, type PreparedJournal, type JournalEntry, type PublishedJournalEntry } from './journal';
 import { assertClosedLocalOriginals, closedLocalBase, readUnpreparedLocalPart } from './closedLocal';
-import { digest, equalBytes, json, newId, underWriteLease, withMetadataRead, metadataPath, selectedTextCommit, type MetadataReadPorts, type TextCommitPorts } from './persistence';
+import { digest, equalBytes, json, newId, underWriteLease, withMetadataRead, metadataPath, selectedTextCommit, measureMetadata, type MetadataTiming, type MetadataReadPorts, type TextCommitPorts } from './persistence';
 import { canonicalMetadataEdit, isLiveRecordEdit, planMetadataEdit, type LiveRecordEdit, type MetadataEdit } from './commands';
 import { checkRemoteStored, copyFullSource, initialWorkspaceChanges, planRemoteChanges, type FullMetadataSource, type RemoteBatchProof } from './remote';
 import { WorkspaceReceiveJob, type ReceiverProof } from '../projectPackage/receiveJob';
@@ -90,13 +90,7 @@ export interface CompletedBackupDisplay {
   readonly includesDeclaredEditorNames?: boolean; readonly requiresEditorAttributionReader?: boolean; readonly requiresPortableMediaReader?: boolean; readonly requiresScenePlacementReader?: boolean;
 }
 
-/** Local elapsed-time diagnostics only; no source values, evidence or authority. */
-export type MetadataTiming = (stage: string, milliseconds: number) => void;
-export function measureMetadata<T>(timing: MetadataTiming | undefined, stage: string, action: () => Promise<T>): Promise<T> {
-  if (!timing) return action();
-  const started = performance.now();
-  return action().finally(() => { try { timing(stage, performance.now() - started); } catch { /* Observers cannot change the result. */ } });
-}
+export { measureMetadata, type MetadataTiming } from './persistence';
 
 function weakContent(provider: Extract<ProjectProviderRead, { kind: 'scene-provider' }>, limits: MetadataLimits) {
   const candidates = provider.inspection.candidates, active = new Set(candidates.knownActiveRoots), queue = [...active];
@@ -161,6 +155,7 @@ export class MetadataProjectSession {
   private acknowledgedLocalChanges = new Set<string>();
   private acknowledgmentsLoaded = false;
   private verifiedPublications: readonly JournalEntry[] | undefined;
+  private readonly confirmedSmallTags = new WeakMap<readonly JournalEntry[], Set<string>>();
   private verifiedWitnessWork: number | undefined;
   private retained: { start: JournalStart; parts: Uint8Array[]; stagedBlobs?: JsonObject[];
     liveRecord?: true;
@@ -292,11 +287,11 @@ export class MetadataProjectSession {
     }
   }
 
-  private async readRecordCandidate(ports: MetadataReadPorts, command: LiveRecordEdit) {
+  private async readRecordCandidate(ports: MetadataReadPorts, command: LiveRecordEdit, knownSmallTags?: ReadonlySet<string>) {
     const read = this.last, chain = this.verifiedPublications;
     if (!chain || read.state !== 'ready' || !read.source || read.provider?.kind !== 'scene-provider' ||
       !this.acknowledgmentsLoaded || this.retained) return this.readCandidate(undefined, ports, true, false, ports);
-    const journal = new TransactionJournal(ports.fs, this.limits), entries = await journal.entries();
+    const journal = new TransactionJournal(ports.fs, this.limits), entries = await journal.entries(knownSmallTags);
     if (json(entries) !== json(chain) || observeJournal(entries).pending ||
       (await this.readSceneAppendStates(ports.fs, journal, entries)).length) return fail('command-base-changed');
     await journal.checkRestoredBinding(entries);
@@ -496,13 +491,18 @@ export class MetadataProjectSession {
     return underWriteLease(this.fs, async lease => {
       const live = isLiveRecordEdit(command) ? command : undefined;
       const ready = this.last.state === 'ready' && this.acknowledgmentsLoaded && !!this.verifiedPublications && !this.retained;
+      const chain = this.verifiedPublications;
+      const knownSmallTags = chain && ready && live && live.kind !== 'editCaption' ? this.confirmedSmallTags.get(chain) : undefined;
+      // A failure, another edit or a full reread cannot renew this chain's scheduling hint.
+      if (chain) this.confirmedSmallTags.delete(chain);
       const commit = live && ready ? selectedTextCommit(this.fs, this.storage, lease) : undefined;
       if (commit && live) {
         const timing = live.kind === 'editCaption' ? 'text' : live.kind === 'createTag' ? 'tag.create' : 'tag.assign';
         const { candidate, transaction, prepared, projected } = await commit.prepare(async ports => {
           const textChain = this.last.state === 'ready' && this.acknowledgmentsLoaded && !this.retained ? this.verifiedPublications : undefined;
           await this.measure(`${timing}.slot`, () => assertReviewEditSlot(ports.fs, this.limits, undefined, undefined, textChain));
-          const candidate = await this.measure(`${timing}.base`, () => this.readRecordCandidate(ports, live));
+          const candidate = await this.measure(`${timing}.base`, () => this.readRecordCandidate(ports, live,
+            this.verifiedPublications === chain ? knownSmallTags : undefined));
           const { state, source, provider } = candidate.read;
           if (state !== 'ready' || !source || !provider || source.token !== expectedToken || !candidate.commandBase) return fail('command-not-ready');
           if (provider.kind !== 'scene-provider' || provider.token !== source.token) return fail('provider-not-ready');
@@ -528,7 +528,8 @@ export class MetadataProjectSession {
         if (candidate.witnessWork === undefined || candidate.witnessWork + 1 > this.limits.maxWork) return fail('retained-media-limit');
         const { transactionId, repositoryId } = transaction.start;
         return commit.write(transactionId, this.repository.documentId(repositoryId), async ports => {
-          const entries = await this.measure(`${timing}.write-base`, () => new TransactionJournal(ports.fs, this.limits).entries());
+          const previousTags = this.verifiedPublications === chain ? knownSmallTags : undefined;
+          const entries = await this.measure(`${timing}.write-base`, () => new TransactionJournal(ports.fs, this.limits).entries(previousTags));
           if (this.retained || !matchesPublishedBase(entries, priorPublications, 0)) return fail('command-base-changed');
           // Claim the edit only after the fresh on-disk base check succeeds.
           this.adoptRead(candidate);
@@ -539,7 +540,12 @@ export class MetadataProjectSession {
             ports.assertCanAcknowledge();
             if (this.retained !== transaction) return fail('text-commit-state');
             this.retained = null;
+            const priorStillOwned = this.verifiedPublications === candidate.priorPublications;
             this.adoptRead({ read: completed.read, priorPublications: completed.chain, witnessWork: candidate.witnessWork! + 1, acknowledged, localChanges: nextLocal });
+            if (live.kind !== 'editCaption' && hasSmallPublishedReceipts(completed.chain.at(-1)!, this.limits)) {
+              const tags = priorStillOwned && previousTags ? previousTags : new Set<string>();
+              this.confirmedSmallTags.set(completed.chain, tags.add(transactionId));
+            }
           };
           return completed.read;
         });
@@ -1382,7 +1388,7 @@ export class MetadataProjectSession {
     const [storedPart] = await journal.validateParts(prepared);
     if (!storedPart || !equalBytes(storedPart, parts[0]!)) return fail('journal-part-source');
     await ports.advance('repository');
-    await this.measure('resume.persist-readback', () => repository.persistRecordEdit(start.repositoryId, base, next, command, storedPart));
+    await this.measure('resume.persist-readback', () => repository.persistRecordEdit(start.repositoryId, base, next, command, storedPart, this.timing));
     await ports.advance('publication');
     await this.measure('resume.publish', () => journal.publish(prepared, next));
     await ports.advance('readback');

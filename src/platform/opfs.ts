@@ -252,7 +252,9 @@ export class OpfsFS implements WorkspaceFS {
             // Retain lexical prefix pruning, including partial names.
             const branch = `${p}/`;
             if (prefix.startsWith(branch) || branch.startsWith(prefix)) {
-              if (workers < 4) start(handle as FileSystemDirectoryHandle, p);
+              // On the way to the requested prefix only one subtree can match.
+              // Reserve workers for sibling subtrees below it.
+              if (workers < 4 && !prefix.startsWith(branch)) start(handle as FileSystemDirectoryHandle, p);
               else await walk(handle as FileSystemDirectoryHandle, p);
             }
           } else if (p.startsWith(prefix)) out.push(p);

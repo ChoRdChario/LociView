@@ -850,7 +850,8 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       positionInput() || deletion || pickerScope || recovery?.hasChanges() || mediaManager?.hasChanges() ||
       [...panels.values()].some(p => p.hasChanges()) || viewport.read().dragging ? '現在の入力・操作を完了してください。' : null),
     run,
-    scene(next) { sceneId = next; resetDraft(); }, caption: selectCaption, changed: render, message(text) { feedback = text; render(); },
+    scene(next) { sceneId = next; resetDraft(); }, caption: selectCaption, changed: render,
+    message(text, when) { feedback = text; if (!when) render(); },
   });
   sceneManagement.append(organization.sceneRoot);
   captionContent.insertBefore(organization.tagsRoot, detail.mediaSlot.nextSibling);
@@ -1122,7 +1123,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   function positionValid() { return rawPosition.every(v => /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(v.trim()) && Number.isFinite(Number(v))); }
   async function perform(action: () => Promise<unknown>, complete: () => void, owner?: EditOwner, after?: () => Promise<void>) {
     if (disposed) return;
-    document.defaultView?.clearTimeout(feedbackTimer); passiveFeedback = null; storageFailure=undefined; busy = true; feedback = '変更を適用しています。'; pending = { action, complete, owner, after };
+    document.defaultView?.clearTimeout(feedbackTimer); passiveFeedback = null; storageFailure=undefined; busy = true;
+    feedback = owner === 'attachCreatedTag' ? 'タグを作成しました。記録に付けています。' : '変更を適用しています。';
+    pending = { action, complete, owner, after };
     let succeeded = false;
     let residency: { release(): void } | undefined;
     try { render(); if (owner === 'media') residency = await mediaWork.acquire(new AbortController().signal);
@@ -1137,8 +1140,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     } }
     finally {
       residency?.release(); busy = false;
-      // Keep the single user action visibly in progress between its separately
-      // acknowledged phases; the internal guards have already fully settled.
+      // The follow-up shows the next phase or the reason it could not start.
       if (!disposed && !(succeeded && after)) render();
       if (!disposed && !succeeded && owner === 'recovery' && !reviewPanel.hidden) {
         closeReview();
@@ -1151,8 +1153,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     // and pending state have settled; never nest a second perform in complete().
     if (succeeded && !disposed && after) {
       try { await after(); }
-      catch (error) { if (!disposed) feedback = error instanceof Error ? error.message : 'メディアの選択を保持しています。'; }
-      finally { if (!disposed) render(); }
+      catch (error) {
+        if (!disposed) { feedback = error instanceof Error ? error.message : 'メディアの選択を保持しています。'; render(); }
+      }
     }
   }
   async function run(command: MetadataEdit, complete: () => void, after?: () => Promise<void>, purpose?: 'attachCreatedTag') {
@@ -1252,9 +1255,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       });
     } catch (error) { feedback = (error as Error).message; render(); }
   });
-  function mediaChoiceBlocked() {
+  function mediaChoiceBlocked(captions?: ReturnType<typeof projectCaptions>) {
     return disposed || (autosave ? !!captionInputBlock() || !!selectedMedia : !!mutationBlock()) || !!sceneEdit || includeMemory().composing || !!deletion || panelInput() || !!mediaManager?.hasChanges() ||
-      positionInput() || !!recovery?.hasChanges() || composingInput() || viewport.read().dragging || detailContext().source.kind !== 'ready';
+      positionInput() || !!recovery?.hasChanges() || composingInput() || viewport.read().dragging || detailContext(captions).source.kind !== 'ready';
   }
   mediaInput.addEventListener('click', event => {
     if (mediaChoiceBlocked()) { event.preventDefault(); return; }
@@ -1666,7 +1669,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
       cancelScene.hidden = !sceneEdit; cancelScene.disabled = busy || !!pending || ports.status().kind !== 'idle' || ports.otherPending() || !!sceneEdit?.composing;
       sceneNote.textContent = sceneEdit?.kind === 'create' ? 'このシーンのモデルを引き継ぎます。記録は追加されません。' : sceneEdit?.kind === 'default' ? '次にプロジェクトを開くときの開始シーンにします。' : ''; sceneNote.hidden = !sceneNote.textContent;
       sceneStatus.textContent = staleScene ? '内容が更新されています。入力は保持しています。取り消して選び直してください。' : start ? `開始シーン：${fieldValue(p.state.scenes[start]?.name) ?? '名称を確認'}` : '開始シーンの状態を確認してください。';
-      mediaInput.disabled = mediaChoiceBlocked();
+      mediaInput.disabled = mediaChoiceBlocked(captions);
       mediaDraftNotice.hidden = !selectedMedia;
       const mediaNote = selectedMedia ? `${selectedMedia.file.name} — ${autosave ? autosave.failed ? '追加できませんでした。選択は保持しています。' : '追加を準備しています。' : selectedMedia.recordApplied
         ? '記録の変更は反映済みです。メディアの追加完了は未確認です。' : '変更を適用すると追加します。'}` : '';

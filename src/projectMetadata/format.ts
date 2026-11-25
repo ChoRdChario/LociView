@@ -126,6 +126,7 @@ function inspectPhysicalDetail(doc: PhysicalDoc, inputProof: MetadataProof, limi
   const containers = new Map<string, { path: string[]; birth: string }>([['_root', { path: [], birth: rootHash }]]);
   const occupied = new Set<string>(), ancestors = new Map<string, Set<string>>();
   const changes: AtomicChange[] = [], scalars = new Map<string, { objectId: string; key: string }>();
+  const checkedKeys = new Set<string>();
   let work = 0, operations = 0, schema: JsonObject | undefined, identity: JsonValue | undefined, profileMarker: JsonValue | undefined;
   const portableChanges = new Set<string>();
   const scenePlacementChanges = new Set<string>();
@@ -166,7 +167,10 @@ function inspectPhysicalDetail(doc: PhysicalDoc, inputProof: MetadataProof, limi
         if (!parent || (parent.birth !== hash && !prior.has(parent.birth)) ||
           typeof op.key !== 'string' || !op.key || ('insert' in op && op.insert)) fail('structure');
         // An array of path strings does not exercise the domain's object-key guard.
-        cloneCanonicalValue({ [op.key]: null }, limits);
+        if (!checkedKeys.has(op.key)) {
+          cloneCanonicalValue({ [op.key]: null }, limits);
+          checkedKeys.add(op.key);
+        }
         const path = [...parent!.path, op.key];
         const address = canonical(path), root = parent!.path.length === 0;
         if (op.action === 'makeMap') {

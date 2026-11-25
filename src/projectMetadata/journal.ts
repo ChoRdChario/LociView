@@ -6,7 +6,7 @@ import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { checkedChanges, checkedProof, checkLimits, fail, type MetadataLimits, type MetadataProof } from './format';
 import { ProjectMetadataSource } from './source';
-import { digest, equalBytes, json, metadataPath, readReceipt, technicalId, withMetadataRead, writeReceipt } from './persistence';
+import { digest, equalBytes, json, metadataPath, readReceipt, readReceiptSnapshot, technicalId, withMetadataRead, writeReceipt } from './persistence';
 import { initialWorkspaceChanges, planRemoteChanges } from './remote';
 import { captureJournalRemote, checkJournalRemote, isPackageRemote, isContributionRemote, isBackupRestore, isBackupRestoreInput, validateJournalRemote, validateBackupRestore,
   remoteEvidenceBytes, remoteEvidenceDescriptors, remoteInputFromEvidence,
@@ -34,6 +34,13 @@ interface Durable { transactionId: string; exactChangeSetDigest: string }
 export interface Publication extends Durable { heads: string[] }
 export interface JournalEntry { start: JournalStart; prepared: PreparedJournal | null; durable: Durable | null; publication: Publication | null; closedLocal?: ClosedLocalReceipt }
 export type PublishedJournalEntry = JournalEntry & { prepared: PreparedJournal; publication: Publication };
+const smallReceiptBytes = 16 * 1024;
+/** Scheduling hint only. A valid canonical receipt may also have a three-byte UTF-8 BOM. */
+export function hasSmallPublishedReceipts(entry: JournalEntry, limits: MetadataLimits): boolean {
+  if (entry.start.purpose !== 'localCommand' || entry.closedLocal || !entry.prepared || !entry.durable || !entry.publication) return false;
+  const limit = Math.min(smallReceiptBytes, limits.maxTotalBytes);
+  return [entry.start, entry.prepared, entry.durable, entry.publication].every(value => new TextEncoder().encode(json(value)).length + 3 <= limit);
+}
 export type JournalCommandBase = Pick<JournalStart, 'transactionId' | 'repositoryId' | 'proof' | 'requiredCapabilities'>;
 export interface JournalObservation {
   readonly entries: readonly JournalEntry[];
@@ -102,36 +109,60 @@ function validateStart(s: JournalStart, limits: MetadataLimits): void {
 export class TransactionJournal {
   constructor(private readonly fs: ProjectWorkspaceFS, private readonly limits: MetadataLimits) {}
   path(tx: string, name: string) { return metadataPath(this.fs, `journal/${technicalId(tx)}/${name}`); }
-  async entries(): Promise<JournalEntry[]> {
+  async entries(knownSmallTags?: ReadonlySet<string>): Promise<JournalEntry[]> {
     const limits = checkLimits(this.limits);
-    return withMetadataRead(this.fs, undefined, ({ fs }) => new TransactionJournal(fs, limits).entriesDirect(), 'journal.entries');
+    return withMetadataRead(this.fs, undefined, ({ fs }) => new TransactionJournal(fs, limits).entriesDirect(knownSmallTags), 'journal.entries');
   }
 
-  private async entriesDirect(): Promise<JournalEntry[]> {
+  private async readSmallTag(id: string) {
+    const read = async <T>(name: string) => {
+      const path = this.path(id, name), first = await this.fs.readStream(path);
+      if (!first || !Number.isSafeInteger(first.size) || first.size < 0 || first.size > Math.min(smallReceiptBytes, this.limits.maxTotalBytes)) return fail('receipt-read');
+      const second = await this.fs.readStream(path);
+      if (!second || second.size !== first.size) return fail('receipt-read');
+      return await readReceiptSnapshot<T>(second, this.limits) ?? fail('receipt-read');
+    };
+    const [start, prepared, durable, publication] = await Promise.allSettled([
+      read<JournalStart>('staging.json'), read<PreparedJournal>('blobsVerified.json'),
+      read<Durable>('metadataDurable.json'), read<Publication>('published.json'),
+    ]);
+    const value = <T>(result: PromiseSettledResult<T>): T => {
+      if (result.status === 'rejected') throw result.reason;
+      return result.value;
+    };
+    return { start: value(start), prepared: value(prepared), durable: value(durable), publication: value(publication) };
+  }
+
+  private async entriesDirect(knownSmallTags?: ReadonlySet<string>): Promise<JournalEntry[]> {
     const prefix = metadataPath(this.fs, 'journal/'), paths = await this.fs.list(prefix);
-    const ids = [...new Set(paths.map(path => {
+    const filesByTransaction = new Map<string, string[]>();
+    for (const path of paths) {
       const tail = path.slice(prefix.length);
       if (!/^[0-9a-f]{32}\/(staging\.json|blobsVerified\.json|metadataDurable\.json|published\.json|closedLocal\.json|source-metadata\.am|source-manifest\.(json|sha256)|source-protected-inventory\.json|source-exchange-bases\.json|changes\/[0-9]{8}\.amchange|wire-changes\/[0-9]{8}\.amchange|derived-target-metadata\.am|base-evidence\/[0-9a-f]{64})$/.test(tail)) fail('journal-path');
-      return tail.split('/')[0]!;
-    }))];
-    if (ids.length > this.limits.maxChanges) fail('journal-count');
+      const id = tail.slice(0, 32);
+      const files = filesByTransaction.get(id);
+      if (files) files.push(path);
+      else filesByTransaction.set(id, [path]);
+    }
+    if (filesByTransaction.size > this.limits.maxChanges) fail('journal-count');
     const entries: JournalEntry[] = [];
-    for (const id of ids) {
-      const start = await readReceipt<JournalStart>(this.fs, this.path(id, 'staging.json'), this.limits);
+    for (const [id, files] of filesByTransaction) {
+      const known = knownSmallTags?.has(id) ? await this.readSmallTag(id) : undefined;
+      const start = known?.start ?? await readReceipt<JournalStart>(this.fs, this.path(id, 'staging.json'), this.limits);
       if (!start || start.transactionId !== id) fail('journal-start-missing');
       validateStart(start!, this.limits);
-      const prepared = await readReceipt<PreparedJournal>(this.fs, this.path(id, 'blobsVerified.json'), this.limits);
+      const prepared = known?.prepared ?? await readReceipt<PreparedJournal>(this.fs, this.path(id, 'blobsVerified.json'), this.limits);
       if (prepared) await this.validatePrepared(start!, prepared);
       if (start!.purpose === 'appendScene') await this.validateSceneAppend(start!, prepared);
       if (prepared && (!prepared.remote || !isPackageRemote(prepared.remote)) &&
-        paths.some(path => path.startsWith(this.path(id, 'source-manifest.')))) fail('journal-source-kind');
+        files.some(path => path.startsWith(this.path(id, 'source-manifest.')))) fail('journal-source-kind');
       if (prepared) {
         const allowed = new Set(prepared.remote ? remoteEvidenceDescriptors(prepared.remote).map(([name]) => this.path(id, name)) : []);
-        for (const path of paths.filter(path => path.startsWith(this.path(id, '')) && /\/(source-|wire-changes\/|base-evidence\/|derived-target-)/.test(path)))
-          if (!allowed.has(path)) fail('journal-source-kind');
+        for (const path of files)
+          if (/\/(source-|wire-changes\/|base-evidence\/|derived-target-)/.test(path) && !allowed.has(path)) fail('journal-source-kind');
       }
-      const durable = await readReceipt<Durable>(this.fs, this.path(id, 'metadataDurable.json'), this.limits);
-      const publication = await readReceipt<Publication>(this.fs, this.path(id, 'published.json'), this.limits);
+      const durable = known?.durable ?? await readReceipt<Durable>(this.fs, this.path(id, 'metadataDurable.json'), this.limits);
+      const publication = known?.publication ?? await readReceipt<Publication>(this.fs, this.path(id, 'published.json'), this.limits);
       for (const receipt of [durable, publication]) if (receipt) {
         const keys = receipt === publication ? 'exactChangeSetDigest,heads,transactionId' : 'exactChangeSetDigest,transactionId';
         if (Object.keys(receipt).sort().join(',') !== keys || !prepared ||
@@ -141,32 +172,37 @@ export class TransactionJournal {
         heads(publication.heads); if (!publication.heads.length || !durable) fail('publication-before-durable');
         if (prepared?.remote && json(publication.heads) !== json(prepared.remote.expectedFinalHeads)) fail('remote-publication-heads');
       }
-      const closedLocal = paths.includes(this.path(id, 'closedLocal.json'))
+      const closedLocal = files.includes(this.path(id, 'closedLocal.json'))
         ? await readReceipt<ClosedLocalReceipt>(this.fs, this.path(id, 'closedLocal.json'), this.limits) : null;
       if (closedLocal && (prepared || durable || publication || start!.purpose !== 'localCommand' ||
-        paths.filter(path => path.startsWith(this.path(id, ''))).some(path => path !== this.path(id, 'staging.json') && path !== this.path(id, 'closedLocal.json') &&
+        files.some(path => path !== this.path(id, 'staging.json') && path !== this.path(id, 'closedLocal.json') &&
           !(closedLocal.schema === 'lociview-metadata-closed-local-2' && path === this.path(id, 'changes/00000000.amchange')))))
         fail('closed-local-directory');
       entries.push({ start: start!, prepared, durable, publication, ...(closedLocal ? { closedLocal } : {}) });
     }
+    const successor = new Map<string | null, JournalEntry | null>();
+    for (const entry of entries) {
+      const key = entry.start.predecessor;
+      successor.set(key, successor.has(key) ? null : entry);
+    }
     const chain: JournalEntry[] = []; let predecessor: string | null = null;
+    let publication: PublishedJournalEntry | undefined;
     while (chain.length < entries.length) {
-      const children = entries.filter(e => e.start.predecessor === predecessor);
-      if (children.length !== 1) fail('journal-chain');
-      const child = children[0]!;
-      const previous = observeJournal(chain);
+      const child: JournalEntry = successor.get(predecessor) ?? fail('journal-chain');
       if (chain.length) checkRequiredCapabilities(child.start.requiredCapabilities,
-        capabilityUnion(readRequiredCapabilities(child.start.requiredCapabilities), readRequiredCapabilities(previous.effectivePublication?.start.requiredCapabilities)));
-      if (chain.length && (previous.pending || !previous.terminal || child.start.repositoryId !== chain[0]!.start.repositoryId ||
+        capabilityUnion(readRequiredCapabilities(child.start.requiredCapabilities), readRequiredCapabilities(publication?.start.requiredCapabilities)));
+      const previous = chain.at(-1);
+      if (previous && ((!previous.publication && !previous.closedLocal) || child.start.repositoryId !== chain[0]!.start.repositoryId ||
         json(child.start.proof) !== json(chain[0]!.start.proof))) fail('journal-chain');
       if (child.closedLocal) {
-        if (!previous.effectivePublication) return fail('closed-local-publication');
-        await validateClosedLocal(child.closedLocal, child.start, previous.effectivePublication, this.limits);
+        if (!publication) return fail('closed-local-publication');
+        await validateClosedLocal(child.closedLocal, child.start, publication, this.limits);
         if (child.closedLocal.schema === 'lociview-metadata-closed-local-2') {
           const part = await readUnpreparedLocalPart(this.fs, this.path(child.start.transactionId, 'changes/00000000.amchange'), this.limits);
           if (json(part) !== json(child.closedLocal.unpreparedParts[0])) return fail('closed-local-part-changed');
         }
       }
+      if (child.publication) publication = child as PublishedJournalEntry;
       chain.push(child); predecessor = child.start.transactionId;
     }
     return chain;

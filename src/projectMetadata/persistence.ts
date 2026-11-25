@@ -9,6 +9,13 @@ export const equalBytes = (a: Uint8Array, b: Uint8Array) => a.length === b.lengt
 export const json = (v: unknown) => canonical(v as JsonValue);
 export const technicalId = (v: unknown): string => typeof v === 'string' && /^[0-9a-f]{32}$/.test(v) ? v : fail('technical-id');
 export const newId = () => crypto.randomUUID().replaceAll('-', '');
+/** Local elapsed-time diagnostics only; no source values, evidence or authority. */
+export type MetadataTiming = (stage: string, milliseconds: number) => void;
+export function measureMetadata<T>(timing: MetadataTiming | undefined, stage: string, action: () => Promise<T>): Promise<T> {
+  if (!timing) return action();
+  const started = performance.now();
+  return action().finally(() => { try { timing(stage, performance.now() - started); } catch { /* Observers cannot change the result. */ } });
+}
 export async function digest(bytes: Uint8Array): Promise<string> {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes.slice().buffer))].map(v => v.toString(16).padStart(2, '0')).join('');
 }

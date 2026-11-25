@@ -3586,6 +3586,58 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await expect(reopened.dispatch(saved.source!.token, assign)).rejects.toThrow();
     expect(await f.base.list('')).toEqual(beforeRejected);
   });
+  it.each(['missing', 'resized', 'changed', 'bom'] as const)('checks both fresh opens of a confirmed tag before assigning: %s', async mode => {
+    const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));
+    const tagId = `tag_${newId()}`, membershipId = `tgm_${newId()}`;
+    const created = await host.dispatch(host.read().source!.token, { kind: 'createTag', tagId, label: '連続確認',
+      colorSrgb: [0, 0, 1], orderKey: 'B', eventId: `evt_${newId()}` });
+    const assign = { kind: 'setCaptionTag' as const, tagId, membershipId, captionId: f.captionId,
+      included: true, observedIds: [], eventId: `evt_${newId()}` };
+    const paths = await f.base.list(''), prefix = paths.find(p => p.endsWith('/' + created.publication + '/published.json'))!.replace(/published\.json$/, '');
+    const path = prefix + 'published.json', original = (await f.base.readBytes(path))!;
+    if (mode === 'bom') await f.base.writeBytes(path, new Uint8Array([0xef, 0xbb, 0xbf, ...original]));
+    const open = f.base.readStream.bind(f.base);
+    const arrival = new Set<string>(), invalidBody = vi.fn(() => { throw Error('resized body was opened'); });
+    let opened = 0, siblingOpens = 0, release!: () => void;
+    const held = new Promise<void>(resolve => { release = resolve; });
+    const inspect = vi.spyOn(f.base, 'readStream').mockImplementation(async name => {
+      if (name.startsWith(prefix)) arrival.add(name);
+      if (name === prefix + 'blobsVerified.json' && mode === 'missing' && ++siblingOpens === 1) await held;
+      if (name === path && ++opened === 2) {
+        if (mode === 'missing') return null;
+        if (mode === 'resized') return { size: original.length + 1, stream: invalidBody };
+        if (mode === 'changed') {
+          const value = JSON.parse(new TextDecoder().decode(original));
+          value.heads = [value.heads[0].replace(/^./, (c: string) => c === 'f' ? '0' : 'f')];
+          const blob = new Blob([json(value)]); expect(blob.size).toBe(original.length);
+          return { size: blob.size, stream: () => blob.stream() };
+        }
+      }
+      return open(name);
+    });
+    let finished = false;
+    const result = host.dispatch(created.source!.token, assign).then(() => 'saved', () => 'refused').finally(() => { finished = true; });
+    try {
+      if (mode === 'missing') {
+        await vi.waitFor(() => { expect(arrival.size).toBe(4); expect(opened).toBe(2); });
+        await new Promise(resolve => setTimeout(resolve, 0));
+        expect(siblingOpens).toBe(1); expect(finished).toBe(false); expect(await f.base.list('')).toEqual(paths);
+      }
+    } finally { release(); }
+    try {
+      expect(await result).toBe(mode === 'bom' ? 'saved' : 'refused');
+      expect(opened).toBeGreaterThanOrEqual(2);
+      expect(invalidBody).not.toHaveBeenCalled();
+    } finally { inspect.mockRestore(); }
+    if (mode !== 'bom') {
+      expect(await f.base.list('')).toEqual(paths);
+      await host.dispatch(created.source!.token, assign);
+    }
+    const final = host.read();
+    expect(final.source!.originalChanges()).toHaveLength(created.source!.originalChanges().length + 1);
+    expect(final.provider?.kind === 'scene-provider' && final.provider.details.mutable.captionTagMembershipsById[membershipId])
+      .toMatchObject({ tagId: { value: tagId }, captionId: { value: f.captionId } });
+  });
   it('retries an interrupted live tag assignment strictly and publishes only its original change', async () => {
     const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));
     const tagId = `tag_${newId()}`, membershipId = `tgm_${newId()}`;

@@ -66,8 +66,8 @@ describe('OPFS scoped fresh listing', () => {
     await expect(f.fs.list('other/')).rejects.toBe(error);
     await expect(f.fs.list('')).rejects.toBe(error);
   });
-  it('overlaps independent native waits with one bound across wide and deep branches', async () => {
-    const keys = Array.from({ length: 12 }, (_, i) => `branch-${i}/nested/deep/one.json`);
+  it.each(['', 'projects/a/logs/'])('overlaps independent native waits under prefix %j within one bound', async prefix => {
+    const keys = Array.from({ length: 12 }, (_, i) => `${prefix}branch-${i}/nested/deep/one.json`);
     const f = await setup(keys); let active = 0, maximum = 0;
     const wrap = (dir: Directory) => {
       const entries = dir.entries.bind(dir);
@@ -84,8 +84,15 @@ describe('OPFS scoped fresh listing', () => {
       for (const child of dir.children.values()) if (child instanceof Directory) wrap(child);
     };
     wrap(f.root);
-    expect(await f.fs.list('')).toEqual(await f.memory.list(''));
+    expect(await f.fs.list(prefix)).toEqual(await f.memory.list(prefix));
     expect(maximum).toBeGreaterThan(1); expect(maximum).toBeLessThanOrEqual(4); expect(active).toBe(0);
+  });
+  it('rejects an ancestor enumeration failure after finding the requested subtree', async () => {
+    const f = await setup(['projects/a/logs/one.json']);
+    const error = new DOMException('Enumeration failed', 'NotReadableError');
+    const entries = f.root.entries.bind(f.root);
+    f.root.entries = async function* () { yield* entries(); throw error; };
+    await expect(f.fs.list('projects/a/logs/')).rejects.toBe(error);
   });
   it.each([false, true])('drains a held sibling and preserves the native failure (closing failure: %s)', async closeFails => {
     const f = await setup(['held/file.json', 'broken/file.json', 'later/file.json']);
