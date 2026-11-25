@@ -1578,6 +1578,34 @@ describe('new-workspace metadata persistence service (memory ports, not device/a
     expect(h.fault.writes).toBe(writes); // already durable, no metadata rewrite
   });
 
+  it('recovers an interrupted tag assignment once while preserving the completed tag and original caption', async () => {
+    const h = setup(), writer = h.session(), initial = await writer.create(h.records);
+    const tagId = id('tag', 8), membershipId = id('tgm', 8), captionId = id('cap');
+    const created = await writer.edit(initial.source!.token, { kind: 'createTag', tagId, label: '天蓋', colorSrgb: [0, 0, 1],
+      orderKey: 'B', eventId: id('evt', 8) });
+    h.fs.reject = path => path.endsWith('/published.json');
+    await expect(writer.edit(created.source!.token, { kind: 'setCaptionTag', captionId, tagId, membershipId,
+      included: true, observedIds: [], eventId: id('evt', 9) })).rejects.toThrow('synthetic quota');
+    const cold = h.session(), pending = checked(await cold.read());
+    expect(pending.state).toBe('pending');
+    expect(pending.source!.originalChanges()).toEqual(created.source!.originalChanges());
+    expect(pending.provider.details.mutable.captionTagsById[tagId]!.label).toEqual({ kind: 'value', value: '天蓋' });
+    expect(pending.provider.details.mutable.captionTagMembershipsById[membershipId]).toBeUndefined();
+    const journal = new TransactionJournal(h.fs, limits), entry = (await journal.entries()).at(-1)!;
+    const retained = await journal.validateParts(entry.prepared!);
+    expect(retained).toHaveLength(1);
+    h.fs.reject = () => false;
+    const recovered = checked(await cold.retry());
+    expect(recovered.state).toBe('ready');
+    expect(recovered.source!.originalChanges()).toEqual([...created.source!.originalChanges(), ...retained]);
+    expect(recovered.provider.details.mutable.captionTagMembershipsById[membershipId]).toMatchObject({
+      tagId: { kind: 'value', value: tagId }, captionId: { kind: 'value', value: captionId },
+    });
+    const writes = [h.fault.writes, h.fs.writes];
+    expect((await h.session().retry()).source!.originalChanges()).toEqual(recovered.source!.originalChanges());
+    expect([h.fault.writes, h.fs.writes]).toEqual(writes);
+  });
+
   it('keeps unpublished initialization incomplete and retries the same bootstrap, never reseeding identity', async () => {
     const h = setup(), writer = h.session(); h.fault.save = true;
     await expect(writer.create(h.records)).rejects.toThrow();
@@ -1603,7 +1631,7 @@ describe('new-workspace metadata persistence service (memory ports, not device/a
     const repositoryId = (await new TransactionJournal(h.fs, limits).entries())[0]!.start.repositoryId;
     const next = await initial.prepareCaptionText(initial.token, id('cap'), 'body', '保存した本文');
     const part = next.originalChanges().find(bytes => next.heads.includes(A.decodeChange(bytes).hash))!;
-    await expect(underWriteLease(h.fs, () => repository.persistText(repositoryId, initial, next, id('cap'), part))).rejects.toThrow('text-commit-document');
+    await expect(underWriteLease(h.fs, () => repository.persistRecordEdit(repositoryId, initial, next, { kind: 'editCaption', captionId: id('cap'), edits: { body: '保存した本文' } }, part))).rejects.toThrow('text-commit-document');
     await expect(repository.confirmPublishedEdit(repositoryId, initial.heads, next.heads, part)).rejects.toThrow('publication-readback');
     await underWriteLease(h.fs, () => repository.persist(repositoryId, next));
     await expect(repository.confirmPublishedEdit(repositoryId, initial.heads, next.heads, part)).resolves.toBeUndefined();

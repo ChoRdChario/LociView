@@ -3552,6 +3552,64 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     expect(reopened.read().source!.originalChanges()).toEqual(expect.arrayContaining(final.source!.originalChanges()));
     expect(reopened.read().source!.originalChanges()).toHaveLength(final.source!.originalChanges().length);
   });
+  it('confirms only live tag creation and assignment with a missing photo, then requires it for output and reopen', async () => {
+    const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));
+    const base = host.read().source!, tagId = `tag_${newId()}`, membershipId = `tgm_${newId()}`;
+    const create = { kind: 'createTag' as const, tagId, label: '要再確認', colorSrgb: [0, 0, 1], orderKey: 'B', eventId: `evt_${newId()}` };
+    const assign = { kind: 'setCaptionTag' as const, tagId, membershipId, captionId: f.captionId, included: true, observedIds: [], eventId: `evt_${newId()}` };
+    const objects = await f.base.list('v2/cas/objects/');
+    let photo: { path: string; bytes: Uint8Array } | undefined;
+    for (const path of objects) {
+      const bytes = (await f.base.readBytes(path))!;
+      if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) { photo = { path, bytes }; break; }
+    }
+    if (!photo) throw Error('Expected a saved PNG');
+    await f.base.remove(photo.path);
+    const opened = vi.spyOn(f.base, 'readStream');
+    const created = await host.dispatch(base.token, create);
+    const saved = await host.dispatch(created.source!.token, assign);
+    expect(saved.source!.originalChanges()).toHaveLength(base.originalChanges().length + 2);
+    expect(opened.mock.calls.filter(([path]) => path.includes('/metadata/evidence/') || path.includes('/cas/'))).toEqual([]);
+    opened.mockRestore();
+    const savedPaths = await f.base.list('');
+    await expect(host.dispatch(saved.source!.token, { ...assign, included: false, observedIds: [membershipId] })).rejects.toThrow();
+    expect(await f.base.list('')).toEqual(savedPaths);
+    await expect(host.workspaceOutput.generateBackup(saved.source!.token)).rejects.toThrow();
+    await host.dispose();
+    await expect(openValidationHost(f.options)).rejects.toThrow();
+    await f.base.writeBytes(photo.path, photo.bytes);
+    const reopened = owned(await openValidationHost(f.options));
+    expect(reopened.read().source!.originalChanges()).toEqual(saved.source!.originalChanges());
+    expect(reopened.read().provider).toEqual(saved.provider);
+    const beforeRejected = await f.base.list('');
+    await expect(reopened.dispatch(base.token, create)).rejects.toThrow();
+    await expect(reopened.dispatch(saved.source!.token, assign)).rejects.toThrow();
+    expect(await f.base.list('')).toEqual(beforeRejected);
+  });
+  it('retries an interrupted live tag assignment strictly and publishes only its original change', async () => {
+    const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));
+    const tagId = `tag_${newId()}`, membershipId = `tgm_${newId()}`;
+    const created = await host.dispatch(host.read().source!.token, { kind: 'createTag', tagId, label: '保留', colorSrgb: [1, 0, 0], orderKey: 'C', eventId: `evt_${newId()}` });
+    const prior = (await f.base.list('')).find(path => path.endsWith('/' + created.publication + '/changes/00000000.amchange'))!;
+    const bytes = (await f.base.readBytes(prior))!;
+    f.base.reject = path => path.endsWith('/published.json');
+    await expect(host.dispatch(created.source!.token, { kind: 'setCaptionTag', tagId, membershipId, captionId: f.captionId,
+      included: true, observedIds: [], eventId: `evt_${newId()}` })).rejects.toThrow();
+    f.base.reject = () => false;
+    await f.base.remove(prior);
+    await expect(host.authority.retry!()).rejects.toThrow();
+    await f.base.writeBytes(prior, bytes);
+    await host.authority.retry!();
+    const done = host.read();
+    expect(done.source!.originalChanges()).toHaveLength(created.source!.originalChanges().length + 1);
+    if (done.provider?.kind !== 'scene-provider') throw Error('expected restored tag assignment');
+    expect(done.provider.details.mutable.captionTagMembershipsById[membershipId]).toMatchObject({
+      captionId: { value: f.captionId }, tagId: { value: tagId },
+    });
+    await host.dispose();
+    const reopened = owned(await openValidationHost(f.options));
+    expect(reopened.read().source!.originalChanges()).toEqual(done.source!.originalChanges());
+  });
   it.each(['evidence', 'original', 'restored source', 'earlier change'] as const)('confirms live text after losing unrelated %s, but refuses output and cold reopen until repaired', async missing => {
     const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));
     const paths = await f.base.list(''), original = host.read().source!;

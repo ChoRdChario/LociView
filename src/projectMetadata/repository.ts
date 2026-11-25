@@ -3,7 +3,7 @@ import { Repo, stringifyAutomergeUrl, parseAutomergeUrl, type DocumentId, type B
 import type { ProjectWorkspaceFS } from '../platform/fs';
 import { checkedChanges, checkedProof, checkLimits, fail, inspectPhysical, type MetadataLimits, type MetadataProof, type PhysicalDoc } from './format';
 import { assertTextDocumentWriter, digest, equalBytes, json, technicalId, withMetadataRead } from './persistence';
-import { ProjectMetadataSource } from './source';
+import { ProjectMetadataSource, type LiveRecordEdit } from './source';
 
 /** Owned storage factory, bound to one new-workspace namespace; no library objects escape. */
 export interface MetadataStoragePort {
@@ -176,26 +176,26 @@ export class MetadataRepository {
     });
   }
 
-  /** Confirm an ordinary text edit against the latest document in the selected store. */
-  async confirmTextSource(id: string, expected: ProjectMetadataSource, captionId: string): Promise<void> {
+  /** Check the current document and the records involved in this live command. */
+  async confirmRecordSource(id: string, expected: ProjectMetadataSource, command: LiveRecordEdit): Promise<void> {
     await this.use(false, async storage => {
       const doc = await storage.loadDoc(this.documentId(id));
-      if (!doc || !expected.matchesStoredCaption(doc, captionId, this.limits)) return fail('command-base-changed');
+      if (!doc || !expected.matchesStoredRecord(doc, command, this.limits)) return fail('command-base-changed');
     });
   }
 
-  /** Live selected text command only. Recovery uses persist and a full fresh inspection. */
-  async persistText(id: string, base: ProjectMetadataSource, expected: ProjectMetadataSource, captionId: string, part: Uint8Array) {
+  /** Live single-record command only. Recovery uses persist and a full fresh inspection. */
+  async persistRecordEdit(id: string, base: ProjectMetadataSource, expected: ProjectMetadataSource, command: LiveRecordEdit, part: Uint8Array) {
     const owned = part.slice(), key = this.documentId(id);
     assertTextDocumentWriter(this.fs, this.factory, key);
     await this.use(true, async storage => {
       const previous = await storage.loadDoc(key);
-      if (!previous || !base.matchesStoredCaption(previous, captionId, this.limits)) return fail('command-base-changed');
+      if (!previous || !base.matchesStoredRecord(previous, command, this.limits)) return fail('command-base-changed');
       const [next] = A.applyChanges(previous, [owned]);
-      if (!expected.matchesStoredCaption(next, captionId, this.limits)) return fail('stored-original-bytes');
+      if (!expected.matchesStoredRecord(next, command, this.limits)) return fail('stored-original-bytes');
       await storage.saveDoc(key, next);
     });
-    await this.confirmTextSource(id, expected, captionId);
+    await this.confirmRecordSource(id, expected, command);
     this.fs.mutationAuthority.assertWorkspaceWriteAuthorized();
   }
 

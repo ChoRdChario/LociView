@@ -82,6 +82,15 @@ export type MetadataEdit =
   | { kind: 'createAttachment'; sceneId: string; captionId: string; attachmentId: string; media: JsonObject; orderKey: string; altText: string; eventId: string }
   | { kind: 'editAttachment'; sceneId: string; captionId: string; attachmentId: string; field: 'altText' | 'orderKey'; value: string }
   | { kind: 'deleteAttachment'; sceneId: string; captionId: string; attachmentId: string; eventId: string };
+export type TagAddition = Extract<MetadataEdit, { kind: 'createTag' }> | (Extract<MetadataEdit, { kind: 'setCaptionTag' }> & { included: true });
+export type LiveRecordEdit = Extract<MetadataEdit, { kind: 'editCaption' }> | TagAddition;
+
+export function isLiveRecordEdit(command: MetadataEdit): command is LiveRecordEdit {
+  if (command.kind === 'editCaption') return Object.keys(command.edits).every(field => field === 'title' || field === 'body');
+  return command.kind === 'createTag' || (command.kind === 'setCaptionTag' && command.included === true &&
+    Array.isArray(command.observedIds) && command.observedIds.length === 0);
+}
+
 export interface MetadataRecordEdit { map: MutableRecordMap | 'mediaResourcesById' | 'assetBindingsById' | 'assetRevisionsById' | 'representationsById'; id: string; create: boolean; fields: JsonObject; remove?: readonly ('defaultViewId' | 'colorSrgb' | 'altText' | 'bindingId' | 'anchor')[] }
 export type MetadataWrite = MetadataRecordEdit | { map: 'project'; id: 'defaultSceneId'; create: false; fields: { defaultSceneId: string } };
 type Provider = Extract<ProjectProviderRead, { kind: 'scene-provider' }>;

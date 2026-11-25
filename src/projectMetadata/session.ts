@@ -16,7 +16,7 @@ import { MetadataRepository, type MetadataStorageFactory } from './repository';
 import { TransactionJournal, observeJournal, journalCommandBase, type JournalCommandBase, type JournalStart, type PreparedJournal, type JournalEntry, type PublishedJournalEntry } from './journal';
 import { assertClosedLocalOriginals, closedLocalBase, readUnpreparedLocalPart } from './closedLocal';
 import { digest, equalBytes, json, newId, underWriteLease, withMetadataRead, metadataPath, selectedTextCommit, type MetadataReadPorts, type TextCommitPorts } from './persistence';
-import { canonicalMetadataEdit, planMetadataEdit, type MetadataEdit } from './commands';
+import { canonicalMetadataEdit, isLiveRecordEdit, planMetadataEdit, type LiveRecordEdit, type MetadataEdit } from './commands';
 import { checkRemoteStored, copyFullSource, initialWorkspaceChanges, planRemoteChanges, type FullMetadataSource, type RemoteBatchProof } from './remote';
 import { WorkspaceReceiveJob, type ReceiverProof } from '../projectPackage/receiveJob';
 import { isContributionRemote, type JournalRemoteInput } from './packageRemote';
@@ -163,7 +163,7 @@ export class MetadataProjectSession {
   private verifiedPublications: readonly JournalEntry[] | undefined;
   private verifiedWitnessWork: number | undefined;
   private retained: { start: JournalStart; parts: Uint8Array[]; stagedBlobs?: JsonObject[];
-    liveText?: true;
+    liveRecord?: true;
     modelFacts?: { plan: MetadataModelFactPlan; next: ProjectMetadataSource };
     remote?: JournalRemoteInput;
     introduction?: { source: ProjectMetadataSource; command: Extract<MetadataEdit, { kind: 'createAttachment' }>; editor: LocalEditorContext } } | null = null;
@@ -292,7 +292,7 @@ export class MetadataProjectSession {
     }
   }
 
-  private async readTextCandidate(ports: MetadataReadPorts, captionId: string) {
+  private async readRecordCandidate(ports: MetadataReadPorts, command: LiveRecordEdit) {
     const read = this.last, chain = this.verifiedPublications;
     if (!chain || read.state !== 'ready' || !read.source || read.provider?.kind !== 'scene-provider' ||
       !this.acknowledgmentsLoaded || this.retained) return this.readCandidate(undefined, ports, true, false, ports);
@@ -301,7 +301,7 @@ export class MetadataProjectSession {
       (await this.readSceneAppendStates(ports.fs, journal, entries)).length) return fail('command-base-changed');
     await journal.checkRestoredBinding(entries);
     const published = observeJournal(entries).effectivePublication!;
-    await new MetadataRepository(ports.fs, ports.factory!, this.limits).confirmTextSource(published.start.repositoryId, read.source, captionId);
+    await new MetadataRepository(ports.fs, ports.factory!, this.limits).confirmRecordSource(published.start.repositoryId, read.source, command);
     return { read, acknowledged: this.acknowledgedMedia, localChanges: this.acknowledgedLocalChanges,
       commandBase: journalCommandBase(observeJournal(entries)), priorPublications: entries, witnessWork: this.verifiedWitnessWork };
   }
@@ -411,8 +411,8 @@ export class MetadataProjectSession {
     });
   }
 
-  /** Same live text edit only. All new metadata and requested facts are checked normally. */
-  private async projectText(source: ProjectMetadataSource, base: Extract<ProjectProviderRead, { kind: 'scene-provider' }>) {
+  /** Recheck the edited graph against the unchanged media and model requests of its live base. */
+  private async projectRecordEdit(source: ProjectMetadataSource, base: Extract<ProjectProviderRead, { kind: 'scene-provider' }>) {
     const checks = base.inspection.checks;
     const media = new Set(checks.filter(c => c.outcome === 'verified' && c.request.fact === 'media').flatMap(c => c.request.records.map(json)));
     let index = 0;
@@ -492,34 +492,35 @@ export class MetadataProjectSession {
   async edit(expectedToken: string, command: MetadataEdit, editor?: LocalEditorContext): Promise<MetadataSessionRead> {
     editor = captureEditor(editor);
     command = canonicalMetadataEdit(command, this.limits);
-    let acceptText: (() => void) | undefined;
+    let acceptRecord: (() => void) | undefined;
     return underWriteLease(this.fs, async lease => {
-      const isText = command.kind === 'editCaption' && Object.keys(command.edits).every(name => name === 'title' || name === 'body');
-      const textReady = this.last.state === 'ready' && this.acknowledgmentsLoaded && !!this.verifiedPublications && !this.retained;
-      const commit = isText && textReady ? selectedTextCommit(this.fs, this.storage, lease) : undefined;
-      if (commit && command.kind === 'editCaption') {
-        const captionId = command.captionId;
+      const live = isLiveRecordEdit(command) ? command : undefined;
+      const ready = this.last.state === 'ready' && this.acknowledgmentsLoaded && !!this.verifiedPublications && !this.retained;
+      const commit = live && ready ? selectedTextCommit(this.fs, this.storage, lease) : undefined;
+      if (commit && live) {
+        const timing = live.kind === 'editCaption' ? 'text' : live.kind === 'createTag' ? 'tag.create' : 'tag.assign';
         const { candidate, transaction, prepared, projected } = await commit.prepare(async ports => {
           const textChain = this.last.state === 'ready' && this.acknowledgmentsLoaded && !this.retained ? this.verifiedPublications : undefined;
-          await this.measure('text.slot', () => assertReviewEditSlot(ports.fs, this.limits, undefined, undefined, textChain));
-          const candidate = await this.measure('text.base', () => this.readTextCandidate(ports, captionId));
+          await this.measure(`${timing}.slot`, () => assertReviewEditSlot(ports.fs, this.limits, undefined, undefined, textChain));
+          const candidate = await this.measure(`${timing}.base`, () => this.readRecordCandidate(ports, live));
           const { state, source, provider } = candidate.read;
           if (state !== 'ready' || !source || !provider || source.token !== expectedToken || !candidate.commandBase) return fail('command-not-ready');
           if (provider.kind !== 'scene-provider' || provider.token !== source.token) return fail('provider-not-ready');
-          const transactionId = newId(), prepared = await this.measure('text.plan', async () =>
-            source.prepareEdit(expectedToken, command, provider, transactionId, undefined, editor));
+          const transactionId = newId(), prepared = await this.measure(`${timing}.plan`, async () =>
+            source.prepareEdit(expectedToken, live, provider, transactionId, undefined, editor));
           const parts = source.changesForPreparedEdit(prepared);
           if (!parts.length) return { candidate, transaction: null, prepared, projected: provider };
-          if (parts.length !== 1 || command.kind !== 'editCaption') return fail('text-commit-state');
-          source.assertCaptionTextChange(parts[0]!, command.captionId, provider);
-          const projected = await this.measure('text.project', () => this.projectText(prepared, provider));
-          const transaction = { liveText: true as const, start: { transactionId, repositoryId: candidate.commandBase.repositoryId,
+          if (parts.length !== 1) return fail('text-commit-state');
+          if (live.kind === 'editCaption') source.assertCaptionTextChange(parts[0]!, live.captionId, provider);
+          else source.assertTagAddition(parts[0]!, live, provider);
+          const projected = await this.measure(`${timing}.project`, () => this.projectRecordEdit(prepared, provider));
+          const transaction = { liveRecord: true as const, start: { transactionId, repositoryId: candidate.commandBase.repositoryId,
             predecessor: candidate.commandBase.transactionId, purpose: 'localCommand' as const, proof: source.proof, baseHeads: source.heads,
             ...capabilityFields(capabilityUnion(readRequiredCapabilities(candidate.commandBase.requiredCapabilities), prepared.requiredCapabilities)) }, parts };
           return { candidate, transaction, prepared, projected };
         });
         if (!transaction) {
-          acceptText = () => { this.adoptRead(candidate); };
+          acceptRecord = () => { this.adoptRead(candidate); };
           return candidate.read;
         }
         const { priorPublications, localChanges, acknowledged } = candidate;
@@ -527,14 +528,14 @@ export class MetadataProjectSession {
         if (candidate.witnessWork === undefined || candidate.witnessWork + 1 > this.limits.maxWork) return fail('retained-media-limit');
         const { transactionId, repositoryId } = transaction.start;
         return commit.write(transactionId, this.repository.documentId(repositoryId), async ports => {
-          const entries = await this.measure('text.write-base', () => new TransactionJournal(ports.fs, this.limits).entries());
+          const entries = await this.measure(`${timing}.write-base`, () => new TransactionJournal(ports.fs, this.limits).entries());
           if (this.retained || !matchesPublishedBase(entries, priorPublications, 0)) return fail('command-base-changed');
           // Claim the edit only after the fresh on-disk base check succeeds.
           this.adoptRead(candidate);
           this.retained = transaction;
-          const completed = await this.commitLiveText(ports, entries, candidate.read.source!, prepared, projected, captionId, transaction);
+          const completed = await this.commitLiveRecord(ports, entries, candidate.read.source!, prepared, projected, live, transaction);
           const nextLocal = new Set(localChanges).add(completed.hash);
-          acceptText = () => {
+          acceptRecord = () => {
             ports.assertCanAcknowledge();
             if (this.retained !== transaction) return fail('text-commit-state');
             this.retained = null;
@@ -544,7 +545,7 @@ export class MetadataProjectSession {
         });
       }
       await assertReviewEditSlot(this.fs, this.limits);
-      const candidate = isText
+      const candidate = live?.kind === 'editCaption'
         ? await withMetadataRead(this.fs, this.storage, ports => this.readCandidate(undefined, ports, true))
         : undefined;
       const read = candidate ? this.adoptRead(candidate) : await this.read();
@@ -576,7 +577,7 @@ export class MetadataProjectSession {
       if (!transaction) return read;
       this.retained = transaction;
       return this.resume();
-    }, () => acceptText?.());
+    }, () => acceptRecord?.());
   }
 
   private async prepareEditTransaction(durable: ProjectMetadataSource, provider: ProjectProviderRead, prior: JournalCommandBase,
@@ -625,7 +626,7 @@ export class MetadataProjectSession {
   async retry(): Promise<MetadataSessionRead> { return underWriteLease(this.fs, async () => {
     await assertReviewEditSlot(this.fs, this.limits);
     if ((await this.sceneAppendStates()).length) return fail('scene-append-recovery-required');
-    if (this.retained?.liveText) {
+    if (this.retained?.liveRecord) {
       const { start, parts } = this.retained;
       const published = await this.read(true);
       if (published.state !== 'pending' || !published.source || published.provider?.kind !== 'scene-provider')
@@ -1366,9 +1367,9 @@ export class MetadataProjectSession {
     });
   }
 
-  private async commitLiveText(ports: TextCommitPorts, entries: JournalEntry[], base: ProjectMetadataSource,
+  private async commitLiveRecord(ports: TextCommitPorts, entries: JournalEntry[], base: ProjectMetadataSource,
     next: ProjectMetadataSource, provider: Extract<ProjectProviderRead, { kind: 'scene-provider' }>,
-    captionId: string, transaction: { start: JournalStart; parts: Uint8Array[] }) {
+    command: LiveRecordEdit, transaction: { start: JournalStart; parts: Uint8Array[] }) {
     const { fs, factory } = ports, { start, parts } = transaction;
     const journal = new TransactionJournal(fs, this.limits), repository = new MetadataRepository(fs, factory, this.limits);
     const observation = observeJournal(entries), prior = journalCommandBase(observation);
@@ -1381,7 +1382,7 @@ export class MetadataProjectSession {
     const [storedPart] = await journal.validateParts(prepared);
     if (!storedPart || !equalBytes(storedPart, parts[0]!)) return fail('journal-part-source');
     await ports.advance('repository');
-    await this.measure('resume.persist-readback', () => repository.persistText(start.repositoryId, base, next, captionId, storedPart));
+    await this.measure('resume.persist-readback', () => repository.persistRecordEdit(start.repositoryId, base, next, command, storedPart));
     await ports.advance('publication');
     await this.measure('resume.publish', () => journal.publish(prepared, next));
     await ports.advance('readback');

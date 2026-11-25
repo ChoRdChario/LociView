@@ -35,6 +35,33 @@ function field(source: ProjectMetadataSource, name: string) {
 
 const originalBudget = { maxNodes: PACKAGE_LIMITS.inspectionNodes, maxWork: PACKAGE_LIMITS.inspectionWork };
 
+describe('live tag change boundaries', () => {
+  it('requires exactly the planned tag or membership and rejects an additional caption write', async () => {
+    const { source } = create(), provider = await readProjectScene(source.read(), limits, developmentContentVerifier([]));
+    if (provider.kind !== 'scene-provider') throw Error('provider');
+    const createTag = { kind: 'createTag' as const, tagId: id('tag', 8), label: '天蓋', colorSrgb: [0, 0, 1], orderKey: 'B', eventId: id('evt', 8) };
+    const tag = source.prepareEdit(source.token, createTag, provider, 'a'.repeat(32), undefined, { kind: 'self-declared', name: '担当' });
+    const [first] = source.changesForPreparedEdit(tag);
+    expect(() => source.assertTagAddition(first!, createTag, provider)).not.toThrow();
+    expect(() => source.assertTagAddition(first!, { ...createTag, label: '別のタグ' }, provider)).toThrow('tag-change');
+    const tagged = await readProjectScene(tag.read(), limits, developmentContentVerifier([]));
+    if (tagged.kind !== 'scene-provider') throw Error('provider');
+    const assign = { kind: 'setCaptionTag' as const, captionId: id('cap'), tagId: createTag.tagId, membershipId: id('tgm', 8),
+      included: true as const, observedIds: [], eventId: id('evt', 9) };
+    const linked = tag.prepareEdit(tag.token, assign, tagged, 'b'.repeat(32));
+    const [second] = tag.changesForPreparedEdit(linked);
+    expect(() => tag.assertTagAddition(second!, assign, tagged)).not.toThrow();
+    expect(() => tag.assertTagAddition(second!, { ...assign, membershipId: id('tgm', 9) }, tagged)).toThrow('tag-change');
+    const extra = changed(tag, draft => {
+      const record = { id: assign.membershipId, captionId: assign.captionId, tagId: assign.tagId,
+        lifecycle: { state: 'active', reason: 'initial', eventId: assign.eventId } };
+      draft.captionTagMembershipsById[assign.membershipId] = Object.fromEntries(Object.entries(record).map(([key, value]) => [key, new A.ImmutableString(canonical(value))]));
+      draft.captionsById[assign.captionId].body = new A.ImmutableString(canonical('別の更新'));
+    }).at(-1)!;
+    expect(() => tag.assertTagAddition(extra, assign, tagged)).toThrow('tag-change');
+  });
+});
+
 describe('08b editor declarations in original change headers', () => {
   it('preserves exact Unicode and hash-owned declarations without changing actor identity or no-op semantics', async () => {
     const { source } = create(), provider = await readProjectScene(source.read(), limits, developmentContentVerifier([]));

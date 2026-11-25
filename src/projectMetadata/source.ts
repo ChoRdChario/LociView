@@ -10,7 +10,8 @@ import { checkMutableField } from '../domain/projectMutableFields';
 import { immutableKinds, object, same } from '../domain/projectGraphSupport';
 import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import type { ProjectProviderRead } from '../scene/projectProvider';
-import { planMetadataEdit, type MetadataEdit } from './commands';
+import { planMetadataEdit, type MetadataEdit, type LiveRecordEdit, type TagAddition } from './commands';
+export type { LiveRecordEdit } from './commands';
 import { adapterFormatVersion, adapterFormatVersion2, metadataSemanticProfile, checkedChanges, checkedProof, checkLimits, fail, inspectPhysical, inspectPhysicalSource, inspectOriginalSource, originalEntryWitness, scalar, MetadataSourceError,
   type MetadataLimits, type MetadataProof, type PhysicalDoc, type OriginalInspectionBudget } from './format';
 
@@ -112,6 +113,27 @@ export class ProjectMetadataSource {
     }
     planMetadataEdit(provider, { kind: 'editCaption', captionId, edits }, this.limits);
   }
+  /** Validate the one record encoded by a newly prepared live tag command. */
+  assertTagAddition(bytes: Uint8Array, command: TagAddition, provider: Extract<ProjectProviderRead, {kind: 'scene-provider'}>): void {
+    if (provider.token !== this.token) return fail('tag-change');
+    const edits = planMetadataEdit(provider, command, this.limits), record = edits[0];
+    const map = command.kind === 'createTag' ? 'captionTagsById' : 'captionTagMembershipsById';
+    const id = command.kind === 'createTag' ? command.tagId : command.membershipId;
+    if (edits.length !== 1 || !record?.create || record.map !== map || record.id !== id ||
+      Object.keys(projectRecordMaps).some(name => Object.hasOwn(this.doc[name], id))) return fail('tag-change');
+    const change = A.decodeChange(bytes), [make, ...writes] = change.ops;
+    if (!same([...change.deps].sort(), this.heads) || !make || make.action !== 'makeMap' ||
+      make.obj !== A.getObjectId(this.doc[map]) || make.key !== id || make.pred.length || ('insert' in make && make.insert))
+      return fail('tag-change');
+    const objectId = `${change.startOp}@${change.actor}`, fields = new Map(Object.entries(record.fields));
+    for (const op of writes) {
+      if (op.action !== 'set' || op.obj !== objectId || op.pred.length || op.datatype !== undefined || ('insert' in op && op.insert) ||
+        typeof op.key !== 'string' || !fields.has(op.key) || op.value !== String(scalar(fields.get(op.key)!, this.limits))) return fail('tag-change');
+      fields.delete(op.key);
+    }
+    if (fields.size) fail('tag-change');
+  }
+
   /** Finite prepared attachment admission; never a generic pending-edit bypass. */
   assertCaptionAttachmentIntroduction(bytes: Uint8Array, provider: Extract<ProjectProviderRead, {kind: 'scene-provider'}>): JsonObject {
     if (provider.token !== this.token) return fail('restore-destination-not-ready');
@@ -170,7 +192,7 @@ export class ProjectMetadataSource {
   }
   get heads(): string[] { return A.getHeads(this.doc).sort(); }
   /** Internal repository comparison against this already inspected source. */
-  matchesStoredCaption(doc: PhysicalDoc, captionId: string, limits: MetadataLimits): boolean {
+  matchesStoredRecord(doc: PhysicalDoc, command: LiveRecordEdit, limits: MetadataLimits): boolean {
     if (Object.entries(this.limits).some(([key, n]) => n !== limits[key as keyof MetadataLimits]) ||
       A.getMissingDeps(doc, []).length || !same(A.getHeads(doc).sort(), this.heads)) return false;
     const expected = A.getAllChanges(this.doc), actual = A.getAllChanges(doc);
@@ -185,17 +207,27 @@ export class ProjectMetadataSource {
       }
       if (remaining.size) return false;
     }
-    const before = this.doc.captionsById[captionId], after = doc.captionsById?.[captionId];
-    if (!before || !after || A.getObjectId(before) !== A.getObjectId(after)) return false;
-    return ['title', 'body'].every(field => {
-      const left = before[field], right = after[field];
-      if (left !== undefined || right !== undefined) {
-        if (!(left instanceof A.ImmutableString && right instanceof A.ImmutableString) || left.toString() !== right.toString()) return false;
-      }
-      const prior = A.getConflicts(before, field) ?? {}, saved = A.getConflicts(after, field) ?? {};
-      return Object.keys(prior).length === Object.keys(saved).length &&
-        Object.entries(prior).every(([id, value]) => typeof value === 'string' && Object.hasOwn(saved, id) && saved[id] === value);
-    });
+    const matches = (map: string, id: string, fields: string[], allowAbsent = false) => {
+      const before = this.doc[map][id], after = doc[map]?.[id];
+      if (!doc[map] || A.getObjectId(this.doc[map]) !== A.getObjectId(doc[map])) return false;
+      if (before === undefined || after === undefined) return allowAbsent && before === after;
+      if (A.getObjectId(before) !== A.getObjectId(after)) return false;
+      return fields.every(field => {
+        const left = before[field], right = after[field];
+        if (left !== undefined || right !== undefined) {
+          if (!(left instanceof A.ImmutableString && right instanceof A.ImmutableString) || left.toString() !== right.toString()) return false;
+        }
+        const prior = A.getConflicts(before, field) ?? {}, saved = A.getConflicts(after, field) ?? {};
+        return Object.keys(prior).length === Object.keys(saved).length &&
+          Object.entries(prior).every(([operationId, value]) => typeof value === 'string' && Object.hasOwn(saved, operationId) && saved[operationId] === value);
+      });
+    };
+    if (command.kind === 'editCaption') return matches('captionsById', command.captionId, ['title', 'body']);
+    const tagFields = ['id', 'label', 'colorSrgb', 'orderKey', 'lifecycle'];
+    if (command.kind === 'createTag') return matches('captionTagsById', command.tagId, tagFields, true);
+    return matches('captionsById', command.captionId, ['id', 'lifecycle']) &&
+      matches('captionTagsById', command.tagId, tagFields) &&
+      matches('captionTagMembershipsById', command.membershipId, ['id', 'captionId', 'tagId', 'lifecycle'], true);
   }
   originalChanges(): Uint8Array[] { return A.getAllChanges(this.doc).map(b => b.slice()); }
   /** Only for a local edit prepared on this immutable ancestor. */
