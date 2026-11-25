@@ -132,8 +132,15 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     if (!details || reference?.assetId === details.target.assetId || scopeIssueFor(details) || available?.kind !== 'value' || available.value !== 'visible') return;
     setProposal({ target: details.target, placement: details.placement, mode: 'translate', ...(pivot === 'centre' && details.boundsAsset ? { pivotAsset: boundsCentre(details.boundsAsset) } : {}) }); host.changed();
   });
-  const fields = make('div'), labels = ['位置 X', '位置 Y', '位置 Z', '回転 X', '回転 Y', '回転 Z', '倍率'];
+  const fields = make('div');
   fields.className = 'lv-model-transform-values';
+  const placementFields: { parent: HTMLElement; caption: string; name: string }[] = ['位置', '回転'].flatMap(name => {
+    const group = make('fieldset');
+    group.append(make('legend', name));
+    fields.append(group);
+    return ['X', 'Y', 'Z'].map(axis => ({ parent: group, caption: axis, name: `${name} ${axis}` }));
+  });
+  placementFields.push({ parent: fields, caption: '倍率', name: '倍率' });
   let cancelScrub: (() => void) | null = null;
   function updateField(index: number, value: string) {
     if (!edit || host.block('models')) return;
@@ -147,9 +154,9 @@ export function createProjectModels(document: Document, host: ProjectPanelHost):
     } catch { /* Keep incomplete text and the last valid preview. */ }
     host.changed();
   }
-  const inputs = labels.map((text, index) => {
-    const label = make('label'), heading = make('span', text), node = make('input');
-    node.type = 'number'; node.step = 'any'; node.setAttribute('aria-label', text); label.append(heading, node); fields.append(label);
+  const inputs = placementFields.map(({ parent, caption, name }, index) => {
+    const label = make('label'), heading = make('span', caption), node = make('input');
+    node.type = 'number'; node.step = 'any'; node.setAttribute('aria-label', name); label.append(heading, node); parent.append(label);
     node.addEventListener('input', () => updateField(index, node.value));
     node.addEventListener('compositionstart', () => { composing = true; host.changed(); });
     node.addEventListener('compositionend', () => { composing = false; host.changed(); });

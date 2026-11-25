@@ -81,9 +81,13 @@
 .lv-project-body [role="tab"] { flex: 1 0 auto; min-width: 44px; padding: 6px 4px; white-space: nowrap; }
 .lv-project-body [role="tab"][aria-selected="true"] { border-bottom: 3px solid var(--lv-action); background: var(--lv-selected); }
 .lv-project-body .lv-model-transform-values,
+.lv-model-transform-values fieldset,
 .lv-project-body .lv-model-gizmo-modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.lv-model-transform-values fieldset { grid-column: 1 / -1; min-inline-size: 0; margin: 0; padding: 0; border: 0; }
+.lv-model-transform-values legend { padding: 0; margin-bottom: 4px; font-weight: 600; }
 .lv-model-transform-values label { min-width: 0; }
 .lv-model-transform-values label > span { cursor: ew-resize; user-select: none; touch-action: pan-y; border-bottom: 1px dotted var(--lv-line); justify-self: start; }
+.lv-model-transform-values fieldset label > span { justify-self: stretch; }
 .lv-model-gizmo-modes > span { grid-column: 1 / -1; font-weight: 600; }
 .lv-project-body .lv-model-gizmo-modes button { min-width: 0; padding-inline: 3px; }
 .lv-project-body [aria-label="モデルの配置"] h3 { margin: 0; font-size: 1rem; }
