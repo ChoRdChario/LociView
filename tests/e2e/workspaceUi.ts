@@ -151,6 +151,12 @@ export async function revealFileSurface(page: Page, surface: '保存' | '共有'
 
 /** Current share checkbox and the retained fixed-build selector. */
 export async function selectShareOutput(area: Locator, purpose: 'teamWorkspace' | 'contribution' | 'review') {
+  const whole = area.getByRole('checkbox', { name: 'プロジェクト全体を渡す', exact: true });
+  if (await whole.isVisible()) {
+    await whole.setChecked(purpose === 'teamWorkspace');
+    if (purpose !== 'teamWorkspace') await area.getByLabel('出力する内容', { exact: true }).selectOption(purpose);
+    return;
+  }
   const partial = area.getByRole('checkbox', { name: '一部だけ出力', exact: true });
   if (!await partial.isVisible()) {
     await area.getByLabel('渡す内容', { exact: true }).selectOption(purpose);

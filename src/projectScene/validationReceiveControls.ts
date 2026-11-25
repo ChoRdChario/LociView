@@ -22,7 +22,8 @@ export function createValidationReceiveControls(document: Document, host: Return
   labelText.textContent = '更新ファイルを選択'; input.type = 'file'; input.setAttribute('aria-label', '更新ファイルを選択'); label.append(labelText, input);
   submit.type = 'submit'; submit.textContent = '更新を受け取る';
   const clear = document.createElement('button'); clear.type = 'button'; clear.textContent = '選択を取り消す';
-  const help = document.createElement('p'); help.textContent = '同じプロジェクトの作業一式・変更分を統合します。元ファイルは変更しません。';
+  const receiveHelp = '同じプロジェクトで相手が編集したファイルを選びます。手元の変更とまとめます。元のファイルは残ります。';
+  const help = document.createElement('p'); help.textContent = receiveHelp;
   const status = document.createElement('p'), jobs = document.createElement('section'); status.setAttribute('role', 'status');
   status.className = 'lv-operation-status';
   const failureDetails = createFailureDetails(document), restoreDetails = createFailureDetails(document);
@@ -100,7 +101,7 @@ export function createValidationReceiveControls(document: Document, host: Return
     heading.textContent = copyPending ? '編集コピー' : host.workspaceFiles.initialImport ? 'ファイルを開く' : '更新ファイル';
     root.setAttribute('aria-label', heading.textContent);
     help.textContent = copyPending ? '中断したコピー作成を確認してください。元の閲覧用ファイルは変更していません。' : host.workspaceFiles.initialImport ? '読み込み途中のデータは、元のファイルから再開できます。' :
-      '同じプロジェクトの作業一式・変更分を統合します。元ファイルは変更しません。';
+      receiveHelp;
     output.render(); form.inert = busy || output.hasChanges() || restoreChanges(); submit.disabled = busy || otherInput() || output.hasChanges() || restoreChanges() || host.authority.readOnly || !input.files?.length;
     clear.disabled = busy; clear.hidden = !input.files?.length && !selectedJob;
     form.hidden = copyPending && !selectedCopy || !['all','receive'].includes(surface);

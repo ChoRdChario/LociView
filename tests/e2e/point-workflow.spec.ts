@@ -36,7 +36,7 @@ async function download(page: Page, info: TestInfo, name: string, purpose: 'back
   if(compact){if(purpose!=='backup')await selectShareOutput(area, purpose);}
   else if (purpose === 'review') { await area.locator('summary').filter({hasText:/^その他$/}).click(); await area.getByRole('button',{name:'シーンを共有',exact:true}).click(); } else await area.getByRole('button', { name: purpose === 'backup' ? '保存' : '相手に渡す', exact: true }).click();
   if (purpose === 'backup') await area.getByLabel('保存名（任意）', { exact: true }).fill(name);
-  else if (purpose !== 'review') { if(!compact)await selectShareOutput(area, purpose); if (base) await area.getByLabel('元にする作業一式', { exact: true }).selectOption(base); }
+  else if (purpose !== 'review') { if(!compact)await selectShareOutput(area, purpose); if (base) await area.getByLabel('相手と共有したファイル', { exact: true }).selectOption(base); }
   if (purpose === 'review') { await chooseSharedScene(area); await area.getByRole('button',{name:'内容を確認',exact:true}).click(); }
   const primary=area.locator('button.lv-file-primary'); await expect(primary).toHaveText(purpose==='backup'?'ファイルに保存':'ダウンロード',{timeout:180_000}); await expect(primary).toBeEnabled({timeout:180_000});
   const [result] = await Promise.all([page.waitForEvent('download', { timeout: 180_000 }), primary.click()]);

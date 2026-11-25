@@ -92,7 +92,7 @@ test('daily Scene and Caption organization, tags, alignment, settings and files 
     await info.attach('native-media-environment',{body:JSON.stringify({browser:first.context.browser()?.version()??await p.evaluate(()=>navigator.userAgent),nativeHeic,avcAacMp3:'actual initial decode and play time/frame progression passed'},null,2),contentType:'application/json'});
     console.log('daily: original media playback and HEIC capability verified');
     await phase(info, 'media.ready');
-    const tags = p.getByLabel('分類タグ', { exact: true }); await tags.locator(':scope > summary').click(); await tags.locator('.lv-tag-settings > summary').click(); await tags.getByLabel('タグ名', { exact: true }).fill('現地'); await tags.getByRole('button', { name: 'タグを追加', exact: true }).click(); await ready(p, 'タグを保存しました。');
+    const tags = p.getByLabel('分類タグ', { exact: true }); await tags.locator(':scope > summary').click(); await tags.getByRole('checkbox',{name:'この記録に付ける',exact:true}).uncheck(); await tags.getByLabel('タグ名', { exact: true }).fill('現地'); await tags.getByRole('button', { name: 'タグを追加', exact: true }).click(); await ready(p, 'タグを保存しました。');
     await tags.getByRole('button', { name: 'この記録にタグを付ける', exact: true }).click(); await ready(p, '記録のタグを変更しました。');
     await p.getByRole('button', { name: '記録を複製', exact: true }).click(); await ready(p, '記録を複製しました。元の記録は変わりません。');
     await p.getByLabel('タイトル', { exact: true }).fill('複製の記録'); await p.getByLabel('本文', { exact: true }).fill('独立した本文'); await finishCaptionEditing(p, {}, 90_000);

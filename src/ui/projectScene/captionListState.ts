@@ -25,6 +25,8 @@ export interface CaptionListContext {
   readonly source: CaptionListSource;
   readonly memory: SceneUiMemory;
   readonly pending: PendingInteraction | null;
+  /** The active editor already shows the next action beside the input. */
+  readonly pendingExplained?: boolean;
   /** Local owner reveal may retain an ordinary text draft; other operations keep pending. */
   readonly showModelPending?: PendingInteraction | null;
   /** Host's reason that shared edits are unavailable. Local finding still works. */

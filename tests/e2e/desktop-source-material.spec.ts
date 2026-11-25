@@ -31,7 +31,7 @@ async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWor
   else if(purpose==='review'){const more=area.locator('summary').filter({hasText:/^その他$/});if(!await more.evaluate(n=>(n.parentElement as HTMLDetailsElement).open))await more.click();await area.getByRole('button',{name:'シーンを共有',exact:true}).click();}
   else await area.getByRole('button',{name:purpose==='backup'?'保存':'相手に渡す',exact:true}).click();
   if(purpose==='backup')await area.getByLabel('保存名（任意）',{exact:true}).fill(name);
-  else if(purpose!=='review'){if(!compact)await selectShareOutput(area, purpose);if(base)await area.getByLabel('元にする作業一式',{exact:true}).selectOption(base);}
+  else if(purpose!=='review'){if(!compact)await selectShareOutput(area, purpose);if(base)await area.getByLabel('相手と共有したファイル',{exact:true}).selectOption(base);}
   if(purpose==='review'){await chooseSharedScene(area);}
   if(purpose==='review')await area.getByRole('button',{name:'内容を確認',exact:true}).click();
   const primary=area.locator('button.lv-file-primary');await expect(primary).toBeEnabled({timeout:300000});const [download]=await Promise.all([p.waitForEvent('download',{timeout:300000}),primary.click()]);const path=info.outputPath(name+'.zip');await download.saveAs(path);expect(await download.failure()).toBeNull();await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy','false',{timeout:300000});await closeFileSurface(p);return path;

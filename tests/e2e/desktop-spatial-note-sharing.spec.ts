@@ -24,6 +24,12 @@ const tab = (page: Page, name: string) => page.getByRole('tab', { name, ...exact
 const detail = (page: Page) => page.getByRole('region', { name: '記録の詳細', ...exact });
 const status = (page: Page, text: string) => expect(page.getByText(text, exact)).toBeVisible();
 
+async function expectOnlyPlacementModel(task: Locator) {
+  const target = task.getByLabel('記録するモデル', exact);
+  await expect(target).toBeHidden();
+  await expect(target.locator('option:checked')).toHaveText('外板.ply');
+}
+
 async function checkPinTouchNavigation(page: Page, pin: Locator, canvasFirst: boolean) {
   await expect(pin).toBeInViewport();
   const contacts = await pin.evaluate(node => {
@@ -130,8 +136,7 @@ for (const touch of [false, true])
         await action(page, '新規ピンを追加').click();
         const task = page.getByRole('region', { name: '位置の調整', ...exact });
         if (kind === 'GS') {
-          const target = task.getByLabel('記録するモデル', exact);
-          await target.selectOption({ label: '外板.ply' });
+          await expectOnlyPlacementModel(task);
           await expect(action(page, '座標を入力')).toBeVisible();
           // Numeric placement works without a proxy. Cancel leaves an empty list.
           await action(page, '座標を入力').click();
@@ -141,7 +146,7 @@ for (const touch of [false, true])
           await task.getByRole('button', { name: '取り消す', ...exact }).click();
           await expect(page.locator('.lv-caption-select')).toHaveCount(0);
           await action(page, '新規ピンを追加').click();
-          await target.selectOption({ label: '外板.ply' });
+          await expectOnlyPlacementModel(task);
           const pick = page.waitForEvent('filechooser');
           await action(page, 'ピン配置用モデルを選ぶ').click();
           await (await pick).setFiles({ name: '部位.glb', mimeType: 'model/gltf-binary', buffer: triangleGlb() });
@@ -176,10 +181,9 @@ for (const touch of [false, true])
         await checkPhoto(page);
         const tags = page.getByLabel('分類タグ', exact); await tags.locator(':scope > summary').click();
         const tagSettings = tags.locator('.lv-tag-settings'); await expect(tagSettings).not.toHaveAttribute('open');
-        await tagSettings.locator(':scope > summary').click();
-        await tagSettings.getByLabel('タグ名', exact).fill('監修');
-        await tagSettings.getByRole('button', { name: 'タグを追加', ...exact }).click(); await status(page, 'タグを保存しました。');
-        await tagSettings.locator(':scope > summary').click();
+        await tags.getByRole('checkbox',{name:'この記録に付ける',exact:true}).uncheck();
+        await tags.getByLabel('タグ名', exact).fill('監修');
+        await tags.getByRole('button', { name: 'タグを追加', ...exact }).click(); await status(page, 'タグを保存しました。');
         await tags.getByRole('button', { name: 'この記録にタグを付ける', ...exact }).click(); await status(page, '記録のタグを変更しました。');
         await expect(tags.getByRole('button', { name: 'タグを削除', ...exact })).toBeHidden();
         await tags.locator(':scope > summary').click();
@@ -643,7 +647,7 @@ test('配置用モデルのないGSに座標で記録し、再開して元の位
   await expect(action(page, '閲覧する')).toBeEnabled({ timeout: 90000 });
   await action(page, '新規ピンを追加').click();
   const task = page.getByRole('region', { name: '位置の調整', ...exact });
-  await task.getByLabel('記録するモデル', exact).selectOption({ label: '外板.ply' });
+  await expectOnlyPlacementModel(task);
   await action(page, '座標を入力').click();
   const position = ['0.25', '0.5', '0'];
   for (const [index, axis] of ['X', 'Y', 'Z'].entries())

@@ -43,7 +43,7 @@ async function output(p: Page, info: TestInfo, label: string, purpose: 'backup' 
     const more = area.locator('.lv-file-intents > details'); if (!await more.evaluate(n => (n as HTMLDetailsElement).open)) await more.locator('summary').click();
     await more.getByRole('button', { name: 'シーンを共有', exact: true }).click();
   } else await selectShareOutput(area, purpose);
-  if (purpose === 'contribution') await area.getByLabel('元にする作業一式', { exact: true }).selectOption(base!);
+  if (purpose === 'contribution') await area.getByLabel('相手と共有したファイル', { exact: true }).selectOption(base!);
   if (purpose === 'review') { await chooseSharedScene(area); }
   const primary = area.locator('button.lv-file-primary');
   if (purpose === 'review') { await primary.click(); await expect(primary).toHaveText('ダウンロード'); }

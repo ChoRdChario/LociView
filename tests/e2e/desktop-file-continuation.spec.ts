@@ -117,7 +117,7 @@ test('PC Caption work continues after empty tag focus and cancelled file checks,
     await settings.locator(':scope > summary').click(); await expect(help).not.toHaveAttribute('open');
     await expect(settings.getByLabel('このブラウザの表示名', { exact: true })).toHaveValue('入力中の表示名');
     await settings.getByRole('button', { name: '表示名の入力を取り消す', exact: true }).click(); await settings.locator(':scope > summary').click(); await workspaceFits(page);
-    const tags = page.getByLabel('分類タグ', { exact: true }); await tags.locator(':scope > summary').click(); await tags.locator('.lv-tag-settings > summary').click();
+    const tags = page.getByLabel('分類タグ', { exact: true }); await tags.locator(':scope > summary').click(); await tags.getByRole('checkbox',{name:'この記録に付ける',exact:true}).uncheck();
     await tags.getByLabel('タグ名', { exact: true }).focus(); await page.keyboard.press('Tab'); await page.keyboard.press('Tab');
     await expect(tags.getByRole('button', { name: 'タグの入力を取り消す', exact: true })).toBeHidden();
     await expect(page.locator('details.lv-project-files').getByRole('button', { name: 'プロジェクトを選ぶ', exact: true, includeHidden: true })).toBeEnabled();

@@ -54,7 +54,7 @@ for (const touch of [false, true]) test(`autosaved text and photos survive file 
     const firstPicker=page.waitForEvent('filechooser');await page.getByRole('button',{name:'ファイルを開く',exact:true}).click();
     await (await firstPicker).setFiles(sample);
     await expect(page.getByText(sample.name, { exact: true })).toBeVisible();
-    await expect(page.getByText('3Dモデル・点群から新規作成、保存したファイルから再開できます。', { exact: true })).toBeHidden();
+    await expect(page.getByText('3Dデータから記録を始めるか、保存したファイルで続きを開けます。', { exact: true })).toBeHidden();
     await page.getByRole('textbox', { name: 'プロジェクト名', exact: true }).fill('操作の継続'); await page.getByRole('button', { name: 'プロジェクトを作成', exact: true }).click();
     const stage = page.getByRole('button', { name: '3D', exact: true });
     if (touch) { await expect(stage).toBeVisible(); if (await stage.getAttribute('aria-pressed') !== 'true') await stage.click(); }
@@ -137,7 +137,7 @@ for (const touch of [false, true]) test(`autosaved text and photos survive file 
     await nativeBody.press('Control+z');await expect(nativeBody).toHaveValue('元のバックアップ本文');
     await finishCaptionEditing(page,{body:'元のバックアップ本文'});
     await expect(detail.getByLabel('本文', { exact: true })).toBeFocused();
-    await expect(page.getByLabel('バックアップの状態', { exact: true }).locator(':scope > span').first()).toHaveText('このブラウザでは未作成');
+    await expect(page.getByLabel('バックアップの状態', { exact: true }).locator(':scope > span').first()).toHaveText('このブラウザでの作成記録なし');
     const rowEdit = page.locator('.lv-caption-row').first().getByRole('button', { name: '編集', exact: true, includeHidden: true });
     const rowDescription = await rowEdit.getAttribute('aria-describedby'); expect(rowDescription).toBeTruthy();
     await expect(page.locator('#' + rowDescription)).toHaveText('再開時の記録');

@@ -15,15 +15,15 @@ export function createValidationOutputControls(document: Document, host: ReturnT
   select.type = 'file'; select.setAttribute('aria-label', '保存したファイルを選択'); select.hidden = true;
   const nameField = document.createElement('label'), nameInput = document.createElement('input');
   nameField.textContent = '保存名（任意）'; nameInput.type = 'text'; nameInput.setAttribute('aria-label', '保存名（任意）'); nameField.append(nameInput);
-  const shareOptions = document.createElement('div'), partialLabel = document.createElement('label'), partial = document.createElement('input'), partialText = document.createElement('span');
+  const shareOptions = document.createElement('div'), wholeProjectLabel = document.createElement('label'), wholeProject = document.createElement('input'), wholeProjectText = document.createElement('span');
   const scopeLabel = document.createElement('label'), scope = document.createElement('select');
-  shareOptions.className = 'lv-share-scope'; partialLabel.className = 'lv-share-partial';
-  partial.type = 'checkbox'; partialText.textContent = '一部だけ出力'; partial.setAttribute('aria-label', partialText.textContent); partialLabel.append(partial, partialText);
+  shareOptions.className = 'lv-share-scope'; wholeProjectLabel.className = 'lv-share-whole-project';
+  wholeProject.type = 'checkbox'; wholeProjectText.textContent = 'プロジェクト全体を渡す'; wholeProject.setAttribute('aria-label', wholeProjectText.textContent); wholeProjectLabel.append(wholeProject, wholeProjectText);
   scopeLabel.textContent = '出力する内容'; scope.setAttribute('aria-label', '出力する内容'); scopeLabel.append(scope);
   for (const [value, text] of [['review', 'シーン'], ['contribution', '共有後の変更']] as const) {
     const option = document.createElement('option'); option.value = value; option.textContent = text; scope.append(option);
   }
-  shareOptions.append(partialLabel, scopeLabel);
+  shareOptions.append(wholeProjectLabel, scopeLabel);
   const history = document.createElement('details'), historyTitle = document.createElement('summary'), completedFiles = document.createElement('div');
   const primary = document.createElement('button'); primary.type = 'button'; primary.className = 'lv-file-primary'; editOnly(primary); commands.append(primary);
   const scopeHint = document.createElement('span'); scopeHint.id = `lv-share-hint-${crypto.randomUUID()}`;
@@ -119,7 +119,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     try { a.click(); } finally { a.remove(); }
     return a.download;
   };
-  const handoffMessage = () => `${lastHandoff?.name ?? ''} のダウンロードを開始しました。保存先で完了を確認してください。`;
+  const handoffMessage = () => `作成済みの「${lastHandoff?.name ?? ''}」のダウンロードを開始しました。完了はブラウザのダウンロード一覧で確認できます。`;
   type PerformOptions = {
     writes?: boolean;
     completed?: () => void;
@@ -222,8 +222,8 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     root.dataset.presentation = presentation; heading.hidden=!!viewing;heading.textContent=viewing?'':presentation === 'save' ? '保存' : presentation === 'share' ? '共有' : 'ファイル';
     const choicesDisabled = busy || composing || otherBusy() || !!host.authority.readOnly || !!selected || !!cancellation;
     shareOptions.hidden = presentation !== 'share';
-    partial.checked = purpose === 'review' || purpose === 'contribution'; partial.disabled = choicesDisabled;
-    scopeLabel.hidden = !partial.checked; scope.value = purpose === 'contribution' ? 'contribution' : 'review'; scope.disabled = choicesDisabled;
+    wholeProject.checked = purpose === 'teamWorkspace'; wholeProject.disabled = choicesDisabled;
+    scopeLabel.hidden = wholeProject.checked; scope.value = purpose === 'contribution' ? 'contribution' : 'review'; scope.disabled = choicesDisabled;
     if (presentation === 'all') {
     const save = button(actions, '保存', () => choosePurpose('backup'));
     save.setAttribute('aria-pressed', String(purpose === 'backup'));
@@ -324,7 +324,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     }
     if (purpose === 'contribution') {
       const label = document.createElement('label'), base = document.createElement('select'), empty = document.createElement('option');
-      label.textContent = '元にする作業一式'; base.setAttribute('aria-label', '元にする作業一式');
+      label.textContent = '相手と共有したファイル'; base.setAttribute('aria-label', '相手と共有したファイル');
       empty.value = ''; empty.textContent = '選択してください'; base.append(empty);
       for (const choice of host.workspaceOutput.bases) {
         const option = document.createElement('option'); option.value = choice.selection.workspacePackageId; option.textContent = choice.label; base.append(option);
@@ -333,7 +333,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
       base.addEventListener('change', () => { if (!base.disabled) { baseId = base.value; autoBase = false; refreshChoice(base); } });
       if (!chosen) {
         const help = document.createElement('p'); help.textContent = host.workspaceOutput.bases.length ?
-          '相手と共有した作業一式を選択してください。' : '先に作業一式を受け取るか、作成してください。'; actions.append(help);
+          '変更を返す相手と共有したファイルを選んでください。' : '先に、相手からプロジェクト全体を受け取るか、相手に渡してください。'; actions.append(help);
       }
     }
     const create = primary;
@@ -362,7 +362,7 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     } else create.removeAttribute('aria-describedby');
     create.className = 'lv-file-primary';
     if (choicePending) button(commands, '選択を取り消す', () => {
-      resetChoice(); feedback = ''; completedFeedback = false; render(); changed(); if (presentation === 'share') partial.focus();
+      resetChoice(); feedback = ''; completedFeedback = false; render(); changed(); if (presentation === 'share') wholeProject.focus();
     });
     status.dataset.busy = String(busy);
     const diagnostic=host.workspaceOutput.error;
@@ -433,11 +433,11 @@ export function createValidationOutputControls(document: Document, host: ReturnT
     selected = null; select.value = ''; render(); changed();
   }
   select.addEventListener('cancel', cancelFileSelection);
-  partial.addEventListener('change', () => {
-    if (presentation === 'share' && !partial.disabled) choosePurpose(partial.checked ? 'review' : 'teamWorkspace', partial.checked);
+  wholeProject.addEventListener('change', () => {
+    if (presentation === 'share' && !wholeProject.disabled) choosePurpose(wholeProject.checked ? 'teamWorkspace' : 'review', !wholeProject.checked);
   });
   scope.addEventListener('change', () => {
-    if (presentation === 'share' && partial.checked && !scope.disabled && (scope.value === 'review' || scope.value === 'contribution')) choosePurpose(scope.value);
+    if (presentation === 'share' && !wholeProject.checked && !scope.disabled && (scope.value === 'review' || scope.value === 'contribution')) choosePurpose(scope.value);
   });
   select.addEventListener('change', () => {
     const id = selected, file = select.files?.[0];

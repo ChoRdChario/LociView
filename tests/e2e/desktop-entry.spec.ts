@@ -25,6 +25,12 @@ for(const touch of [false,true])test(`Home sample follows normal inspection, sav
   const row=page.locator('.lv-caption-select').filter({hasText:'パネルの傷'});await expect(row).toHaveCount(1);await expect(row).toHaveAccessibleDescription(/右側に細い傷/);await search.fill('');
   if(touch){await page.setViewportSize({width:320,height:568});await expect(search).toBeInViewport();expect((await search.boundingBox())!.width).toBeGreaterThan(250);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);await page.screenshot({path:info.outputPath('sample-list-320.png')});await page.setViewportSize({width:390,height:844});}
   await row.click();const detail=page.getByRole('region',{name:'記録の詳細',exact:true});
+  const tags=detail.getByLabel('分類タグ',{exact:true}),tagText='現地で再確認';
+  await tags.locator(':scope > summary').click();
+  await expect(tags.getByRole('checkbox',{name:'この記録に付ける',exact:true})).toBeChecked();
+  const tagName=tags.getByLabel('タグ名',{exact:true});await tagName.fill(tagText);await tagName.press('Enter');
+  await expect(tags.locator('.lv-caption-tag').filter({hasText:tagText})).toHaveAttribute('data-included','true');
+  await tags.locator(':scope > summary').click();
   await page.getByRole('button',{name:'画像を表示',exact:true}).locator('visible=true').first().click();const viewer=page.getByRole('dialog',{name:'メディアビューア',exact:true});
   await expect.poll(()=>viewer.locator('img').evaluate((node:HTMLImageElement)=>node.naturalWidth)).toBe(320);
   await expect(viewer.getByRole('button',{name:'倍率 100%',exact:true})).toHaveCount(0);await viewer.getByRole('button',{name:'閉じる',exact:true}).click();
@@ -41,6 +47,8 @@ for(const touch of [false,true])test(`Home sample follows normal inspection, sav
   const restored=await recipient.newPage();restored.on('pageerror',e=>errors.push(e.message));await restored.goto(server.url);await chooseHomeFiles(restored,file);await restored.getByRole('button',{name:'このファイルから再開',exact:true}).click();
   await expect(restored.getByRole('button',{name:'閲覧する',exact:true})).toBeEnabled({timeout:90000});await revealCaptionList(restored);await restored.locator('.lv-caption-select').filter({hasText:'パネルの傷'}).click();await expect(restored.getByRole('region',{name:'記録の詳細',exact:true}).getByLabel('本文',{exact:true})).toHaveValue(body);
   await restored.reload();await expect(restored.getByRole('button',{name:'閲覧する',exact:true})).toBeEnabled({timeout:90000});
+  await revealCaptionList(restored);await restored.getByRole('searchbox',{name:'検索',exact:true}).fill(tagText);
+  await expect(restored.locator('.lv-caption-select')).toHaveText(/パネルの傷/);
   await revealProjectSelection(page);await page.getByRole('button',{name:'プロジェクトを選ぶ',exact:true}).click();await sample.click();await expect(page.getByRole('button',{name:'閲覧する',exact:true})).toBeEnabled({timeout:90000});
   expect(await page.evaluate(()=>new URL(location.href).searchParams.get('run'))).not.toBe(firstProject);expect(errors).toEqual([]);expect(remote).toEqual([]);
  }finally{await recipient.close();await context.close();await server.stop();}

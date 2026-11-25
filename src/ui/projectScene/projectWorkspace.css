@@ -352,6 +352,9 @@
 .lv-caption-browser-compact .lv-caption-search input { width: 100%; }
 .lv-caption-browser-compact .lv-caption-count { margin: 0 0 10px; white-space: nowrap; font-size: 12px; }
 .lv-project-body .lv-caption-task .lv-caption-list { flex: 1 1 0; height: 0; min-height: 44px; max-height: none; overflow-y: auto; margin-block: 0; }
+@media (max-height: 640px) {
+  .lv-project-workspace[data-mobile-layout="true"] .lv-caption-task[data-mobile-surface="list"] .lv-caption-list { min-height: 88px; }
+}
 .lv-caption-list-tools { flex: 0 0 auto; }
 .lv-record-tools, .lv-project-workspace .lv-pin-add-row { display: flex; align-items: start; flex-wrap: wrap; gap: 4px; }
 .lv-record-tools > details { flex: 1 1 auto; }
@@ -562,6 +565,11 @@
 :is(.lv-project-shell .lv-project-workspace, .lv-development.lv-review-workspace) button.lv-stage-search:is(:hover,:active):not(:disabled) { background: var(--lv-action-hover); color: var(--lv-field); }
 :is(.lv-project-workspace, .lv-review-workspace) button.lv-stage-search:focus-visible { outline: 2px solid var(--lv-field); outline-offset: 0; box-shadow: 0 0 0 4px var(--lv-ink); }
 .lv-tag-settings { margin-top: 12px; border-top: 1px solid var(--lv-rule); padding-top: 8px; }
+.lv-tag-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 4px 8px; }
+.lv-tag-form input:not([type="checkbox"]) { max-width: 100%; box-sizing: border-box; }
+.lv-tag-form > .lv-tag-attach { display: flex; align-items: center; gap: 6px; min-height: 44px; }
+.lv-caption-detail .lv-tag-attach > input[type="checkbox"] { width: 18px; height: 18px; min-height: 0; margin: 0; padding: 0; flex: none; }
+.lv-tag-form > p { grid-column: 1 / -1; }
 .lv-tag-definition { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding-block: 8px; }
 .lv-tag-definition > span:first-child { flex: 1 0 100%; overflow-wrap: anywhere; }
 :is(.lv-project-workspace, .lv-review-workspace) button.lv-stage-search:disabled { opacity: 1; background: var(--lv-hover); color: var(--lv-muted); }

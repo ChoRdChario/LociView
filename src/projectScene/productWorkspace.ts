@@ -157,6 +157,8 @@ export function createProductWorkspace(document: Document, host: Host, factory: 
     for(const [surface,tab] of fileTabs){tab.setAttribute('aria-selected',String(surface===selectedSurface));tab.tabIndex=surface===selectedSurface?0:-1;if(surface===selectedSurface)fileContent.setAttribute('aria-labelledby',tab.id);}
     if(host.mode!.current==='view'){fileContent.removeAttribute('aria-labelledby');fileContent.setAttribute('aria-label','作成したファイル');}else fileContent.removeAttribute('aria-label');
     tools?.render(); mode.textContent = switching ? '切替中…' : host.mode!.current === 'view' ? '編集する' : '閲覧する';
+    mode.title = host.mode!.current === 'view' ? '本文やピンを編集できます。' : '編集ボタンを隠して、3Dと記録を見ます。';
+    mode.setAttribute('aria-description', mode.title);
     mode.className=[host.mode!.current==='view'?'lv-workspace-primary':'', switching?'lv-mode-switching':''].filter(Boolean).join(' ');
     mode.setAttribute('aria-busy', String(switching));
     mode.disabled = switching || retiringCore || !!navigation?.presentation?.() || !!core?.inputPending()&&!core.canFlushCaption() || !!startup?.hasChanges() || !!tools?.hasChanges();

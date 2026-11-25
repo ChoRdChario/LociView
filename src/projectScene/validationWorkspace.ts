@@ -102,10 +102,15 @@ export function createValidationWorkspace(document: Document, ports: ValidationW
   const workspaceForm = document.createElement('form'), workspaceLabel = document.createElement('label'), workspaceInput = document.createElement('input'), openFile = document.createElement('button');
   workspaceForm.className = 'lv-home-picker';
   workspaceLabel.hidden = true; workspaceLabel.textContent = 'ファイルを選択'; workspaceInput.type = 'file'; workspaceInput.multiple = true; workspaceInput.setAttribute('aria-label', 'ファイルを選択'); workspaceLabel.append(workspaceInput);
-  const fileHelp = document.createElement('p'); fileHelp.textContent = '3Dモデル・点群から新規作成、保存したファイルから再開できます。';
+  const fileHelp = document.createElement('p'); fileHelp.textContent = '3Dデータから記録を始めるか、保存したファイルで続きを開けます。';
   openFile.type = 'button'; openFile.textContent = 'ファイルを開く'; workspaceForm.append(openFile, workspaceLabel, fileHelp);
   const pickedName = document.createElement('p'); pickedName.className = 'lv-picked-name'; pickedName.hidden = true;
-  const sample = document.createElement('button'); sample.type = 'button'; sample.textContent = 'サンプルで試す'; sample.hidden = !ports.sampleFiles; workspaceForm.append(sample);
+  const sample = document.createElement('button'); sample.type = 'button'; sample.className = 'lv-home-sample';
+  const example = document.createElement('span'); example.className = 'lv-home-sample-preview'; example.setAttribute('aria-hidden', 'true');
+  const pinTitle = document.createElement('span'); pinTitle.textContent = 'パネルの傷'; example.append(pinTitle);
+  const sampleAction = document.createElement('span'); sampleAction.textContent = 'サンプルで試す'; sample.append(example, sampleAction);
+  sample.setAttribute('aria-label', 'サンプルで試す'); sample.setAttribute('aria-description', 'ピンと記録の付いた見本を開きます。');
+  sample.hidden = !ports.sampleFiles; workspaceForm.insertBefore(sample, fileHelp);
   const importPanel = document.createElement('section'), importNote = document.createElement('p');
   const importConfirm = document.createElement('button'), importCancel = document.createElement('button');
   importPanel.className = 'lv-update-destination'; importPanel.setAttribute('aria-label', '取り込み先'); importPanel.hidden = true;

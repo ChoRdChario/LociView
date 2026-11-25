@@ -13,7 +13,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
   const root = make('section'); root.className = 'lv-caption-browser'; root.setAttribute('aria-label', '記録');
   const filters = make('div'); filters.className = 'lv-caption-search';
   const searchLabel = make('label', '検索'), search = make('input');
-  search.type = 'search'; search.placeholder = '記録を検索'; search.title = 'このシーンのタイトル・本文・タグを検索'; search.setAttribute('aria-label', '検索');
+  search.type = 'search'; search.placeholder = 'タイトル・本文・タグ'; search.title = 'このシーンのタイトル・本文・タグを検索'; search.setAttribute('aria-label', '検索');
   search.id = `lv-caption-search-${crypto.randomUUID()}`;
   searchLabel.append(search);
   filters.append(searchLabel);
@@ -264,7 +264,7 @@ export function createCaptionListControls(document: Document, onPlan: (plan: Cap
     const selectionMessage = next.memory.selectedCaptionId === null ? '' : !view.selected
       ? '選択した記録はこのシーンにありません。別の項目を選択してください。'
       : !view.selectionVisible ? '選択した記録は絞り込みで非表示です。' : '';
-    status.textContent = [view.issue, sceneSwitchReason(next.pending), !view.issue && selectionMessage].filter(Boolean).join(' ');
+    status.textContent = [view.issue, !next.pendingExplained && sceneSwitchReason(next.pending), !view.issue && selectionMessage].filter(Boolean).join(' ');
     status.hidden = !status.textContent;
     reveal.hidden = !view.selected || view.selectionVisible || Boolean(view.issue);
     count.textContent = view.issue ? '' : `${view.rows.length} / ${view.total}件`;

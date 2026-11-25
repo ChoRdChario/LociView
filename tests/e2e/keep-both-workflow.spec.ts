@@ -45,7 +45,7 @@ async function download(page: Page, info: TestInfo, name: string, purpose: 'back
   await area.getByRole('button', { name: purpose === 'backup' ? '保存' : '相手に渡す', exact: true }).click();
   if (purpose === 'backup') await area.getByLabel('保存名（任意）', { exact: true }).fill(name);
   else { await area.getByLabel('渡す内容', { exact: true }).selectOption(purpose);
-    if (purpose === 'contribution') { expect(base).toBeTruthy(); await area.getByLabel('元にする作業一式', { exact: true }).selectOption(base!); await expect(area.getByLabel('元にする作業一式', { exact: true })).toHaveValue(base!); } }
+    if (purpose === 'contribution') { expect(base).toBeTruthy(); await area.getByLabel('相手と共有したファイル', { exact: true }).selectOption(base!); await expect(area.getByLabel('相手と共有したファイル', { exact: true })).toHaveValue(base!); } }
   const [file] = await Promise.all([page.waitForEvent('download', { timeout: fileTimeout }), area.getByRole('button', { name: purpose === 'backup' ? 'ファイルに保存' : 'ダウンロード', exact: true }).click()]);
   const path = info.outputPath(`${name}.zip`); await file.saveAs(path); expect(await file.failure()).toBeNull();
   await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy', 'false', { timeout: fileTimeout }); return path;

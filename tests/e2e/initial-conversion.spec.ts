@@ -125,7 +125,7 @@ for (const lane of lanes) test(`${lane.kind}ファイルを内容確認して変
       };
       const share=async(p:Page,name:string,purpose:'teamWorkspace'|'contribution',base?:string)=>{
         const area=p.getByRole('region',{name:'ファイル',exact:true});await area.getByRole('button',{name:'相手に渡す',exact:true}).click();
-        await area.getByLabel('渡す内容',{exact:true}).selectOption(purpose);if(base)await area.getByLabel('元にする作業一式',{exact:true}).selectOption(base);
+        await area.getByLabel('渡す内容',{exact:true}).selectOption(purpose);if(base)await area.getByLabel('相手と共有したファイル',{exact:true}).selectOption(base);
         const [result]=await Promise.all([p.waitForEvent('download',{timeout:180_000}),area.getByRole('button',{name:'ダウンロード',exact:true}).click()]);
         const path=info.outputPath(`${name}.zip`);await result.saveAs(path);expect(await result.failure()).toBeNull();await expect(area.locator('.lv-operation-status')).toHaveAttribute('data-busy','false',{timeout:180_000});return path;
       };

@@ -54,8 +54,8 @@ async function download(page: Page, testInfo: TestInfo, name: string, purpose: '
     await area.getByLabel('渡す内容', { exact: true }).selectOption(purpose);
     if (purpose === 'contribution') {
       expect(base).toBeTruthy();
-      await area.getByLabel('元にする作業一式', { exact: true }).selectOption(base!);
-      await expect(area.getByLabel('元にする作業一式', { exact: true })).toHaveValue(base!);
+      await area.getByLabel('相手と共有したファイル', { exact: true }).selectOption(base!);
+      await expect(area.getByLabel('相手と共有したファイル', { exact: true })).toHaveValue(base!);
     }
   }
   const [result] = await Promise.all([

@@ -36,7 +36,7 @@ async function output(p:Page,info:TestInfo,name:string,purpose:'backup'|'teamWor
     await area.getByRole('button',{name:'シーンを共有',exact:true}).click();
   }else await area.getByRole('button',{name:purpose==='backup'?'保存':'相手に渡す',exact:true}).click();
   if(purpose==='backup')await area.getByLabel('保存名（任意）',{exact:true}).fill(name);
-  else if(purpose!=='review'){if(!compact)await selectShareOutput(area, purpose);if(base)await area.getByLabel('元にする作業一式',{exact:true}).selectOption(base);}
+  else if(purpose!=='review'){if(!compact)await selectShareOutput(area, purpose);if(base)await area.getByLabel('相手と共有したファイル',{exact:true}).selectOption(base);}
   if(purpose==='review'){await chooseSharedScene(area,reviewScene);}
   if(purpose==='review')await area.getByRole('button',{name:'内容を確認',exact:true}).click();
   const primary=area.locator('button.lv-file-primary');await expect(primary).toBeEnabled({timeout:300000});
