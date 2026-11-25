@@ -648,7 +648,7 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     if (id && !locatePin.hidden && !locatePin.disabled && canLocatePin(id))
       showPinLocation(id, false, locatePin.textContent === '全体表示');
   });
-  locatePin.className = 'lv-caption-locate'; locatePin.hidden = true;
+  locatePin.className = 'lv-locate-pin'; locatePin.hidden = true;
   const captionBack = button('一覧へ戻る', () => {
     captionSurface = 'list'; render(); list.focusSelection();
   });
@@ -781,8 +781,9 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
   document.addEventListener?.('pointerdown',closeRecordSheets,true);
   document.addEventListener?.('focusin',closeRecordSheets);
   const captionContent=make('div');captionContent.className='lv-caption-content';
-  const captionHeading=make('div');captionHeading.className='lv-caption-heading';captionHeading.append(detailHeading,captionNavigation);
-  detail.mediaSlot.append(media);captionContent.append(captionHeading, locatePin);
+  const captionSubject = make('div'); captionSubject.className = 'lv-caption-subject'; captionSubject.append(detailHeading, locatePin);
+  const captionHeading=make('div');captionHeading.className='lv-caption-heading';captionHeading.append(captionSubject,captionNavigation);
+  detail.mediaSlot.append(media);captionContent.append(captionHeading);
   for(const child of Array.from(detail.root.children))if(child!==detail.actions&&child!==detail.confirmation)captionContent.append(child);
   captionContent.append(conflicts);detail.root.append(captionContent,detail.actions,detail.confirmation);detailPane.append(detail.root);
   const sidebarToolbar=make('div');sidebarToolbar.className='lv-sidebar-toolbar';sidebarToolbar.append(sceneArea,taskTabs);
@@ -1446,7 +1447,15 @@ export function createProjectWorkspace(document: Document, ports: ProjectWorkspa
     const show = !!viewport.revealPin && (compactRecord || !!pin && (!pin.visible || windows.coversPin(pin)));
     if (locatePin.hidden === show) locatePin.hidden = !show;
     const label = pin?.depthVisible === false ? '全体表示' : 'この位置を表示';
-    if (show && label !== locatePin.textContent) locatePin.textContent = label;
+    if (!show) return;
+    if (label !== locatePin.textContent) locatePin.textContent = label;
+    const windowBody = pin && !compactRecord && !windows.root.hidden ? windows.windowContent(pin.id) : undefined;
+    const card = windowBody?.parentElement;
+    if (windowBody && card?.dataset.active === 'true') {
+      if (locatePin.parentElement !== card) card.insertBefore(locatePin, windowBody);
+    } else if (locatePin.parentElement !== captionSubject) {
+      captionSubject.append(locatePin);
+    }
   }
   function paintViewportPresentation(frame:WorkspaceViewportPresentation):boolean {
     const baseline=overlayBaseline;

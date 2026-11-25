@@ -184,7 +184,7 @@ test('PC Caption work continues after empty tag focus and cancelled file checks,
     await restore.getByLabel('バックアップを選択', { exact: true }).setInputFiles(backup); await restore.getByRole('button', { name: '内容を確認', exact: true }).click();
     await expect(restore.getByRole('button', { name: 'このバックアップから復元', exact: true })).toBeEnabled({ timeout: 90_000 });
     await page.emulateMedia({ reducedMotion: 'reduce' }); await holdDigest(page); await restore.getByRole('button', { name: 'このバックアップから復元', exact: true }).click();
-    const restoreStatus = restore.locator(':scope > p[role="status"]'); await expect(restoreStatus).toHaveAttribute('data-busy', 'true'); await expect(restoreStatus).toHaveText('復元を確認しています。'); await expect(incomingStatus).toBeEmpty();
+    const restoreStatus = restore.locator(':scope > p[role="status"]'); await expect(restoreStatus).toHaveAttribute('data-busy', 'true'); await expect(restoreStatus).toHaveText('バックアップの内容に切り替えています。復元先の記録は切り替え後に読めます。'); await expect(incomingStatus).toBeEmpty();
     await expect.poll(() => page.evaluate(() => !!(window as any).__continuationDigestHeld)).toBe(true);
     expect(await restoreStatus.evaluate(n => getComputedStyle(n, '::before').animationName)).toBe('none'); await page.screenshot({ path: info.outputPath('restore-working-reduced-motion.png'), fullPage: true });
     await releaseDigest(page); await expect(restoreStatus).toHaveText('バックアップから復元しました。ファイルへの反映はしていません。', { timeout: 90_000 }).catch(async error=>{

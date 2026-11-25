@@ -130,7 +130,10 @@ export class BackupRestoreJob {
     if (!(file instanceof Blob)) return fail('restore-file');
     const owned = file.slice(0, file.size), inspection = await BackupArchive.inspect(owned, checked, signal);
     const state = await reconcileRestoreDatabases(root, checked, () => databases.listGenerations()), current = await this.current(root, ports, checked, state);
-    if (!restoreEqual(current.source.proof, inspection.source.proof)) fail('restore-project-identity');
+    if (!restoreEqual(current.source.proof, inspection.source.proof)) {
+      if (current.source.proof.identity.projectId !== inspection.source.proof.identity.projectId) fail('restore-foreign-backup');
+      fail('restore-project-identity');
+    }
     checkAbort(signal); return new BackupRestoreJob(root, newId(), checked, inspection, owned, current, state.selection, null);
   }
   static async prepareFirstOpen(root: ProjectWorkspaceFS, file: Blob, limits: MetadataLimits, databases: RestoreDatabasePorts, signal?: AbortSignal) {

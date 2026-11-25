@@ -9,6 +9,8 @@ export function storageFailureText(error:unknown):string|undefined {
 
 /** Explains a refusal; it neither repairs nor authorizes overwriting stored data. */
 export function metadataFailureText(message: string | undefined): string | undefined {
+  if (message === 'Metadata source invalid (restore-foreign-backup)')
+    return '別のプロジェクトのバックアップです。「復元の選択を取り消す」→「プロジェクトを選ぶ」→「ファイルを開く」の順で開けます。';
   if (message?.startsWith('Metadata source invalid (closed-local-'))
     return '再開に必要な情報を確認できません。中断記録は削除していません。';
   if (message === 'Metadata source invalid (incomplete-staging-repair)')

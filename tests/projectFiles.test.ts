@@ -4739,6 +4739,14 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await expect(BackupArchive.fromSelectedArchive(await PackageArchive.inspect(f.file), metadata)).rejects.toThrow('backup-purpose');
     expect(await f.fs.list('v2/local-restore/')).toEqual([]);
   }, 30000);
+  it('identifies a backup of another project before restore and accepts the current project backup afterwards', async () => {
+    const current = await restoreFileFixture(), other = await restoreFileFixture();
+    await expect(BackupRestoreJob.prepare(current.fs, current.ports, other.backupFile, metadata, current.databases))
+      .rejects.toMatchObject({ code: 'restore-foreign-backup' });
+    expect(await current.fs.list('v2/local-restore/')).toEqual([]);
+    expect((await current.session.read()).source!.token).toBe(current.current.source!.token);
+    expect((await current.prepare()).current.source.proof).toEqual(current.current.source!.proof);
+  }, 30000);
   it('refuses restore preparation and confirmation while a completed output has lost its acknowledged artifact', async () => {
     const f = await restoreFileFixture(), prepared = await f.prepare();
     const artifact = (await f.fs.list('v2/packages/backup-output/')).find(p => p.includes('/artifacts/') && p.endsWith('.zip'))!;

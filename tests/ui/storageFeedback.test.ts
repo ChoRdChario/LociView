@@ -22,6 +22,14 @@ describe('storage recovery feedback',()=>{
     expect(metadataFailureText('receipt-invalid')).toBeUndefined();
     expect(metadataFailureText(undefined)).toBeUndefined();
   });
+  it('directs a foreign backup to the home screen and keeps recovery mismatches distinct',()=>{
+    const error = new MetadataSourceError('restore-foreign-backup');
+    const fallback = '復元を完了できません。';
+    expect(failurePresentation(error, fallback)).toEqual({
+      message: '別のプロジェクトのバックアップです。「復元の選択を取り消す」→「プロジェクトを選ぶ」→「ファイルを開く」の順で開けます。', diagnostic: error.message,
+    });
+    expect(failurePresentation(new MetadataSourceError('restore-project-identity'), fallback).message).toBe(fallback);
+  });
   it('identifies real native quota while warning that deleting site data destroys restart data',()=>{
     const message=storageFailureText(new DOMException('browser-specific quota text','QuotaExceededError'))!;
     expect(message).toContain('保存容量が不足');expect(message).toContain('再試行');expect(message).toContain('再開用データも消えます');
