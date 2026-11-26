@@ -6,7 +6,7 @@ import { cloneCanonicalValue, type JsonObject } from '../domain/values';
 import { ProjectRecordFields } from '../domain/projectRecordFields';
 import { checkedChanges, checkedProof, checkLimits, fail, type MetadataLimits, type MetadataProof } from './format';
 import { ProjectMetadataSource } from './source';
-import { digest, equalBytes, json, metadataPath, readReceipt, readReceiptSnapshot, technicalId, withMetadataRead, writeReceipt } from './persistence';
+import { digest, equalBytes, json, metadataPath, readReceipt, technicalId, withMetadataRead, writeReceipt } from './persistence';
 import { initialWorkspaceChanges, planRemoteChanges } from './remote';
 import { captureJournalRemote, checkJournalRemote, isPackageRemote, isContributionRemote, isBackupRestore, isBackupRestoreInput, validateJournalRemote, validateBackupRestore,
   remoteEvidenceBytes, remoteEvidenceDescriptors, remoteInputFromEvidence,
@@ -34,13 +34,7 @@ interface Durable { transactionId: string; exactChangeSetDigest: string }
 export interface Publication extends Durable { heads: string[] }
 export interface JournalEntry { start: JournalStart; prepared: PreparedJournal | null; durable: Durable | null; publication: Publication | null; closedLocal?: ClosedLocalReceipt }
 export type PublishedJournalEntry = JournalEntry & { prepared: PreparedJournal; publication: Publication };
-const smallReceiptBytes = 16 * 1024;
-/** Scheduling hint only. A valid canonical receipt may also have a three-byte UTF-8 BOM. */
-export function hasSmallPublishedReceipts(entry: JournalEntry, limits: MetadataLimits): boolean {
-  if (entry.start.purpose !== 'localCommand' || entry.closedLocal || !entry.prepared || !entry.durable || !entry.publication) return false;
-  const limit = Math.min(smallReceiptBytes, limits.maxTotalBytes);
-  return [entry.start, entry.prepared, entry.durable, entry.publication].every(value => new TextEncoder().encode(json(value)).length + 3 <= limit);
-}
+const tagTransactionFiles = ['staging.json', 'blobsVerified.json', 'metadataDurable.json', 'published.json', 'changes/00000000.amchange'];
 export type JournalCommandBase = Pick<JournalStart, 'transactionId' | 'repositoryId' | 'proof' | 'requiredCapabilities'>;
 export interface JournalObservation {
   readonly entries: readonly JournalEntry[];
@@ -109,31 +103,13 @@ function validateStart(s: JournalStart, limits: MetadataLimits): void {
 export class TransactionJournal {
   constructor(private readonly fs: ProjectWorkspaceFS, private readonly limits: MetadataLimits) {}
   path(tx: string, name: string) { return metadataPath(this.fs, `journal/${technicalId(tx)}/${name}`); }
-  async entries(knownSmallTags?: ReadonlySet<string>): Promise<JournalEntry[]> {
+  /** Confirmed tags are supplied only by the live Session that wrote and verified them. */
+  async entries(confirmedTags?: ReadonlyMap<string, PublishedJournalEntry>): Promise<JournalEntry[]> {
     const limits = checkLimits(this.limits);
-    return withMetadataRead(this.fs, undefined, ({ fs }) => new TransactionJournal(fs, limits).entriesDirect(knownSmallTags), 'journal.entries');
+    return withMetadataRead(this.fs, undefined, ({ fs }) => new TransactionJournal(fs, limits).entriesDirect(confirmedTags), 'journal.entries');
   }
 
-  private async readSmallTag(id: string) {
-    const read = async <T>(name: string) => {
-      const path = this.path(id, name), first = await this.fs.readStream(path);
-      if (!first || !Number.isSafeInteger(first.size) || first.size < 0 || first.size > Math.min(smallReceiptBytes, this.limits.maxTotalBytes)) return fail('receipt-read');
-      const second = await this.fs.readStream(path);
-      if (!second || second.size !== first.size) return fail('receipt-read');
-      return await readReceiptSnapshot<T>(second, this.limits) ?? fail('receipt-read');
-    };
-    const [start, prepared, durable, publication] = await Promise.allSettled([
-      read<JournalStart>('staging.json'), read<PreparedJournal>('blobsVerified.json'),
-      read<Durable>('metadataDurable.json'), read<Publication>('published.json'),
-    ]);
-    const value = <T>(result: PromiseSettledResult<T>): T => {
-      if (result.status === 'rejected') throw result.reason;
-      return result.value;
-    };
-    return { start: value(start), prepared: value(prepared), durable: value(durable), publication: value(publication) };
-  }
-
-  private async entriesDirect(knownSmallTags?: ReadonlySet<string>): Promise<JournalEntry[]> {
+  private async entriesDirect(confirmedTags?: ReadonlyMap<string, PublishedJournalEntry>): Promise<JournalEntry[]> {
     const prefix = metadataPath(this.fs, 'journal/'), paths = await this.fs.list(prefix);
     const filesByTransaction = new Map<string, string[]>();
     for (const path of paths) {
@@ -145,13 +121,20 @@ export class TransactionJournal {
       else filesByTransaction.set(id, [path]);
     }
     if (filesByTransaction.size > this.limits.maxChanges) fail('journal-count');
+    for (const id of confirmedTags?.keys() ?? []) if (!filesByTransaction.has(id)) fail('journal-tag-files-changed');
     const entries: JournalEntry[] = [];
     for (const [id, files] of filesByTransaction) {
-      const known = knownSmallTags?.has(id) ? await this.readSmallTag(id) : undefined;
-      const start = known?.start ?? await readReceipt<JournalStart>(this.fs, this.path(id, 'staging.json'), this.limits);
+      const known = confirmedTags?.get(id);
+      if (known) {
+        if (files.length !== tagTransactionFiles.length ||
+          tagTransactionFiles.some(name => !files.includes(this.path(id, name)))) fail('journal-tag-files-changed');
+        entries.push(known);
+        continue;
+      }
+      const start = await readReceipt<JournalStart>(this.fs, this.path(id, 'staging.json'), this.limits);
       if (!start || start.transactionId !== id) fail('journal-start-missing');
       validateStart(start!, this.limits);
-      const prepared = known?.prepared ?? await readReceipt<PreparedJournal>(this.fs, this.path(id, 'blobsVerified.json'), this.limits);
+      const prepared = await readReceipt<PreparedJournal>(this.fs, this.path(id, 'blobsVerified.json'), this.limits);
       if (prepared) await this.validatePrepared(start!, prepared);
       if (start!.purpose === 'appendScene') await this.validateSceneAppend(start!, prepared);
       if (prepared && (!prepared.remote || !isPackageRemote(prepared.remote)) &&
@@ -161,8 +144,8 @@ export class TransactionJournal {
         for (const path of files)
           if (/\/(source-|wire-changes\/|base-evidence\/|derived-target-)/.test(path) && !allowed.has(path)) fail('journal-source-kind');
       }
-      const durable = known?.durable ?? await readReceipt<Durable>(this.fs, this.path(id, 'metadataDurable.json'), this.limits);
-      const publication = known?.publication ?? await readReceipt<Publication>(this.fs, this.path(id, 'published.json'), this.limits);
+      const durable = await readReceipt<Durable>(this.fs, this.path(id, 'metadataDurable.json'), this.limits);
+      const publication = await readReceipt<Publication>(this.fs, this.path(id, 'published.json'), this.limits);
       for (const receipt of [durable, publication]) if (receipt) {
         const keys = receipt === publication ? 'exactChangeSetDigest,heads,transactionId' : 'exactChangeSetDigest,transactionId';
         if (Object.keys(receipt).sort().join(',') !== keys || !prepared ||

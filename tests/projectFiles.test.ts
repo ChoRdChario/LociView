@@ -3586,57 +3586,81 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     await expect(reopened.dispatch(saved.source!.token, assign)).rejects.toThrow();
     expect(await f.base.list('')).toEqual(beforeRejected);
   });
-  it.each(['missing', 'resized', 'changed', 'bom'] as const)('checks both fresh opens of a confirmed tag before assigning: %s', async mode => {
+  it.each(['content', 'missing path', 'extra path'] as const)('checks confirmed tag paths during editing and content on strict reads: %s', async mode => {
     const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));
+    const initial = host.read().source!;
     const tagId = `tag_${newId()}`, membershipId = `tgm_${newId()}`;
-    const created = await host.dispatch(host.read().source!.token, { kind: 'createTag', tagId, label: '連続確認',
-      colorSrgb: [0, 0, 1], orderKey: 'B', eventId: `evt_${newId()}` });
+    const create = { kind: 'createTag' as const, tagId, label: '連続確認', colorSrgb: [0, 0, 1], orderKey: 'B', eventId: `evt_${newId()}` };
     const assign = { kind: 'setCaptionTag' as const, tagId, membershipId, captionId: f.captionId,
       included: true, observedIds: [], eventId: `evt_${newId()}` };
-    const paths = await f.base.list(''), prefix = paths.find(p => p.endsWith('/' + created.publication + '/published.json'))!.replace(/published\.json$/, '');
-    const path = prefix + 'published.json', original = (await f.base.readBytes(path))!;
-    if (mode === 'bom') await f.base.writeBytes(path, new Uint8Array([0xef, 0xbb, 0xbf, ...original]));
-    const open = f.base.readStream.bind(f.base);
-    const arrival = new Set<string>(), invalidBody = vi.fn(() => { throw Error('resized body was opened'); });
-    let opened = 0, siblingOpens = 0, release!: () => void;
-    const held = new Promise<void>(resolve => { release = resolve; });
-    const inspect = vi.spyOn(f.base, 'readStream').mockImplementation(async name => {
-      if (name.startsWith(prefix)) arrival.add(name);
-      if (name === prefix + 'blobsVerified.json' && mode === 'missing' && ++siblingOpens === 1) await held;
-      if (name === path && ++opened === 2) {
-        if (mode === 'missing') return null;
-        if (mode === 'resized') return { size: original.length + 1, stream: invalidBody };
-        if (mode === 'changed') {
-          const value = JSON.parse(new TextDecoder().decode(original));
-          value.heads = [value.heads[0].replace(/^./, (c: string) => c === 'f' ? '0' : 'f')];
-          const blob = new Blob([json(value)]); expect(blob.size).toBe(original.length);
-          return { size: blob.size, stream: () => blob.stream() };
-        }
-      }
-      return open(name);
-    });
-    let finished = false;
-    const result = host.dispatch(created.source!.token, assign).then(() => 'saved', () => 'refused').finally(() => { finished = true; });
-    try {
-      if (mode === 'missing') {
-        await vi.waitFor(() => { expect(arrival.size).toBe(4); expect(opened).toBe(2); });
-        await new Promise(resolve => setTimeout(resolve, 0));
-        expect(siblingOpens).toBe(1); expect(finished).toBe(false); expect(await f.base.list('')).toEqual(paths);
-      }
-    } finally { release(); }
-    try {
-      expect(await result).toBe(mode === 'bom' ? 'saved' : 'refused');
-      expect(opened).toBeGreaterThanOrEqual(2);
-      expect(invalidBody).not.toHaveBeenCalled();
-    } finally { inspect.mockRestore(); }
-    if (mode !== 'bom') {
-      expect(await f.base.list('')).toEqual(paths);
-      await host.dispatch(created.source!.token, assign);
+    const created = await host.dispatch(initial.token, create);
+    const first = await host.dispatch(created.source!.token, assign);
+    const paths = await f.base.list('');
+    const past = paths.find(path => path.endsWith('/' + created.publication + '/published.json'))!;
+    const extra = past.replace(/published\.json$/, 'closedLocal.json');
+    const original = (await f.base.readText(past))!;
+    if (mode === 'missing path') await f.base.remove(past);
+    else if (mode === 'extra path') await f.base.writeText(extra, original);
+    else await f.base.writeText(past, original.replace(/("exactChangeSetDigest":")([a-f0-9])/, (_, key: string, digit: string) => key + (digit === '0' ? '1' : '0')));
+    const secondTag = `tag_${newId()}`, secondMembership = `tgm_${newId()}`;
+    const secondCreate = { ...create, tagId: secondTag, label: '次のタグ', orderKey: 'C', eventId: `evt_${newId()}` };
+    if (mode !== 'content') {
+      const damagedPaths = await f.base.list('');
+      await expect(host.dispatch(first.source!.token, secondCreate)).rejects.toThrow();
+      expect(await f.base.list('')).toEqual(damagedPaths);
+      return;
     }
-    const final = host.read();
-    expect(final.source!.originalChanges()).toHaveLength(created.source!.originalChanges().length + 1);
-    expect(final.provider?.kind === 'scene-provider' && final.provider.details.mutable.captionTagMembershipsById[membershipId])
-      .toMatchObject({ tagId: { value: tagId }, captionId: { value: f.captionId } });
+
+    const pastDirectories = [created.publication, first.publication].map(id => `/journal/${id}/`);
+    const afterPublish = new Map<string, number>(), open = f.base.readBytes.bind(f.base), write = f.base.writeText.bind(f.base);
+    const stat = vi.spyOn(f.base, 'readStream');
+    const bytes = vi.spyOn(f.base, 'readBytes').mockImplementation(path => {
+      if (afterPublish.has(path)) afterPublish.set(path, afterPublish.get(path)! + 1);
+      return open(path);
+    });
+    const publication = vi.spyOn(f.base, 'writeText').mockImplementation(async (path, text) => {
+      await write(path, text);
+      if (path.endsWith('/published.json')) afterPublish.set(path, 0);
+    });
+    let saved: Awaited<ReturnType<typeof host.dispatch>>;
+    try {
+      const next = await host.dispatch(first.source!.token, secondCreate);
+      saved = await host.dispatch(next.source!.token, { ...assign, tagId: secondTag, membershipId: secondMembership, eventId: `evt_${newId()}` });
+      expect(afterPublish.size).toBe(2);
+      // The receipt writer and the final commit check read each new publication separately.
+      for (const count of afterPublish.values()) expect(count).toBeGreaterThanOrEqual(2);
+      expect([...stat.mock.calls, ...bytes.mock.calls].filter(([path]) => pastDirectories.some(dir => path.includes(dir)))).toEqual([]);
+    } finally { stat.mockRestore(); bytes.mockRestore(); publication.mockRestore(); }
+    expect(saved.source!.originalChanges()).toHaveLength(initial.originalChanges().length + 4);
+    const savedPaths = await f.base.list('');
+    await expect(host.workspaceOutput.generateBackup(saved.source!.token)).rejects.toThrow();
+    await expect(host.dispatch(saved.source!.token, { ...secondCreate, tagId: `tag_${newId()}`,
+      label: '書き出し後', orderKey: 'D', eventId: `evt_${newId()}` })).rejects.toThrow();
+    expect(await f.base.list('')).toEqual(savedPaths);
+    await host.dispose();
+    await expect(openValidationHost(f.options)).rejects.toThrow();
+    await f.base.writeText(past, original);
+    const reopened = owned(await openValidationHost(f.options));
+    expect(reopened.read().source!.originalChanges()).toEqual(saved.source!.originalChanges());
+    expect(reopened.read().provider).toEqual(saved.provider);
+  });
+  it('rejects a changed current tag publication at the independent final readback', async () => {
+    const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));
+    const prior = host.read(), priorPaths = new Set(await f.base.list(''));
+    const open = f.base.readBytes.bind(f.base);
+    let readbacks = 0;
+    const change = vi.spyOn(f.base, 'readBytes').mockImplementation(async path => {
+      const bytes = await open(path);
+      if (!bytes || priorPaths.has(path) || !path.endsWith('/published.json') || ++readbacks !== 2) return bytes;
+      const wrong = new TextDecoder().decode(bytes).replace(/("exactChangeSetDigest":")([a-f0-9])/, (_, key: string, digit: string) => key + (digit === '0' ? '1' : '0'));
+      return new TextEncoder().encode(wrong);
+    });
+    const tagId = `tag_${newId()}`;
+    try {
+      await expect(host.dispatch(prior.source!.token, { kind: 'createTag', tagId, label: '確認途中',
+        colorSrgb: [0, 0, 1], orderKey: 'B', eventId: `evt_${newId()}` })).rejects.toThrow();
+      expect(readbacks).toBeGreaterThanOrEqual(2);
+    } finally { change.mockRestore(); }
   });
   it('retries an interrupted live tag assignment strictly and publishes only its original change', async () => {
     const f = await restoredBodyFixture(), host = owned(await openValidationHost(f.options));
@@ -3644,10 +3668,15 @@ describe('limited real-format validation (synthetic GLB bytes, injected PNG deco
     const created = await host.dispatch(host.read().source!.token, { kind: 'createTag', tagId, label: '保留', colorSrgb: [1, 0, 0], orderKey: 'C', eventId: `evt_${newId()}` });
     const prior = (await f.base.list('')).find(path => path.endsWith('/' + created.publication + '/changes/00000000.amchange'))!;
     const bytes = (await f.base.readBytes(prior))!;
+    const priorReceipt = prior.replace(/changes\/00000000\.amchange$/, 'published.json');
+    const receipt = (await f.base.readText(priorReceipt))!;
     f.base.reject = path => path.endsWith('/published.json');
     await expect(host.dispatch(created.source!.token, { kind: 'setCaptionTag', tagId, membershipId, captionId: f.captionId,
       included: true, observedIds: [], eventId: `evt_${newId()}` })).rejects.toThrow();
     f.base.reject = () => false;
+    await f.base.writeText(priorReceipt, receipt.replace(/("exactChangeSetDigest":")([a-f0-9])/, (_, key: string, digit: string) => key + (digit === '0' ? '1' : '0')));
+    await expect(host.authority.retry!()).rejects.toThrow();
+    await f.base.writeText(priorReceipt, receipt);
     await f.base.remove(prior);
     await expect(host.authority.retry!()).rejects.toThrow();
     await f.base.writeBytes(prior, bytes);
